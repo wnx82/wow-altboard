@@ -29,6 +29,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
           {/* Trop étroite pour tous ses liens, la navigation défile de côté au lieu de s'empiler. */}
           <nav aria-label="Navigation principale" className="scroll-row min-w-0 flex-1 items-center">
             <NavLink href="/">Personnages</NavLink>
+            <NavLink href="/items">Objets</NavLink>
             <NavLink href="/professions">Métiers</NavLink>
             <NavLink href="/levels">Niveaux</NavLink>
             <NavLink href="/activity">Activité</NavLink>
