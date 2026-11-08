@@ -653,6 +653,24 @@ export const opportunities = pgTable(
   ],
 );
 
+// Audit du jour rédigé par l'assistant (web/src/lib/economy/daily-audit.ts), à partir des seuls faits
+// du moteur : un par marché et par jour (Europe/Brussels), réécrit à la demande. run_id : le calcul
+// dont viennent ses faits.
+export const economyAudits = pgTable(
+  "economy_audits",
+  {
+    id: id(),
+    marketId: marketId(),
+    day: date("day", { mode: "string" }).notNull(),
+    runId: bigint("run_id", { mode: "number" }).references(() => opportunityRuns.id, { onDelete: "set null" }),
+    dataThrough: date("data_through", { mode: "string" }),
+    model: text("model").notNull(),
+    text: text("text").notNull(),
+    writtenAt: ts("written_at").notNull(),
+  },
+  (t) => [unique("economy_audits_market_day_key").on(t.marketId, t.day)],
+);
+
 // ---------------------------------------------------------------------------
 // Objectifs par personnage
 // ---------------------------------------------------------------------------

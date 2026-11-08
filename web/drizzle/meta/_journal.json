@@ -57,6 +57,13 @@
       "when": 1794144986317,
       "tag": "0007_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794145638251,
+      "tag": "0008_economy_audits",
+      "breakpoints": true
     }
   ]
 }

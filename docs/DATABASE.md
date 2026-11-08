@@ -10,7 +10,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (40 tables, 8 migrations, 2026-11-08) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (41 tables, 9 migrations, 2026-11-08) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -26,7 +26,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (40)
+## Tables (41)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -70,7 +70,7 @@ recettes viennent de NaowhForever (tables de l'économie).
 
 ### Économie
 
-Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy` et `0006_farm_open_session`.
+Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_farm_open_session` et `0008_economy_audits`.
 
 | Table | Clé | Contenu |
 |---|---|---|
@@ -87,6 +87,7 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy` et `0006_
 | `farm_session_items` | `(session_id, phase, location, item_key)` | Inventaire au début (`start`) et à la fin (`end`), sacs et banque |
 | `opportunity_runs` | `id` | Un calcul d'opportunités : marché, date, version du moteur, paramètres et base (`jsonb`), dernier import, jour des données |
 | `opportunities` | `(run_id, rank)` | Une recommandation : type, objet ou recette, valeur, confiance, horizon, raisons, entrées (`jsonb`) |
+| `economy_audits` | `(market_id, day)` | Audit du jour rédigé par l'assistant : jour (Europe/Brussels), calcul dont viennent ses faits (`run_id`, vidé si ce calcul disparaît), jour des données, modèle, texte, date de rédaction. Réécrit le même jour, il remplace le précédent |
 
 ### Objectifs par personnage
 
@@ -220,6 +221,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0005_economy` | 13 tables de l'économie, colonnes `app_settings.market_history_from` et `auction_cut_percent` (ajouts seuls) |
 | `0006_farm_open_session` | index unique partiel `farm_sessions_open_character_idx` (ajout seul) |
 | `0007_goals` | `character_goals`, `goal_templates`, `goal_template_items` et leurs index (ajouts seuls) |
+| `0008_economy_audits` | `economy_audits` (ajout seul) |
 
 ## Checkpoint B
 

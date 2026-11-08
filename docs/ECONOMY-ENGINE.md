@@ -126,6 +126,15 @@ paramètres (dont la date du jour).
   Il ne reçoit que ces faits, jamais la base ni du SQL. Toute réponse qui cite un nombre absent des
   faits et de la question est **refusée** (petits entiers jusqu'à 10 exceptés). 10 questions par
   10 minutes et par utilisateur.
+- **Audit du jour** (page Opportunités, `daily-audit.ts`) : sur demande, l'assistant rédige un bilan
+  du marché en cinq points : fraîcheur des relevés, meilleures opportunités et leur confiance,
+  crafts à éviter, mouvements notables (constats) et limites des faits. Mêmes faits, même
+  vérification des nombres. Un audit par marché et par jour (Europe/Brussels), conservé dans
+  `economy_audits` avec le calcul dont il vient. Le relire ne rappelle pas l'assistant ; le
+  réécrire remplace celui du jour, et un audit refusé laisse le précédent en place. La page montre
+  les 8 derniers audits et signale celui du jour s'il repose sur un calcul remplacé depuis.
+  5 rédactions par 10 minutes et par utilisateur. Essai réel le 2026-11-08 (qwen3.5:9b, Ollama,
+  `reasoning_effort` `none`) : 14 à 22 s, aucun nombre hors des faits.
 
 ## Limites connues
 

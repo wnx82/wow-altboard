@@ -226,6 +226,7 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 | Pages Opportunités, Marché, objet, Craft, Farm, Audit | ✅ | vérifiées dans un navigateur sur les données réelles, aucune erreur de console |
 | Sessions de farm (po/h mesuré) | 🟡 | testées ; aucune session réelle en jeu |
 | Faits structurés et assistant facultatif | 🟡 | `GET /api/economy/facts` vérifié sur les données réelles ; assistant essayé avec un modèle local réel, pas encore depuis la page en production |
+| Audit du jour rédigé par l'assistant | 🟡 | conservé par marché et par jour, mêmes faits et même vérification ; essayé avec un modèle local réel sur la fixture (2026-11-08), pas encore en production |
 | Nombre d'enchères, prix « 24 h », prix moyen pondéré | 🔴 | absents d'Auctionator, qui ne garde qu'un relevé par jour |
 
 ## Reste à faire

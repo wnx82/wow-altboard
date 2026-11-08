@@ -7,6 +7,7 @@ import { RateLimiter } from "@/lib/rate-limit";
 import { parseAuctionCutInput, parseHistoryDayInput } from "@/lib/settings/input";
 import { writeSettings } from "@/lib/settings/store";
 import { askAssistant, assistantConfig, MAX_QUESTION_LENGTH } from "./assistant";
+import { writeDailyAudit } from "./daily-audit";
 import { loadFacts } from "./facts-service";
 import { cancelFarmSession, endFarmSession, MAX_LABEL_LENGTH, startFarmSession } from "./sessions";
 
@@ -98,4 +99,24 @@ export async function askAssistantAction(_previous: AssistantState, formData: Fo
   const answer = await askAssistant(config, result.facts, question);
   console.log(JSON.stringify({ event: "assistant.answer", userId: session.userId, ok: answer.ok }));
   return answer.ok ? { answer: answer.answer, question } : { error: answer.error, question };
+}
+
+export type DailyAuditState = { error?: string; written?: boolean };
+
+/** Un audit fait relire tous les faits au modèle : moins fréquent qu'une question. */
+const AUDIT_LIMIT = { max: 5, windowMs: 10 * 60_000 };
+const auditLimiter = new RateLimiter();
+
+/** Rédige l'audit du jour du marché, ou le réécrit : faits du moteur seuls, réponse vérifiée. */
+export async function writeDailyAuditAction(_previous: DailyAuditState, formData: FormData): Promise<DailyAuditState> {
+  const session = await requireSession();
+  const config = assistantConfig();
+  if (!config) return { error: "Assistant désactivé." };
+  if (!auditLimiter.consume(`audit:${session.userId}`, AUDIT_LIMIT)) return { error: "Trop de demandes. Réessayez dans quelques minutes." };
+
+  const result = await writeDailyAudit(getDatabase(), config, { marketId: idField(formData, "market") ?? undefined, now: new Date() });
+  console.log(JSON.stringify({ event: "assistant.audit", userId: session.userId, ok: result.ok, marketId: result.ok ? result.marketId : null }));
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/opportunities");
+  return { written: true };
 }

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useTransition } from "react";
-import type { AssistantState, EconomySettingsState, FarmState } from "@/lib/economy/actions";
+import type { AssistantState, DailyAuditState, EconomySettingsState, FarmState } from "@/lib/economy/actions";
 
 type SettingsAction = (previous: EconomySettingsState, formData: FormData) => Promise<EconomySettingsState>;
 
@@ -169,6 +169,24 @@ export function AssistantForm({ action, marketId, maxLength }: { action: Assista
         </span>
       </div>
       {state.answer && <p className="panel whitespace-pre-line p-4 text-sm">{state.answer}</p>}
+    </form>
+  );
+}
+
+type DailyAuditAction = (previous: DailyAuditState, formData: FormData) => Promise<DailyAuditState>;
+
+/** Rédige ou réécrit l'audit du jour ; la page relue affiche le texte conservé. */
+export function DailyAuditForm({ action, marketId, rewrite }: { action: DailyAuditAction; marketId: number; rewrite: boolean }) {
+  const [state, formAction, pending] = useActionState(action, {});
+  return (
+    <form action={formAction} className="flex flex-wrap items-center gap-3">
+      <input type="hidden" name="market" value={marketId} />
+      <button className="button" data-variant={rewrite ? undefined : "primary"} type="submit" disabled={pending}>
+        {pending ? "Rédaction…" : rewrite ? "Réécrire l'audit du jour" : "Rédiger l'audit du jour"}
+      </button>
+      <span className="text-sm" role="status">
+        {state.error && <span className="text-danger">{state.error}</span>}
+      </span>
     </form>
   );
 }

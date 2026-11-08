@@ -267,7 +267,8 @@ un vrai nombre au mauvais objet ; le contrôle des nombres ne le détecte pas.
 
 Un serveur local n'est pas toujours allumé (PC de jeu, double démarrage). Éteint, il ne gêne rien
 d'autre : la page Opportunités l'indique en quelques secondes et masque le formulaire de
-l'assistant ; le bouton « Réessayer » le sonde de nouveau une fois la machine démarrée. Essai réel
+l'assistant et le bouton de l'audit du jour (les audits déjà rédigés restent lisibles) ; le bouton
+« Réessayer » le sonde de nouveau une fois la machine démarrée. Essai réel
 du 2026-11-08 depuis le conteneur `web` : une adresse du réseau local sans machine allumée échoue
 en `EHOSTUNREACH` après 3 s.
 

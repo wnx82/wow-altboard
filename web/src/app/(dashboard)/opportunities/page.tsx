@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { Confidence, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
-import { AssistantForm, AssistantRetryButton } from "@/components/economy-forms";
+import { AssistantForm, AssistantRetryButton, DailyAuditForm } from "@/components/economy-forms";
 import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { askAssistantAction } from "@/lib/economy/actions";
+import { askAssistantAction, writeDailyAuditAction } from "@/lib/economy/actions";
 import { assistantConfig, MAX_QUESTION_LENGTH, probeAssistant, type AssistantConfig } from "@/lib/economy/assistant";
+import { listDailyAudits, type DailyAudit } from "@/lib/economy/daily-audit";
+import { todayInBrussels } from "@/lib/economy/days";
 import { loadEconomy } from "@/lib/economy/load";
 import { KIND_LABELS, type Opportunity, type OpportunityKind } from "@/lib/economy/opportunities";
 import { ensureOpportunityRun } from "@/lib/economy/runs";
@@ -18,6 +20,9 @@ export const metadata: Metadata = { title: "Opportunités" };
 
 const KINDS = Object.keys(KIND_LABELS) as OpportunityKind[];
 const KIND_TONES: Partial<Record<OpportunityKind, "ok" | "warn" | "danger">> = { CRAFT: "ok", PROCESS: "ok", SELL: "ok", BUY: "warn", DONT_CRAFT: "danger" };
+
+// Une seule sonde par affichage, pour l'audit du jour comme pour les questions.
+const probe = cache(probeAssistant);
 
 export default async function OpportunitiesPage({ searchParams }: PageProps<"/opportunities">) {
   await requireSession();
@@ -40,7 +45,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
   }
 
   // Calcul conservé en base, refait seulement quand sa base change (import, synchronisation, réglages).
-  const run = await ensureOpportunityRun(db, context, now);
+  const [run, audits] = await Promise.all([ensureOpportunityRun(db, context, now), listDailyAudits(db, context.market.id)]);
   const kind = KINDS.find((entry) => entry === params.kind) ?? null;
   const list = kind ? run.opportunities.filter((o) => o.kind === kind) : run.opportunities;
   const counts = new Map(KINDS.map((entry) => [entry, run.opportunities.filter((o) => o.kind === entry).length]));
@@ -88,6 +93,10 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
         </ol>
       )}
 
+      {(assistant || audits.length > 0) && (
+        <DailyAuditSection audits={audits} today={todayInBrussels(now)} currentRun={run.id} config={assistant} marketId={context.market.id} />
+      )}
+
       <section aria-label="Assistant" className="mt-10">
         <SectionTitle aside={assistant ? `modèle ${assistant.model}` : "désactivé"}>Explication en langage naturel</SectionTitle>
         <div className="panel p-5 text-sm text-muted">
@@ -121,7 +130,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
 
 /** Formulaire de l'assistant, ou la raison de son absence quand son serveur ne répond pas. */
 async function AssistantPanel({ config, marketId }: { config: AssistantConfig; marketId: number }) {
-  const status = await probeAssistant(config);
+  const status = await probe(config);
   if (!status.up) {
     return (
       <div className="flex flex-wrap items-center gap-3">
@@ -133,6 +142,73 @@ async function AssistantPanel({ config, marketId }: { config: AssistantConfig; m
     );
   }
   return <AssistantForm action={askAssistantAction} marketId={marketId} maxLength={MAX_QUESTION_LENGTH} />;
+}
+
+/** Audit du jour conservé, ses prédécesseurs, et le bouton qui le rédige quand l'assistant répond. */
+function DailyAuditSection({
+  audits,
+  today,
+  currentRun,
+  config,
+  marketId,
+}: {
+  audits: DailyAudit[];
+  today: string;
+  currentRun: number;
+  config: AssistantConfig | null;
+  marketId: number;
+}) {
+  const current = audits.find((audit) => audit.day === today) ?? null;
+  const previous = audits.filter((audit) => audit !== current);
+  return (
+    <section aria-label="Audit du jour" className="mt-10">
+      <SectionTitle aside={current ? `rédigé le ${formatDateTime(current.writtenAt)} · modèle ${current.model}` : "pas encore rédigé"}>Audit du jour</SectionTitle>
+      <div className="panel space-y-4 p-5 text-sm">
+        {current ? (
+          <>
+            <p className="whitespace-pre-line">{current.text}</p>
+            <p className="text-xs text-muted">
+              Rédigé par l&apos;assistant à partir des faits du calcul n° {current.runId ?? "?"}, données jusqu&apos;au {formatDay(current.dataThrough)}.
+              Aucun nombre hors de ces faits n&apos;est admis.
+              {current.runId !== currentRun && <span className="text-warn"> Le calcul a changé depuis : réécrivez l&apos;audit pour en tenir compte.</span>}
+            </p>
+          </>
+        ) : (
+          <p className="text-muted">
+            Un bilan du marché en quelques paragraphes : fraîcheur des relevés, meilleures opportunités, crafts à éviter, mouvements notables et
+            limites des données. L&apos;assistant le rédige à partir des seuls faits du moteur, vérifiés comme ses réponses.
+          </p>
+        )}
+        {config && (
+          <Suspense fallback={<p className="text-muted" role="status">Vérification du serveur de l&apos;assistant…</p>}>
+            <DailyAuditButton config={config} marketId={marketId} rewrite={current !== null} />
+          </Suspense>
+        )}
+        {previous.length > 0 && (
+          <details className="text-muted">
+            <summary className="cursor-pointer hover:text-text">Audits précédents ({previous.length})</summary>
+            <ol className="mt-3 space-y-4">
+              {previous.map((audit) => (
+                <li key={audit.day}>
+                  <p className="eyebrow">
+                    {formatDay(audit.day)} · calcul n° {audit.runId ?? "?"} · {audit.model}
+                  </p>
+                  <p className="mt-1 whitespace-pre-line text-text">{audit.text}</p>
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+      </div>
+    </section>
+  );
+}
+
+async function DailyAuditButton({ config, marketId, rewrite }: { config: AssistantConfig; marketId: number; rewrite: boolean }) {
+  const status = await probe(config);
+  // La raison et le bouton « Réessayer » sont dans la section de l'assistant, plus bas.
+  if (!status.up) return <p className="text-muted">Serveur de l&apos;assistant injoignable : l&apos;audit ne peut pas être rédigé pour l&apos;instant.</p>;
+  return <DailyAuditForm action={writeDailyAuditAction} marketId={marketId} rewrite={rewrite} />;
 }
 
 function Header() {
