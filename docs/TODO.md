@@ -376,7 +376,10 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 
 ## 5. Déploiement et exploitation
 
-- [ ] **P1 · S** — Aucune copie hors de l'hôte n'a jamais réussi. Chaque nuit, le journal de
+- [x] **P1 · S** — Abandonné par le joueur le 2026-11-08 : la copie restic hors de l'hôte n'est
+  pas nécessaire. Le dump local de chaque nuit et la sauvegarde PBS du conteneur, deux fois par
+  semaine sur un autre hôte, suffisent. Le script essaie toujours l'envoi et le reporte sans
+  échouer. Constat d'origine : aucune copie hors de l'hôte n'a jamais réussi. Chaque nuit, le journal de
   `wow-altboard-backup.service` dit « restic : dépôt injoignable », et la métrique
   `wow_altboard_backup_offsite_last_success_timestamp_seconds` n'a jamais été publiée (constaté le
   2026-10-29). L'alerte de copie hors de l'hôte ne compte qu'à partir de la première copie réussie
@@ -385,8 +388,8 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   `backup-gateway` joignable à 03:45 ou changer d'heure, et alerter aussi quand aucune copie n'a
   jamais réussi. Revu le 2026-11-08 : toujours en échec (« no route to host »), et plus aucune
   machine du réseau local ne porte l'adresse du dépôt restic ; les autres sauvegardes du conteneur
-  visent la même. Le serveur de dépôt a sans doute changé de place : à retrouver avec le joueur.
-  Les sauvegardes PBS du conteneur sur un autre hôte existent (2026-11-02 et 2026-11-05).
+  visent la même. Ni proxnas ni le DSM n'ont de serveur de dépôt ni de dépôt restic. Les
+  sauvegardes PBS du conteneur sur un autre hôte existent (2026-11-02 et 2026-11-05).
 - [x] **P1 · M** — Conditionner le déploiement à la CI. L'action Komodo déploie tout commit de
   `main` dans les cinq minutes, sans regarder la CI (`deploy/proxmox/komodo.toml:46` ;
   [DEPLOYMENT § Mettre à jour](DEPLOYMENT.md) le reconnaît). Un test en échec n'empêche pas la mise

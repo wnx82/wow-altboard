@@ -126,7 +126,7 @@ Les données sont reconstructibles par une nouvelle synchronisation, **sauf l'hi
 | Niveau | Fréquence | Où | Conservation |
 |---|---|---|---|
 | `pg_dump` | chaque nuit, 03:45 | `/opt/wow-altboard/backups/` sur le conteneur LXC 102 | 14 jours |
-| restic | à la suite du dump | dépôt `backup-gateway` de l'hôte, hors du conteneur | celle du dépôt, non gérée ici |
+| restic | à la suite du dump | dépôt `backup-gateway` de l'hôte, hors du conteneur ; injoignable, et abandonné le 2026-11-08 | celle du dépôt, non gérée ici |
 | Conteneur entier | lundi et jeudi | Proxmox Backup Server (`pbs-hdd`) | deux dernières (constaté le 2026-10-05) |
 
 Le dump et l'envoi restic sont faits par `deploy/proxmox/backup/wow-altboard-backup.sh`, que

@@ -226,7 +226,7 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 | Pages Opportunités, Marché, objet, Craft, Farm, Audit | ✅ | vérifiées dans un navigateur sur les données réelles, aucune erreur de console |
 | Sessions de farm (po/h mesuré) | 🟡 | testées ; aucune session réelle en jeu |
 | Faits structurés et assistant facultatif | 🟡 | `GET /api/economy/facts` vérifié sur les données réelles ; assistant essayé avec un modèle local réel, pas encore depuis la page en production |
-| Audit du jour rédigé par l'assistant | 🟡 | conservé par marché et par jour, mêmes faits et même vérification ; essayé avec un modèle local réel sur la fixture (2026-11-08), pas encore en production |
+| Audit du jour rédigé par l'assistant | 🟡 | conservé par marché et par jour, mêmes faits et même vérification ; essayé avec un modèle local réel sur la fixture (2026-11-08) ; en production depuis le 2026-11-08 (site 0.7.0), pas encore essayé depuis la page |
 | Nombre d'enchères, prix « 24 h », prix moyen pondéré | 🔴 | absents d'Auctionator, qui ne garde qu'un relevé par jour |
 
 ## Reste à faire
@@ -234,7 +234,7 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 | Quoi | Qui |
 |---|---|
 | Sortie officielle (4 novembre 2026) : réinitialisation des personnages, serveur de connexion européen et libellé faits le 2026-10-29. Reste à relever les adresses des serveurs de jeu européens et à les saisir dans **Paramètres** (relevé : [SERVER-STATUS § Adresses en service](SERVER-STATUS.md#adresses-en-service)) | joueur |
-| Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer l'agent 0.4.1, téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
+| Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer la dernière version de l'agent (0.5.1 depuis le 2026-11-08), téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
 | Créer son compte d'accès (voir [DEPLOYMENT § Comptes et jetons](DEPLOYMENT.md)) | joueur |
 | Recette après une vraie modification en jeu | joueur |
 | Agent sur les autres PC : copier `AltBoardSync.exe`, créer un jeton par PC | joueur |
