@@ -252,6 +252,55 @@ public class WatchTests
     }
 
     [Fact]
+    public async Task An_unreadable_token_is_reported_and_the_watch_keeps_running()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        // Jeton chiffré pour un autre utilisateur ou un autre PC : DPAPI refuse de le lire.
+        Directory.CreateDirectory(h.Home);
+        await File.WriteAllBytesAsync(Path.Combine(h.Home, "token.dat"), [1, 2, 3, 4]);
+        var server = new FakeServer(HttpStatusCode.OK);
+
+        h.Start(server, token: null);
+        await Eventually(() => h.Events.Count >= 2, "deux échecs successifs : la surveillance réessaie");
+
+        Assert.All(h.Events, e => Assert.Contains("Jeton illisible", Assert.IsType<WatchEvent.Failed>(e).Error));
+        Assert.Equal(0, server.Calls);
+        Assert.Equal(AgentApp.ExitOk, await h.StopAsync());
+    }
+
+    /// <summary>Faux serveur dont le premier appel lève une exception imprévue, puis répond 200.</summary>
+    private sealed class ThrowsOnce : HttpMessageHandler
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _calls) == 1) throw new InvalidOperationException("panne imprévue");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(SuccessBody, Encoding.UTF8, "application/json") });
+        }
+    }
+
+    [Fact]
+    public async Task An_unexpected_error_is_logged_and_retried_instead_of_stopping_the_watch()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ThrowsOnce();
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Synced>().Any(), "l'envoi réussi après l'erreur imprévue");
+
+        var failure = Assert.IsType<WatchEvent.Failed>(h.Events.First());
+        Assert.Contains("erreur inattendue (InvalidOperationException)", failure.Error);
+        Assert.Equal(2, server.Calls);
+        Assert.Contains("panne imprévue", h.Log);
+        Assert.Equal(AgentApp.ExitOk, await h.StopAsync());
+    }
+
+    [Fact]
     public async Task Sends_on_request_even_when_nothing_changed()
     {
         using var h = new Harness();

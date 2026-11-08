@@ -85,7 +85,18 @@ internal sealed class WatchLoop(
             while (true)
             {
                 // Un seul cycle à la fois : ce qui arrive pendant un envoi attend dans la file.
-                var error = await CycleAsync(client, state, force, cancellationToken).ConfigureAwait(false);
+                string? error;
+                try
+                {
+                    error = await CycleAsync(client, state, force, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    // Filet de dernier recours : une erreur imprévue (fichier verrouillé un instant par un
+                    // antivirus…) est un échec comme un autre. La surveillance ne s'arrête que sur demande.
+                    log.Error($"cycle de synchronisation interrompu : {e}");
+                    error = $"erreur inattendue ({e.GetType().Name}) : {e.Message}";
+                }
                 if (error is null)
                 {
                     retry = TimeSpan.Zero;
@@ -154,7 +165,18 @@ internal sealed class WatchLoop(
 
         if (!force && readable.All(r => state.Fingerprints.GetValueOrDefault(StateKey(r)) == r.Fingerprint)) return null;
 
-        var token = tokenStore.Read();
+        string? token;
+        try
+        {
+            token = tokenStore.Read();
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            // Jeton enregistré par un autre utilisateur ou un autre PC, ou fichier verrouillé : la fenêtre
+            // affiche le message et propose la saisie, comme pour un jeton absent.
+            return e.Message;
+        }
+
         if (token is null) return TokenStore.MissingMessage;
 
         var document = PayloadBuilder.Build(

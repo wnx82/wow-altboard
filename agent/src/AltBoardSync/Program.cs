@@ -125,6 +125,13 @@ catch (OperationCanceledException)
     environment.Error.WriteLine("Interrompu.");
     exitCode = AgentApp.ExitFailed;
 }
+catch (Exception e)
+{
+    // Filet de dernier recours : une sortie sans un mot laisserait croire à un arrêt normal. En
+    // arrière-plan, ce texte part dans la boîte de message ci-dessous.
+    environment.Error.WriteLine($"Erreur inattendue ({e.GetType().Name}) : {e.Message}");
+    exitCode = AgentApp.ExitFailed;
+}
 finally
 {
     if (OperatingSystem.IsWindows()) host?.Dispose();
