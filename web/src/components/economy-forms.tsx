@@ -175,17 +175,18 @@ export function AssistantForm({ action, marketId, maxLength }: { action: Assista
 
 type DailyAuditAction = (previous: DailyAuditState, formData: FormData) => Promise<DailyAuditState>;
 
-/** Rédige ou réécrit l'audit du jour ; la page relue affiche le texte conservé. */
+/** Lance ou relance l'analyse IA du jour (audit conservé) ; la page relue affiche le texte. */
 export function DailyAuditForm({ action, marketId, rewrite }: { action: DailyAuditAction; marketId: number; rewrite: boolean }) {
   const [state, formAction, pending] = useActionState(action, {});
   return (
     <form action={formAction} className="flex flex-wrap items-center gap-3">
       <input type="hidden" name="market" value={marketId} />
       <button className="button" data-variant={rewrite ? undefined : "primary"} type="submit" disabled={pending}>
-        {pending ? "Rédaction…" : rewrite ? "Réécrire l'audit du jour" : "Rédiger l'audit du jour"}
+        {pending ? "Analyse en cours…" : rewrite ? "Relancer l'analyse IA" : "Lancer l'analyse IA"}
       </button>
       <span className="text-sm" role="status">
-        {state.error && <span className="text-danger">{state.error}</span>}
+        {pending && <span className="text-muted">L&apos;IA lit les faits du moteur, jusqu&apos;à deux minutes.</span>}
+        {!pending && state.error && <span className="text-danger">{state.error}</span>}
       </span>
     </form>
   );

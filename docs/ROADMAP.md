@@ -197,7 +197,7 @@ Depuis l'agent 0.4.0 : saisie du jeton dans la fenêtre, sans ligne de commande.
 |---|---|---|
 | Sources de statut étudiées | ✅ | aucune API documentée pour WoW Forever ; voir [SERVER-STATUS](SERVER-STATUS.md) |
 | Sonde TCP, moniteur, historique, page **Serveurs** | ✅ | implémentés et testés (58 tests) ; en production depuis le 2026-10-09, sur les serveurs de la bêta jusqu'au 2026-10-29 |
-| Adresses des serveurs européens de production | 🟡 | serveur de connexion `eu.actual.battle.net:1119` en service depuis le 2026-10-29, relevé dans le journal du client `_forever_` ; aucune adresse de jeu vérifiée ([SERVER-STATUS](SERVER-STATUS.md#adresses-en-service)) |
+| Adresses des serveurs européens de production | ✅ | serveur de connexion `eu.actual.battle.net:1119` en service depuis le 2026-10-29, relevé dans le journal du client `_forever_` ; deux serveurs de jeu (royaume et monde, port 3724) relevés sur un client en jeu et sondés en production depuis le 2026-11-08 : en ligne, 2/2 ([SERVER-STATUS](SERVER-STATUS.md#adresses-en-service)) |
 | Maintenances annoncées | ⬜ | aucune source officielle documentée |
 
 ## P15 — Paramètres
@@ -233,7 +233,6 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 
 | Quoi | Qui |
 |---|---|
-| Sortie officielle (4 novembre 2026) : réinitialisation des personnages, serveur de connexion européen et libellé faits le 2026-10-29. Reste à relever les adresses des serveurs de jeu européens et à les saisir dans **Paramètres** (relevé : [SERVER-STATUS § Adresses en service](SERVER-STATUS.md#adresses-en-service)) | joueur |
 | Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer la dernière version de l'agent (0.5.1 depuis le 2026-11-08), téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
 | Créer son compte d'accès (voir [DEPLOYMENT § Comptes et jetons](DEPLOYMENT.md)) | joueur |
 | Recette après une vraie modification en jeu | joueur |

@@ -63,6 +63,11 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
       </p>
       <MarketSelector path="/opportunities" market={context.market} markets={context.markets} />
 
+      {/* En tête de page : l'analyse se lance d'ici, et son texte s'affiche aussitôt dessous. */}
+      {(assistant || audits.length > 0) && (
+        <DailyAuditSection audits={audits} today={todayInBrussels(now)} currentRun={run.id} config={assistant} marketId={context.market.id} />
+      )}
+
       <section aria-label="Vue générale" className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile label="Opportunités" value={formatInteger(gains.length)} hint={`${counts.get("DONT_CRAFT")} crafts à éviter`} />
         <StatTile label="Gain potentiel" value={<Money copper={gains.reduce((total, o) => total + o.valueCopper, 0)} />} hint="somme brute, avant pondération" />
@@ -91,10 +96,6 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
             <OpportunityCard key={`${opportunity.kind}-${opportunity.itemKey}-${opportunity.spellId}-${index}`} opportunity={opportunity} rank={run.opportunities.indexOf(opportunity) + 1} names={context.names} query={itemQuery} fallbackDay={run.dataThrough} />
           ))}
         </ol>
-      )}
-
-      {(assistant || audits.length > 0) && (
-        <DailyAuditSection audits={audits} today={todayInBrussels(now)} currentRun={run.id} config={assistant} marketId={context.market.id} />
       )}
 
       <section aria-label="Assistant" className="mt-10">
@@ -144,7 +145,7 @@ async function AssistantPanel({ config, marketId }: { config: AssistantConfig; m
   return <AssistantForm action={askAssistantAction} marketId={marketId} maxLength={MAX_QUESTION_LENGTH} />;
 }
 
-/** Audit du jour conservé, ses prédécesseurs, et le bouton qui le rédige quand l'assistant répond. */
+/** Analyse IA du jour (audit conservé), les précédentes, et le bouton qui la lance quand l'assistant répond. */
 function DailyAuditSection({
   audits,
   today,
@@ -161,22 +162,25 @@ function DailyAuditSection({
   const current = audits.find((audit) => audit.day === today) ?? null;
   const previous = audits.filter((audit) => audit !== current);
   return (
-    <section aria-label="Audit du jour" className="mt-10">
-      <SectionTitle aside={current ? `rédigé le ${formatDateTime(current.writtenAt)} · modèle ${current.model}` : "pas encore rédigé"}>Audit du jour</SectionTitle>
+    <section aria-label="Analyse IA du marché" className="mt-6">
+      <SectionTitle aside={current ? `rédigée le ${formatDateTime(current.writtenAt)} · modèle ${current.model}` : "pas encore lancée aujourd'hui"}>
+        Analyse IA du marché
+      </SectionTitle>
       <div className="panel space-y-4 p-5 text-sm">
         {current ? (
           <>
             <p className="whitespace-pre-line">{current.text}</p>
             <p className="text-xs text-muted">
-              Rédigé par l&apos;assistant à partir des faits du calcul n° {current.runId ?? "?"}, données jusqu&apos;au {formatDay(current.dataThrough)}.
+              Rédigée par l&apos;IA à partir des faits du calcul n° {current.runId ?? "?"}, données jusqu&apos;au {formatDay(current.dataThrough)}.
               Aucun nombre hors de ces faits n&apos;est admis.
-              {current.runId !== currentRun && <span className="text-warn"> Le calcul a changé depuis : réécrivez l&apos;audit pour en tenir compte.</span>}
+              {current.runId !== currentRun && <span className="text-warn"> Le calcul a changé depuis : relancez l&apos;analyse pour en tenir compte.</span>}
             </p>
           </>
         ) : (
           <p className="text-muted">
             Un bilan du marché en quelques paragraphes : fraîcheur des relevés, meilleures opportunités, crafts à éviter, mouvements notables et
-            limites des données. L&apos;assistant le rédige à partir des seuls faits du moteur, vérifiés comme ses réponses.
+            limites des données. L&apos;IA le rédige à partir des seuls faits du moteur, vérifiés comme ses réponses ; compter jusqu&apos;à deux
+            minutes. Une analyse par jour est gardée : la relancer remplace celle du jour.
           </p>
         )}
         {config && (
@@ -186,7 +190,7 @@ function DailyAuditSection({
         )}
         {previous.length > 0 && (
           <details className="text-muted">
-            <summary className="cursor-pointer hover:text-text">Audits précédents ({previous.length})</summary>
+            <summary className="cursor-pointer hover:text-text">Analyses précédentes ({previous.length})</summary>
             <ol className="mt-3 space-y-4">
               {previous.map((audit) => (
                 <li key={audit.day}>
@@ -206,8 +210,8 @@ function DailyAuditSection({
 
 async function DailyAuditButton({ config, marketId, rewrite }: { config: AssistantConfig; marketId: number; rewrite: boolean }) {
   const status = await probe(config);
-  // La raison et le bouton « Réessayer » sont dans la section de l'assistant, plus bas.
-  if (!status.up) return <p className="text-muted">Serveur de l&apos;assistant injoignable : l&apos;audit ne peut pas être rédigé pour l&apos;instant.</p>;
+  // La raison et le bouton « Réessayer » sont dans la section de l'assistant, en bas de page.
+  if (!status.up) return <p className="text-muted">Serveur d&apos;IA injoignable (PC éteint ?) : l&apos;analyse ne peut pas être lancée pour l&apos;instant.</p>;
   return <DailyAuditForm action={writeDailyAuditAction} marketId={marketId} rewrite={rewrite} />;
 }
 

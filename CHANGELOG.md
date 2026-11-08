@@ -4,6 +4,21 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.7.2 — 2026-11-08
+
+### Modifié
+
+- Page Opportunités : l'audit du jour devient **Analyse IA du marché**, en tête de page, juste
+  sous le choix du marché. Le bouton **Lancer l'analyse IA** (puis **Relancer**) fait rédiger le
+  bilan par le serveur d'IA, et le texte s'affiche aussitôt dessous. Pendant l'analyse, la page
+  prévient qu'elle peut durer jusqu'à deux minutes. Serveur d'IA éteint : la section le dit.
+
+### Exploitation
+
+- Page **Serveurs** : deux serveurs de jeu européens surveillés depuis le 2026-11-08,
+  `37.244.29.131:3724` (royaume) et `34.187.88.149:3724` (monde), relevés sur un client en jeu
+  et saisis dans **Paramètres** ([SERVER-STATUS](docs/SERVER-STATUS.md#adresses-en-service)).
+
 ## Site 0.7.1 — 2026-11-08
 
 ### Modifié

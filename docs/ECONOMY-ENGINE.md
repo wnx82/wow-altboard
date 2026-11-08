@@ -126,7 +126,8 @@ paramètres (dont la date du jour).
   Il ne reçoit que ces faits, jamais la base ni du SQL. Toute réponse qui cite un nombre absent des
   faits et de la question est **refusée** (petits entiers jusqu'à 10 exceptés). 10 questions par
   10 minutes et par utilisateur.
-- **Audit du jour** (page Opportunités, `daily-audit.ts`) : sur demande, l'assistant rédige un bilan
+- **Audit du jour**, affiché « Analyse IA du marché » en tête de la page Opportunités, avec le bouton
+  **Lancer l'analyse IA** (`daily-audit.ts`) : sur demande, l'assistant rédige un bilan
   du marché en cinq points : fraîcheur des relevés, meilleures opportunités et leur confiance,
   crafts à éviter, mouvements notables (constats) et limites des faits. Mêmes faits, même
   vérification des nombres. Un audit par marché et par jour (Europe/Brussels), conservé dans

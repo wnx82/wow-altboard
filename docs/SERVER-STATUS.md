@@ -4,13 +4,12 @@ Page **Serveurs** du tableau de bord (`/servers`) : le serveur web sonde lui-mê
 connexion et de jeu, enregistre chaque contrôle et affiche statut, latence, disponibilité et
 changements d'état.
 
-**État au 2026-10-29 : la production sonde le serveur de connexion européen, pas encore les
-serveurs de jeu.** La bêta est finie ; le jeu sort le 4 novembre 2026. Le portail
-`eu.actual.battle.net:1119` est celui que le client de la sortie officielle (`_forever_`) a
-contacté ce jour-là. Aucune adresse de jeu européenne n'est encore vérifiée : la liste des serveurs
-de jeu est vide dans **Paramètres**, leur statut reste « Inconnu » (voir
-[Adresses en service](#adresses-en-service)). Le libellé est revenu à « EU », l'historique des
-contrôles de la bêta a été effacé.
+**État au 2026-11-08 : la production sonde le serveur de connexion européen et deux serveurs de
+jeu européens.** Le portail `eu.actual.battle.net:1119` est celui que le client de la sortie
+officielle (`_forever_`) a contacté le 2026-10-29. Les deux adresses de jeu ont été relevées le
+2026-11-08 sur un client en jeu, puis saisies dans **Paramètres** (voir
+[Adresses en service](#adresses-en-service)). Le libellé est « EU » ; l'historique des contrôles de
+la bêta a été effacé le 2026-10-29.
 
 ## Provenance des données
 
@@ -80,18 +79,26 @@ En production, les saisir dans l'environnement de la pile Komodo (`deploy/proxmo
 
 ## Adresses en service
 
-Enregistrées le 2026-10-29 dans **Paramètres**, pour la sortie officielle :
+Enregistrées dans **Paramètres** pour la sortie officielle : serveur de connexion le 2026-10-29,
+serveurs de jeu le 2026-11-08.
 
 | Service | Adresse | Provenance |
 |---|---|---|
 | Serveur de connexion | `eu.actual.battle.net:1119` | `_forever_\Logs\Connection.log` du 2026-10-29 (`Battle.net logon requested host="eu.actual.battle.net" port="1119"`) ; sondé depuis le conteneur `web` : en ligne, 27 ms |
-| Serveurs de jeu | aucune | le journal du client `_forever_` ne nomme que le royaume (`realmAddress="93-5-5"`, six adresses d'entrée), aucune adresse IP |
+| Serveurs de jeu | `37.244.29.131:3724` | connexion au royaume (Blizzard, RDAP `BLIZZARD`), ouverte 15 s après le lancement du client et gardée tout le temps de jeu ; relevée sur `MSI` le 2026-11-08 |
+| | `34.187.88.149:3724` | serveur du monde (Google Cloud, RDAP `GOOGL-2`), ouvert à l'entrée en jeu ; relevé au même moment |
 
-Le journal du client de la sortie officielle n'a écrit aucun `peerAddr=…` le 2026-10-29, connexion
-au royaume comprise, contrairement à celui de la bêta. Pour les serveurs de jeu,
-relever les connexions du client pendant qu'il tourne, par exemple
-`Get-NetTCPConnection -OwningProcess (Get-Process Wow).Id -State Established` à l'écran des
-personnages, puis en jeu.
+Le journal du client de la sortie officielle n'écrit aucune adresse (`peerAddr=…`), contrairement à
+celui de la bêta : il ne nomme que le royaume (`realmAddress="93-5-5"`, six adresses d'entrée). Les
+deux adresses de jeu viennent donc des connexions du client en jeu, relevées par
+`Get-NetTCPConnection -OwningProcess (Get-Process Wow).Id -State Established` (port 3724). Premier
+contrôle de production le 2026-11-08 à 20:30 : en ligne, deux adresses sur deux, 27 ms.
+
+Le client ouvre une nouvelle connexion de monde à chaque changement de zone ou d'instance
+(`Connecting to sourceRealmAddress=…` dans `Connection.log`). Si Blizzard déplace le serveur du
+monde et que l'ancienne adresse cesse de répondre, le service passe à « Dégradé » (une adresse sur
+deux) : relever de nouveau les connexions du client en jeu et remplacer l'adresse dans
+**Paramètres**.
 
 ### Bêta, jusqu'au 2026-10-29
 
