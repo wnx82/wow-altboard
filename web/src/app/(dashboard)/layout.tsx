@@ -22,8 +22,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-20 border-b border-line bg-ink/75 backdrop-blur-xl">
         {/* Une seule ligne, de hauteur fixe : le sommaire des longues pages se cale dessous. */}
         <div className="mx-auto flex h-14 w-full max-w-[1500px] items-center gap-x-2 px-4 sm:gap-x-4 sm:px-6">
-          <Link href="/" className="display flex-none text-xl font-bold text-gold">
-            AltBoard
+          {/* Sur téléphone, « WoW » cède sa place à la navigation. */}
+          <Link href="/" aria-label="WoW AltBoard" className="display flex-none text-xl font-bold text-gold">
+            <span className="hidden sm:inline">WoW </span>AltBoard
           </Link>
           {/* Trop étroite pour tous ses liens, la navigation défile de côté au lieu de s'empiler. */}
           <nav aria-label="Navigation principale" className="scroll-row min-w-0 flex-1 items-center">

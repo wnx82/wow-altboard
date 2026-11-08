@@ -6,7 +6,7 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "sw
 const cinzel = Cinzel({ variable: "--font-cinzel", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "AltBoard", template: "%s · AltBoard" },
+  title: { default: "WoW AltBoard", template: "%s · WoW AltBoard" },
   description: "Tous mes personnages World of Warcraft, synchronisés depuis l'addon AltBoard.",
   robots: { index: false, follow: false },
 };

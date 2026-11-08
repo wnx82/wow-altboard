@@ -4,12 +4,12 @@
 
 [[stack]]
 name = "wow-altboard"
-description = "Tableau de bord AltBoard et API de synchronisation — https://wow.ekreativ.be"
+description = "Tableau de bord WoW AltBoard et API de synchronisation — https://wow.ekreativ.be"
 
 [stack.config]
 server = "komodoprox"
 git_account = "wnx82"
-repo = "wnx82/Allemano-AltBoard-Export"
+repo = "wnx82/wow-altboard"
 branch = "main"
 run_directory = "deploy/proxmox"
 file_paths = ["compose.yaml"]

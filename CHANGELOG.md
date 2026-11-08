@@ -4,6 +4,22 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.6.0 — 2026-11-08
+
+### Ajouté
+
+- La page Opportunités sonde le serveur de l'assistant local (3 s), sans retarder le reste de la
+  page. Machine éteinte ou injoignable : la page le dit, masque le formulaire et propose
+  « Réessayer ». Claude n'est pas sondé.
+
+### Modifié
+
+- Le projet s'appelle **WoW AltBoard** : titre des pages, en-tête (« AltBoard » seul sur
+  téléphone), page de connexion. Dépôt GitHub `wnx82/wow-altboard`. Les noms de l'addon, de
+  l'agent `AltBoardSync`, de la base et de la pile Komodo ne changent pas.
+- Une question posée pendant une panne reçoit sa cause : serveur injoignable (machine éteinte),
+  connexion coupée pendant la réponse, ou délai dépassé. Avant : « L'assistant ne répond pas ».
+
 ## Site 0.5.0 — 2026-11-07
 
 ### Ajouté
