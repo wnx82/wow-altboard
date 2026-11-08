@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NavLink } from "@/components/nav-link";
+import { MainNav } from "@/components/main-nav";
 import { logoutAction } from "@/lib/auth/actions";
 import { requireSession } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/wow/format";
@@ -26,23 +26,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
           <Link href="/" aria-label="WoW AltBoard" className="display flex-none text-xl font-bold text-gold">
             <span className="hidden sm:inline">WoW </span>AltBoard
           </Link>
-          {/* Trop étroite pour tous ses liens, la navigation défile de côté au lieu de s'empiler. */}
-          <nav aria-label="Navigation principale" className="scroll-row min-w-0 flex-1 items-center">
-            <NavLink href="/">Personnages</NavLink>
-            <NavLink href="/items">Objets</NavLink>
-            <NavLink href="/professions">Métiers</NavLink>
-            <NavLink href="/levels">Niveaux</NavLink>
-            <NavLink href="/activity">Activité</NavLink>
-            <NavLink href="/opportunities">Opportunités</NavLink>
-            <NavLink href="/market">Marché</NavLink>
-            <NavLink href="/crafting">Craft</NavLink>
-            <NavLink href="/farming">Farm</NavLink>
-            <NavLink href="/accounts">Comptes</NavLink>
-            <NavLink href="/machines">Machines</NavLink>
-            <NavLink href="/servers">Serveurs</NavLink>
-            <NavLink href="/audit">Audit</NavLink>
-            <NavLink href="/settings">Paramètres</NavLink>
-          </nav>
+          {/* Pages groupées en listes déroulantes : l'en-tête tient sur une ligne à toutes les largeurs. */}
+          <MainNav />
           <form action={logoutAction} className="flex flex-none items-center gap-3">
             <span className="hidden text-xs text-faint lg:inline">{session.email}</span>
             <button className="button" type="submit" aria-label="Se déconnecter" title="Se déconnecter">

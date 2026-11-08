@@ -4,6 +4,17 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.7.1 — 2026-11-08
+
+### Modifié
+
+- Navigation principale en trois groupes déroulants : **Personnages** (accueil, Objets, Métiers,
+  Niveaux, Activité), **Économie** (Opportunités, Marché, Craft, Farm, Audit) et **Gestion**
+  (Comptes, Machines, Serveurs, Paramètres). L'en-tête tient sur une ligne à toutes les largeurs ;
+  le groupe de la page en cours est en or, avec le nom de la page sur grand écran. Sur téléphone,
+  un seul bouton, nommé d'après la page, ouvre les trois groupes. Une liste se ferme au choix
+  d'une page, à un clic ailleurs, avec Échap ou quand le focus quitte la navigation.
+
 ## Site 0.7.0 — 2026-11-08
 
 ### Ajouté
