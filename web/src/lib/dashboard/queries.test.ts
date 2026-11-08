@@ -121,12 +121,14 @@ describe("lecture du tableau de bord", () => {
   });
 
   test("comptes et machines sont agrégés", async () => {
-    await sync(BASE);
+    const payload = structuredClone(BASE);
+    payload.accounts[0].folderName = "111111111#1";
+    await sync(payload);
 
     const accounts = await listAccounts(database.db);
-    assert.deepEqual(accounts.map((a) => [a.label, a.characters, a.maxLevel, a.machines.map((m) => m.label)]), [
-      ["Compte 11…#1", 4, 25, ["PC-FIXTURE"]],
-      ["Compte 22…#1", 2, 13, ["PC-FIXTURE"]],
+    assert.deepEqual(accounts.map((a) => [a.label, a.folderName, a.characters, a.maxLevel, a.machines.map((m) => m.label)]), [
+      ["Compte 11…#1", "111111111#1", 4, 25, ["PC-FIXTURE"]],
+      ["Compte 22…#1", null, 2, 13, ["PC-FIXTURE"]],
     ]);
     assert.equal(accounts[0].totalCopper, BASE.accounts[0].characters.reduce((total, c) => total + (c.moneyCopper ?? 0), 0));
 

@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { sha256Hex } from "@/lib/hash";
 
 // Contrat de POST /api/sync, version 1. Miroir de agent/src/AltBoardSync.Core/Sync/SyncPayload.cs.
 // Objets stricts : tout champ inconnu fait refuser le document. Toute évolution incompatible
@@ -205,20 +206,31 @@ const recipes = z.strictObject({
     .max(200),
 });
 
-const account = z.strictObject({
-  accountKey: sha256,
-  folderHint: text(16),
-  flavor: text(40),
-  addonSchema: int.min(0).max(1_000_000).optional(),
-  addonVersion: text(40).optional(),
-  file: sourceFile,
-  characters: z.array(character).max(200),
-  items: z.array(item).max(50_000),
-  warnings: z.array(text(400)).max(50),
-  // Facultatifs : un agent antérieur à 0.5.0 ne les envoie pas.
-  auctionator: auctionator.optional(),
-  recipes: recipes.optional(),
-});
+/** Empreinte d'un nom de dossier de compte, calculée comme AccountKey.Compute dans l'agent. */
+export const accountKeyOf = (folderName: string) => sha256Hex(`wow-altboard-account:${folderName.trim().toUpperCase()}`);
+
+const account = z
+  .strictObject({
+    accountKey: sha256,
+    folderHint: text(16),
+    // Nom complet du dossier WTF\Account (« 123456789#1 »), envoyé depuis l'agent 0.6.0. ASCII imprimable
+    // seulement : l'agent ne l'envoie pas sinon, et l'empreinte se recalcule ici à l'identique.
+    folderName: z.string().regex(/^[!-~]{1,64}$/).optional(),
+    flavor: text(40),
+    addonSchema: int.min(0).max(1_000_000).optional(),
+    addonVersion: text(40).optional(),
+    file: sourceFile,
+    characters: z.array(character).max(200),
+    items: z.array(item).max(50_000),
+    warnings: z.array(text(400)).max(50),
+    // Facultatifs : un agent antérieur à 0.5.0 ne les envoie pas.
+    auctionator: auctionator.optional(),
+    recipes: recipes.optional(),
+  })
+  .refine((a) => a.folderName === undefined || accountKeyOf(a.folderName) === a.accountKey, {
+    message: "nom de dossier sans rapport avec l'empreinte du compte",
+    path: ["folderName"],
+  });
 
 export const syncPayloadSchema = z.strictObject({
   schemaVersion: z.literal(SUPPORTED_SCHEMA_VERSION),

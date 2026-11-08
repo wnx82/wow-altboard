@@ -1,0 +1,1 @@
+ALTER TABLE "wow_accounts" ADD COLUMN "folder_name" text;

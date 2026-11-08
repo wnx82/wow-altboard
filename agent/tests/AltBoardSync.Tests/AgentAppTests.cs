@@ -108,7 +108,7 @@ public class AgentAppTests
     }
 
     [Fact]
-    public async Task Neither_token_nor_account_folder_names_leak()
+    public async Task Token_never_leaks_and_folder_name_only_goes_to_the_server_field()
     {
         using var h = new Harness();
         h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
@@ -117,7 +117,9 @@ public class AgentAppTests
         await h.Run(server, "sync");
 
         var body = Assert.Single(server.Calls).Body;
-        Assert.DoesNotContain("111111111", body);
+        var account = JsonDocument.Parse(body).RootElement.GetProperty("accounts")[0];
+        Assert.Equal("111111111#1", account.GetProperty("folderName").GetString());
+        Assert.Single(body.Split("111111111").Skip(1));
         Assert.DoesNotContain(Token, body);
         foreach (var text in new[] { h.Out.ToString(), h.Error.ToString(), h.Log })
         {

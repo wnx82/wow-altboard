@@ -262,8 +262,11 @@ public class EconomyPayloadTests
         Assert.Equal(Fixture.Bytes("auctionator-multi-day.lua").LongLength, payload.Auctionator.File.Size);
         Assert.Equal(37, payload.Recipes!.Characters.Single().Recipes.Count);
         Assert.EndsWith($":{payload.Auctionator.File.Hash}:{payload.Recipes.File.Hash}", result.Fingerprint);
+        Assert.StartsWith($"{PayloadBuilder.PayloadFormat}:", result.Fingerprint);
 
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(payload, SyncJsonContext.Default.AccountPayload));
+        Assert.Equal("111111111#1", json.RootElement.GetProperty("folderName").GetString());
+        Assert.Equal("11…#1", json.RootElement.GetProperty("folderHint").GetString());
         var item = json.RootElement.GetProperty("auctionator").GetProperty("markets")[0].GetProperty("items")[0];
         Assert.Equal(JsonValueKind.Array, item.GetProperty("days")[0].ValueKind);
         Assert.Equal(4, item.GetProperty("days")[0].GetArrayLength());

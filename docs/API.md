@@ -32,6 +32,7 @@ Reçoit l'état AltBoard d'une machine.
     {
       "accountKey": "<SHA-256 du nom de dossier, 64 hexadécimaux>",
       "folderHint": "12…#1",
+      "folderName": "123456789#1",
       "flavor": "_classic_beta_",
       "addonSchema": 2,
       "addonVersion": "0.8.3",
@@ -83,9 +84,14 @@ Règles :
   gagnés d'un coup. Au plus 200 niveaux par personnage ;
 - `sessions` est absent quand Allemano Ledger n'en a enregistré aucune. `startedAt` identifie la
   session ; `durationSeconds` est le temps connecté, pauses exclues ; `inProgress` signale une
-  session encore ouverte, aux valeurs provisoires. Au plus 60 sessions par personnage.
+  session encore ouverte, aux valeurs provisoires. Au plus 60 sessions par personnage ;
+- `folderName` (agent 0.6.0) : nom complet du dossier `WTF\Account`, affiché sur la page Comptes.
+  ASCII imprimable sans espace, 64 caractères au plus ; l'agent l'omet sinon. Le serveur recalcule
+  l'empreinte à partir de ce nom (`SHA-256("wow-altboard-account:" + NOM EN MAJUSCULES)`) et refuse
+  le document (`422`) si elle diffère d'`accountKey`. Un envoi sans `folderName` n'efface pas le nom
+  déjà reçu.
 
-Compatibilité : `playtime` et `sessions` sont des ajouts facultatifs à la version 1. Les objets étant
+Compatibilité : `playtime`, `sessions` et `folderName` sont des ajouts facultatifs à la version 1. Les objets étant
 stricts, un serveur antérieur refuserait un document qui les contient : **le serveur se met à jour avant les
 agents**. Un agent antérieur reste accepté par le nouveau serveur.
 

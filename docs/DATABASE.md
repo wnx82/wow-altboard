@@ -10,7 +10,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (41 tables, 9 migrations, 2026-11-08) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (41 tables, 10 migrations, 2026-11-08) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -36,7 +36,7 @@ Conventions : clés `bigint` générées, dates en `timestamptz`, argent en piè
 |---|---|---|
 | `machines` | `machine_uuid` | Un PC : UUID généré par l'agent, nom d'hôte (informatif), nom d'affichage, version de l'agent |
 | `agent_tokens` | `token_hash` | Jeton d'agent (SHA-256 seulement), libellé, machine liée, révocation |
-| `wow_accounts` | `account_key` | Un compte : empreinte du nom de dossier, libellé masqué, nom d'affichage |
+| `wow_accounts` | `account_key` | Un compte : empreinte du nom de dossier, libellé masqué, nom complet du dossier (agent 0.6.0, sinon null), nom d'affichage |
 | `machine_accounts` | `(machine_id, account_id)` | Quel PC a vu quel compte : client, version d'addon, empreinte et date du fichier |
 | `realms` | `name` | Royaume (nom normalisé). Pas de région : absente d'AltBoard |
 | `items` | `item_key` | Référentiel d'objets partagé (`AltBoardDB.items`) |
@@ -222,6 +222,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0006_farm_open_session` | index unique partiel `farm_sessions_open_character_idx` (ajout seul) |
 | `0007_goals` | `character_goals`, `goal_templates`, `goal_template_items` et leurs index (ajouts seuls) |
 | `0008_economy_audits` | `economy_audits` (ajout seul) |
+| `0009_account_folder_name` | colonne `wow_accounts.folder_name` (ajout seul, null pour les comptes existants) |
 
 ## Checkpoint B
 

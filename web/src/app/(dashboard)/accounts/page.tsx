@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccountReference } from "@/components/account-reference";
 import { RenameForm } from "@/components/admin-forms";
 import { EmptyState, Money } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -19,8 +20,8 @@ export default async function AccountsPage() {
       <p className="eyebrow text-gold">World of Warcraft</p>
       <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Comptes</h1>
       <p className="mt-2 max-w-3xl text-sm text-muted">
-        Un compte correspond à un dossier <code className="text-text">WTF\Account</code>. Son nom réel n&apos;est jamais transmis : le serveur ne
-        connaît qu&apos;une empreinte et un libellé masqué. Donnez-lui le nom qui vous parle.
+        Un compte correspond à un dossier <code className="text-text">WTF\Account</code> : sa référence (identifiant Battle.net et numéro de
+        licence WoW) est envoyée par l&apos;agent 0.6.0 et vérifiée contre l&apos;empreinte du compte. Donnez-lui aussi le nom qui vous parle.
       </p>
 
       {accounts.length === 0 ? (
@@ -31,9 +32,9 @@ export default async function AccountsPage() {
         <ul className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {accounts.map((account) => (
             <li key={account.id} className="panel p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                 <h2 className="display text-xl font-bold text-gold">{account.label}</h2>
-                <span className="badge">Dossier {account.folderHint ?? "inconnu"}</span>
+                <AccountReference folderName={account.folderName} folderHint={account.folderHint} />
               </div>
 
               <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">

@@ -97,8 +97,8 @@ export async function buildExport(db: Database, now: Date): Promise<Buffer> {
     },
     {
       name: "Comptes",
-      columns: [{ header: "Compte", width: 24 }, { header: "Dossier (masqué)", width: 18 }, { header: "Personnages", width: 13 }, { header: "Niveau maximum", width: 16 }, { header: "Or cumulé (po)", width: 16 }, { header: "Vu depuis", width: 30 }, { header: "Dernière synchronisation", width: 24 }],
-      rows: accounts.map((a) => [a.label, a.folderHint, a.characters, a.maxLevel, gold(a.totalCopper), a.machines.map((m) => m.label).join(", "), a.lastSyncAt]),
+      columns: [{ header: "Compte", width: 24 }, { header: "Référence", width: 18 }, { header: "Personnages", width: 13 }, { header: "Niveau maximum", width: 16 }, { header: "Or cumulé (po)", width: 16 }, { header: "Vu depuis", width: 30 }, { header: "Dernière synchronisation", width: 24 }],
+      rows: accounts.map((a) => [a.label, a.folderName ?? a.folderHint, a.characters, a.maxLevel, gold(a.totalCopper), a.machines.map((m) => m.label).join(", "), a.lastSyncAt]),
     },
     {
       name: "Machines",

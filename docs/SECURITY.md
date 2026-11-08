@@ -10,12 +10,16 @@ aucun chemin de fichier.
 
 | Donnée | Traitement |
 |---|---|
-| Nom du dossier de compte (`WTF\Account\<COMPTE>`) | jamais transmis : empreinte SHA-256 + libellé masqué (`12…#1`) |
+| Nom du dossier de compte (`WTF\Account\<COMPTE>`, « 123456789#1 ») | transmis depuis l'agent 0.6.0, avec son empreinte SHA-256 et un libellé masqué (`12…#1`) : le serveur vérifie que le nom correspond à l'empreinte, le garde dans `wow_accounts.folder_name` et l'affiche sur la page Comptes. Absent des journaux et fichiers locaux de l'agent, et des textes envoyés au serveur d'IA |
 | Nom d'hôte du PC | transmis, informatif |
 | Noms de personnage, guildes, or, équipement, temps de jeu, sessions | transmis : c'est l'objet du tableau de bord |
 
-L'empreinte du compte est une **pseudonymisation**, pas un secret : elle évite d'afficher ou de
-stocker l'identifiant réel, mais resterait retrouvable par force brute par quiconque lirait la base.
+Le nom du dossier est l'identifiant Battle.net suivi du numéro de licence WoW. Ce n'est pas un
+secret de connexion, mais il identifie le joueur : depuis le 2026-11-08, à la demande du
+propriétaire, il est en base et visible de toute personne connectée au tableau de bord. Les agents
+antérieurs à 0.6.0 n'envoient que l'empreinte et le libellé masqué ; la page Comptes affiche alors
+« masquée ». L'empreinte reste la clé du compte : stable entre PC, elle ne dépend pas de la version
+de l'agent.
 
 ## Agent → API
 

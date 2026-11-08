@@ -21,6 +21,13 @@ public sealed record AccountReadResult(AccountSource Source, AccountPayload? Pay
 
 public sealed class PayloadBuilder(StableFileReader reader)
 {
+    /// <summary>
+    /// Préfixe de <see cref="AccountReadResult.Fingerprint"/>, à changer quand le document gagne un champ :
+    /// les empreintes enregistrées par l'agent précédent ne correspondent plus, et chaque compte est
+    /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
+    /// </summary>
+    public const string PayloadFormat = "2";
+
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
     {
@@ -44,12 +51,13 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 document.Items,
                 [.. document.Warnings, .. ledgerWarnings, .. economyWarnings.Take(MaxEconomyWarnings)])
             {
+                FolderName = AccountKey.FullName(source.AccountFolder),
                 Auctionator = auctionator,
                 Recipes = recipes,
             };
             return new AccountReadResult(source, payload, null)
             {
-                Fingerprint = $"{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}",
+                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}",
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException or AltBoardFormatException)

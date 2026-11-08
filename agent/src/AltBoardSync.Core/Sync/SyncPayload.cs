@@ -28,6 +28,9 @@ public sealed record AccountPayload(
     IReadOnlyList<ItemPayload> Items,
     IReadOnlyList<string> Warnings)
 {
+    /// <summary>Nom complet du dossier du compte (« 123456789#1 ») ; absent s'il ne peut pas être vérifié par le serveur.</summary>
+    public string? FolderName { get; init; }
+
     /// <summary>Base de prix de l'addon Auctionator du même compte ; absente si l'addon n'est pas installé.</summary>
     public AuctionatorPayload? Auctionator { get; init; }
 

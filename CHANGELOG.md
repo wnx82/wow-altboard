@@ -4,6 +4,33 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.8.0 — 2026-11-08
+
+### Ajouté
+
+- Page Comptes : la **référence complète** de chaque compte (nom du dossier `WTF\Account`,
+  « 123456789#1 ») s'affiche dans un badge doré, avec un bouton de copie. Elle arrive avec l'agent
+  0.6.0 ; d'ici là, le badge montre le libellé masqué et la mention « masquée ». L'export tableur
+  donne la même référence.
+- `POST /api/sync` accepte `folderName` par compte. Le serveur vérifie qu'il correspond à
+  l'empreinte du compte (`422` sinon) et ne l'efface pas quand un agent plus ancien renvoie le
+  compte. Migration `0009_account_folder_name` (ajout de colonne seul).
+
+### Modifié
+
+- Confidentialité : le nom du dossier de compte est désormais transmis et gardé en base, à la
+  demande du propriétaire ([SECURITY](docs/SECURITY.md)). Il reste absent des journaux de l'agent
+  et des textes envoyés au serveur d'IA.
+
+## Agent 0.6.0 — 2026-11-08
+
+### Ajouté
+
+- Envoie le nom complet du dossier de chaque compte (`folderName`), pour la page Comptes. Un nom
+  hors ASCII imprimable n'est pas envoyé : le serveur ne pourrait pas le vérifier.
+- Après la mise à jour, chaque compte est renvoyé une fois sans attendre que le jeu réécrive ses
+  fichiers.
+
 ## Site 0.7.2 — 2026-11-08
 
 ### Modifié

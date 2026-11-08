@@ -95,6 +95,17 @@ public class AccountKeyTests
     {
         Assert.Equal(expected, AccountKey.Hint(folder));
     }
+
+    [Theory]
+    [InlineData(" 123456789#1 ", "123456789#1")]
+    [InlineData("MONCOMPTE", "MONCOMPTE")]
+    [InlineData("COMPTÉ", null)]
+    [InlineData("MON COMPTE", null)]
+    public void Full_name_is_kept_only_when_the_server_can_check_it(string folder, string? expected)
+    {
+        Assert.Equal(expected, AccountKey.FullName(folder));
+        Assert.Null(AccountKey.FullName(new string('A', AccountKey.MaxFolderNameLength + 1)));
+    }
 }
 
 public class StableFileReaderTests

@@ -69,7 +69,7 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | Variables d'environnement préfixées `WOW_` + refus des bases étrangères | Un `TEST_DATABASE_URL` générique d'un autre projet a fait viser la mauvaise base pendant le développement |
 | **Drizzle** plutôt que Prisma | Upserts conditionnels et `ON CONFLICT` écrits tels quels ; migrations SQL lisibles |
 | Personnage identifié par **GUID** | Le nom n'est pas unique sur ce client ; le GUID l'est |
-| Compte identifié par une **empreinte** du nom de dossier | Stable entre PC, et le nom réel n'est jamais transmis |
+| Compte identifié par une **empreinte** du nom de dossier | Stable entre PC et entre versions d'agent ; le nom complet, envoyé depuis l'agent 0.6.0, n'est qu'affiché, après vérification contre l'empreinte |
 | Fraîcheur décidée par `lastSeen`, bloc par bloc | Deux PC peuvent détenir des fichiers d'âges différents |
 | Snapshots dédupliqués par hash de **progression** | Une simple connexion ne crée pas d'historique |
 | Agent en `.NET 10` autonome | Aucun runtime à installer sur les PC ; seul le SDK 10 est présent sur le poste de développement |

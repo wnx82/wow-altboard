@@ -9,7 +9,7 @@ import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
 import { RateLimiter } from "@/lib/rate-limit";
 import { handleSyncRequest } from "./handler";
 import { processSync } from "./process";
-import type { CharacterPayload, SyncPayload } from "./schema";
+import { accountKeyOf, type CharacterPayload, type SyncPayload } from "./schema";
 
 // Document produit par l'agent réel à partir des fixtures AltBoard.lua anonymisées.
 const BASE: SyncPayload = JSON.parse(
@@ -197,7 +197,22 @@ describe("document valide", () => {
 
     const accounts = await database.db.select().from(t.wowAccounts).orderBy(asc(t.wowAccounts.id));
     assert.deepEqual(accounts.map((a) => a.folderHint), ["11…#1", "22…#1"]);
+    assert.deepEqual(accounts.map((a) => a.folderName), [null, null]);
     assert.ok(accounts.every((a) => /^[0-9a-f]{64}$/.test(a.accountKey)));
+  });
+
+  test("le nom complet du dossier (agent 0.6.0) est gardé, même quand un agent plus ancien renvoie le compte", async () => {
+    const token2 = (await createAgentToken(database.db, "PC 2")).token;
+    const recent = onlyAccount(0);
+    recent.accounts[0].folderName = "111111111#1";
+
+    await ok(recent);
+    await ok(fromMachine(onlyAccount(0), PC2, "PC-2"), { token: token2, ...later(60) });
+
+    const [account] = await database.db.select().from(t.wowAccounts);
+    assert.deepEqual([account.folderName, account.folderHint], ["111111111#1", "11…#1"]);
+    // Même empreinte que celle de l'agent .NET (fixture produite par l'agent réel).
+    assert.equal(accountKeyOf(" 111111111#1 "), BASE.accounts[0].accountKey);
   });
 
   test("la réponse n'est jamais mise en cache et porte un identifiant de requête", async () => {
@@ -265,6 +280,8 @@ describe("refus", () => {
       ["emplacement hors limites", (p) => ((mageOf(p).gear[0].slot = 20), p)],
       ["octet nul", (p) => ((mageOf(p).name = "VALEUR\u0000SECRETE"), p)],
       ["nom trop long", (p) => ((mageOf(p).name = "VALEUR-SECRETE".repeat(20)), p)],
+      ["nom de dossier sans rapport avec l'empreinte", (p) => ((p.accounts[0].folderName = "VALEUR-SECRETE#1"), p)],
+      ["nom de dossier avec une espace", (p) => ((p.accounts[0].folderName = "VALEUR SECRETE#1"), p)],
       ["pas un objet", () => ["VALEUR-SECRETE"]],
     ];
 

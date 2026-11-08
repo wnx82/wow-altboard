@@ -59,6 +59,8 @@ export const wowAccounts = pgTable("wow_accounts", {
   // Empreinte stable du nom de dossier WTF\Account\<COMPTE> : identique sur tous les PC.
   accountKey: text("account_key").notNull().unique(),
   folderHint: text("folder_hint"),
+  // Nom complet du dossier (« 123456789#1 »), envoyé depuis l'agent 0.6.0 ; null avant.
+  folderName: text("folder_name"),
   displayName: text("display_name"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

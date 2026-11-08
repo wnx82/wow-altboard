@@ -234,6 +234,61 @@ body {
   .badge[data-tone="warn"] { color: var(--warn); border-color: rgb(240 179 84 / 0.35); background: rgb(240 179 84 / 0.1); }
   .badge[data-tone="danger"] { color: var(--danger); border-color: rgb(240 98 95 / 0.35); background: rgb(240 98 95 / 0.1); }
 
+  /* Référence complète d'un compte (« 123456789#1 ») : badge doré, chiffres à chasse fixe. */
+  .account-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent);
+    border-radius: 999px;
+    padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+    background: linear-gradient(135deg, rgb(227 189 106 / 0.16), rgb(227 189 106 / 0.03) 70%);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.07) inset,
+      0 8px 22px -14px rgb(227 189 106 / 0.6);
+    line-height: 1;
+  }
+  .account-ref[data-masked] {
+    padding-right: 0.75rem;
+    border-color: var(--line-strong);
+    background: rgb(255 255 255 / 0.04);
+    box-shadow: none;
+  }
+  .account-ref-icon { flex: none; color: var(--gold); }
+  .account-ref[data-masked] .account-ref-icon { color: var(--faint); }
+  .account-ref-id {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .account-ref[data-masked] .account-ref-id { color: var(--muted); }
+  .account-ref-tag { margin-left: 0.05em; color: var(--gold); font-weight: 700; }
+  .account-ref-note {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .account-ref-copy {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    color: var(--gold);
+    background: rgb(7 10 18 / 0.55);
+    transition: background-color 120ms, color 120ms;
+  }
+  .account-ref-copy:hover { background: rgb(227 189 106 / 0.2); color: var(--text); }
+
   /* Barre de progression native : accessible et sans style en ligne. */
   .meter {
     appearance: none;

@@ -316,6 +316,7 @@ export async function listAccounts(db: Database) {
         id: t.wowAccounts.id,
         displayName: t.wowAccounts.displayName,
         folderHint: t.wowAccounts.folderHint,
+        folderName: t.wowAccounts.folderName,
         lastSyncAt: t.wowAccounts.lastSyncAt,
         characters: sql<number>`count(${t.characters.id})::int`,
         maxLevel: sql<number | null>`max(${t.characters.level})::int`,

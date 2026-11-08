@@ -209,8 +209,12 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
 
   const [row] = await tx
     .insert(t.wowAccounts)
-    .values({ accountKey: account.accountKey, folderHint: account.folderHint, lastSyncAt: now })
-    .onConflictDoUpdate({ target: t.wowAccounts.accountKey, set: { folderHint: account.folderHint, lastSyncAt: now, updatedAt: now } })
+    .values({ accountKey: account.accountKey, folderHint: account.folderHint, folderName: account.folderName ?? null, lastSyncAt: now })
+    .onConflictDoUpdate({
+      target: t.wowAccounts.accountKey,
+      // Un agent antérieur à 0.6.0, sur un autre PC, n'efface pas le nom complet déjà reçu.
+      set: { folderHint: account.folderHint, folderName: sql`coalesce(excluded.folder_name, ${t.wowAccounts.folderName})`, lastSyncAt: now, updatedAt: now },
+    })
     .returning({ id: t.wowAccounts.id });
   const accountId = row.id;
 

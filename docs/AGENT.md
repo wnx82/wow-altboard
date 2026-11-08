@@ -122,6 +122,10 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 ne contiennent ni le jeton ni le nom réel d'un dossier de compte. Perdus, ils ne coûtent que
 l'historique affiché.
 
+Seul le document envoyé au serveur porte le nom complet du dossier (`folderName`, depuis 0.6.0),
+pour la page Comptes. L'agent 0.6.0 change aussi le format des empreintes de `state.json` : après
+la mise à jour, chaque compte est renvoyé une fois, sans attendre que le jeu réécrive ses fichiers.
+
 `machineUuid` est généré au premier lancement et identifie l'installation ; le nom d'hôte n'est
 qu'informatif (un PC peut être renommé). Un `config.json` illisible arrête l'agent : il ne régénère
 jamais l'UUID en silence, ce qui créerait une seconde machine côté serveur.
