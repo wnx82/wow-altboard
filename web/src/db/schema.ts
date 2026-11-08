@@ -654,6 +654,56 @@ export const opportunities = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Objectifs par personnage
+// ---------------------------------------------------------------------------
+
+// Sorte d'un objectif (web/src/lib/goals/evaluate.ts) : « manual » se coche à la main, les autres
+// seuls, à la synchronisation. params : { target, subject } selon la sorte.
+const goalKind = (name: string) => text(name).notNull();
+const goalKindCheck = (column: unknown) =>
+  sql`${column} in ('manual', 'level', 'profession', 'reputation', 'item', 'gold', 'itemLevel', 'currency')`;
+
+// Modèles : des listes à réappliquer, qui survivent à la réinitialisation des personnages.
+export const goalTemplates = pgTable("goal_templates", {
+  id: id(),
+  name: text("name").notNull().unique(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const goalTemplateItems = pgTable(
+  "goal_template_items",
+  {
+    id: id(),
+    templateId: bigint("template_id", { mode: "number" })
+      .notNull()
+      .references(() => goalTemplates.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    kind: goalKind("kind"),
+    params: jsonb("params").notNull().default({}),
+  },
+  (t) => [index("goal_template_items_template_idx").on(t.templateId, t.position), check("goal_template_items_kind_check", goalKindCheck(t.kind))],
+);
+
+// achieved_at : date d'atteinte. Un objectif automatique atteint une fois le reste.
+export const characterGoals = pgTable(
+  "character_goals",
+  {
+    id: id(),
+    characterId: characterId(),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    kind: goalKind("kind"),
+    params: jsonb("params").notNull().default({}),
+    achievedAt: ts("achieved_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("character_goals_character_idx").on(t.characterId, t.position), check("character_goals_kind_check", goalKindCheck(t.kind))],
+);
+
+// ---------------------------------------------------------------------------
 // Surveillance des serveurs de jeu
 // ---------------------------------------------------------------------------
 

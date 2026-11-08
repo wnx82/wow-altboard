@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { recordAchievements } from "@/lib/goals/store";
 import { canonicalHash } from "@/lib/hash";
 import { readSettings } from "@/lib/settings/store";
 import { applyAuctionator, applyRecipes, emptyEconomyCounters, type EconomyCounters } from "./economy";
@@ -150,6 +151,14 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       // Après les personnages : les recettes se rattachent à des personnages déjà connus.
       await applyAuctionator(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
       await applyRecipes(tx, account, now, economy);
+    }
+
+    // Une fois toutes les données appliquées : un objectif que ce document fait atteindre est daté
+    // de cette synchronisation.
+    const guids = payload.accounts.flatMap((account) => account.characters.map((character) => character.guid));
+    if (guids.length > 0) {
+      const received = await tx.select({ id: t.characters.id }).from(t.characters).where(inArray(t.characters.guid, guids));
+      await recordAchievements(tx, received.map((row) => row.id), now);
     }
 
     const warnings = payload.accounts.flatMap((account) =>

@@ -50,6 +50,13 @@
       "when": 1793982957883,
       "tag": "0006_farm_open_session",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794144986317,
+      "tag": "0007_goals",
+      "breakpoints": true
     }
   ]
 }

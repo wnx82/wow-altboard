@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { CharacterGoals } from "@/components/character-goals";
 import { InventoryList } from "@/components/inventory-list";
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
@@ -13,6 +14,7 @@ import { buildHistory } from "@/lib/dashboard/history";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
 import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
+import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
 import {
   classKey,
   classLabel,
@@ -47,6 +49,7 @@ export async function generateMetadata({ params }: PageProps<"/characters/[id]">
 
 // Sommaire de la fiche : les identifiants sont ceux des titres de section, plus bas.
 const SECTIONS: SectionLink[] = [
+  { id: "goals", label: "Objectifs" },
   { id: "professions", label: "Métiers" },
   { id: "equipment", label: "Équipement" },
   { id: "stats", label: "Statistiques" },
@@ -66,6 +69,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
   await requireSession();
   const character = await load(params);
   if (!character) notFound();
+  const db = getDatabase();
+  const [goals, templates] = await Promise.all([listCharacterGoals(db, character.id), listTemplates(db)]);
 
   const now = new Date();
   const stats = character.stats;
@@ -213,6 +218,17 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       </section>
 
       <SectionNav label="Sections de la fiche" items={SECTIONS} />
+
+      <CharacterGoals
+        characterId={character.id}
+        goals={goals}
+        templates={templates}
+        suggestions={{
+          professions: character.professions.map((profession) => profession.name),
+          factions: character.reputations.map((reputation) => reputation.name),
+          currencies: character.currencies.map((currency) => currency.name),
+        }}
+      />
 
       <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-2">
         <section aria-labelledby="professions">

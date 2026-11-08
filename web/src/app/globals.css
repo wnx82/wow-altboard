@@ -298,6 +298,25 @@ body {
   .button[data-variant="danger"] { color: var(--danger); border-color: rgb(240 98 95 / 0.4); }
   .button:disabled { opacity: 0.55; cursor: not-allowed; }
 
+  /* Case d'un objectif : bouton pour un objectif à cocher soi-même, pointillés pour un automatique. */
+  .goal-check {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 0.45rem;
+    background: rgb(255 255 255 / 0.04);
+    color: var(--gold);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .goal-check[data-auto] { border-style: dashed; }
+  button.goal-check { cursor: pointer; }
+  button.goal-check:hover { border-color: var(--gold); }
+  [data-reached] .goal-check { border-color: rgb(227 189 106 / 0.6); background: rgb(227 189 106 / 0.14); }
+
   .data-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
   .data-table th {
     text-align: left;

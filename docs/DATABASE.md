@@ -10,7 +10,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (37 tables, 7 migrations, 2026-11-06) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (40 tables, 8 migrations, 2026-11-08) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -26,7 +26,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (37)
+## Tables (40)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -88,6 +88,19 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy` et `0006_
 | `opportunity_runs` | `id` | Un calcul d'opportunités : marché, date, version du moteur, paramètres et base (`jsonb`), dernier import, jour des données |
 | `opportunities` | `(run_id, rank)` | Une recommandation : type, objet ou recette, valeur, confiance, horizon, raisons, entrées (`jsonb`) |
 
+### Objectifs par personnage
+
+Sortes et règle d'atteinte : `web/src/lib/goals/evaluate.ts`. Un objectif automatique (niveau,
+métier, réputation, objet possédé, or, niveau d'objet moyen, monnaie) est daté par la
+synchronisation qui le fait atteindre, ou à son ajout s'il l'est déjà ; atteint une fois, il le
+reste. Un objectif `manual` se coche sur la fiche.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `character_goals` | `id` | Un objectif : personnage, position, libellé, sorte, paramètres (`jsonb` : `target`, `subject`), date d'atteinte. Supprimé en cascade avec le personnage |
+| `goal_templates` | `id` | Un modèle, par son nom (unique). Indépendant des personnages : survit à leur réinitialisation |
+| `goal_template_items` | `id` | Objectif d'un modèle, sans date : position, libellé, sorte, paramètres |
+
 ### Surveillance des serveurs de jeu
 
 | Table | Contenu |
@@ -130,7 +143,7 @@ avec une **date limite** (par défaut : l'instant de la demande).
 | Suppression | tout personnage dont `source_last_seen_at` est antérieur à la date limite, avec ses tables filles et ses snapshots |
 | Royaumes | un royaume resté sans personnage est supprimé |
 | Date limite | retenue dans `app_settings.characters_cutoff_at` ; la date de la demande dans `characters_reset_at` |
-| Conservés | comptes, machines, jetons, journal des synchronisations, référentiel d'objets, historique des serveurs |
+| Conservés | comptes, machines, jetons, journal des synchronisations, référentiel d'objets, historique des serveurs, modèles d'objectifs (les objectifs des personnages supprimés partent avec eux) |
 
 Une transaction, sous le verrou des synchronisations : aucune ne s'intercale. La suppression est
 définitive ; seule une sauvegarde de la base permet de revenir en arrière
@@ -206,6 +219,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0004_app_settings` | `app_settings` (ajout seul) |
 | `0005_economy` | 13 tables de l'économie, colonnes `app_settings.market_history_from` et `auction_cut_percent` (ajouts seuls) |
 | `0006_farm_open_session` | index unique partiel `farm_sessions_open_character_idx` (ajout seul) |
+| `0007_goals` | `character_goals`, `goal_templates`, `goal_template_items` et leurs index (ajouts seuls) |
 
 ## Checkpoint B
 
