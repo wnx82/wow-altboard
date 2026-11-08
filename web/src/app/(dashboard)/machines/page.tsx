@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import { RenameForm, TokenForm } from "@/components/admin-forms";
 import { EmptyState, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -6,6 +7,7 @@ import { agentDirectory, archiveAgent, findAgent, formatAgentSize } from "@/lib/
 import { requireSession } from "@/lib/auth/session";
 import { createTokenAction, renameMachineAction, revokeTokenAction } from "@/lib/dashboard/actions";
 import { listMachines, listRecentRuns, machineLabel } from "@/lib/dashboard/queries";
+import { isOutdated } from "@/lib/versions";
 import { formatDateTime, formatRelative } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Machines" };
@@ -14,6 +16,11 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   success: { label: "Réussie", tone: "ok" },
   partial: { label: "Partielle", tone: "warn" },
   failed: { label: "Échouée", tone: "danger" },
+};
+
+const ERROR_LABELS: Record<string, string> = {
+  agent_warning: "Avertissement de l'agent",
+  internal_error: "Erreur du serveur",
 };
 
 export default async function MachinesPage() {
@@ -25,6 +32,7 @@ export default async function MachinesPage() {
   const agentVersion = process.env.WOW_AGENT_VERSION || null;
   const archive = agent ? await archiveAgent(agent, agentVersion) : null;
   const basePath = process.env.WOW_BASE_PATH ?? "";
+  const outdated = machines.filter((machine) => isOutdated(machine.agentVersion, agentVersion));
 
   return (
     <>
@@ -47,6 +55,12 @@ export default async function MachinesPage() {
               </a>
             </p>
             <p className="mt-1 break-all text-xs text-faint">SHA-256 de AltBoardSync.exe : {agent.sha256}</p>
+            {outdated.length > 0 && (
+              <p className="mt-2 text-xs text-warn" role="status">
+                À installer sur {outdated.map((machine) => `${machine.label} (${machine.agentVersion})`).join(", ")} : fermez l&apos;agent depuis sa
+                fenêtre, remplacez l&apos;exécutable, puis relancez-le.
+              </p>
+            )}
           </div>
           <a className="button" data-variant="primary" href={`${basePath}/api/agent/zip`} download>
             Télécharger l&apos;agent
@@ -78,7 +92,14 @@ export default async function MachinesPage() {
                   </div>
                   <div>
                     <dt className="eyebrow">Agent</dt>
-                    <dd className="mt-0.5">{machine.agentVersion ?? "—"}</dd>
+                    <dd className="mt-0.5">
+                      {machine.agentVersion ?? "—"}
+                      {isOutdated(machine.agentVersion, agentVersion) && (
+                        <span className="badge ml-2" data-tone="warn" title={`Dernière version : ${agentVersion}`}>
+                          À mettre à jour
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="eyebrow">Nom d&apos;hôte</dt>
@@ -251,25 +272,43 @@ export default async function MachinesPage() {
               <tbody>
                 {runs.map((run) => {
                   const status = STATUS[run.status] ?? { label: run.status, tone: "warn" };
+                  const hidden = run.errorsCount - run.errors.length;
                   return (
-                    <tr key={run.id}>
-                      <td className="whitespace-nowrap" title={formatRelative(run.startedAt, now)}>
-                        {formatDateTime(run.startedAt)}
-                      </td>
-                      <td>{run.machineHostname === null && run.machineDisplayName === null ? "—" : machineLabel({ displayName: run.machineDisplayName, hostname: run.machineHostname })}</td>
-                      <td>
-                        <span className="badge" data-tone={status.tone}>
-                          {status.label}
-                        </span>
-                      </td>
-                      <td className="num">{run.accountsDetected}</td>
-                      <td className="num">{run.charactersDetected}</td>
-                      <td className="num">{run.charactersCreated}</td>
-                      <td className="num">{run.charactersUpdated}</td>
-                      <td className="num">{run.charactersUnchanged}</td>
-                      <td className="num">{run.snapshotsCreated}</td>
-                      <td className="num">{run.durationMs === null ? "—" : `${run.durationMs} ms`}</td>
-                    </tr>
+                    <Fragment key={run.id}>
+                      <tr>
+                        <td className="whitespace-nowrap" title={formatRelative(run.startedAt, now)}>
+                          {formatDateTime(run.startedAt)}
+                        </td>
+                        <td>{run.machineHostname === null && run.machineDisplayName === null ? "—" : machineLabel({ displayName: run.machineDisplayName, hostname: run.machineHostname })}</td>
+                        <td>
+                          <span className="badge" data-tone={status.tone}>
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="num">{run.accountsDetected}</td>
+                        <td className="num">{run.charactersDetected}</td>
+                        <td className="num">{run.charactersCreated}</td>
+                        <td className="num">{run.charactersUpdated}</td>
+                        <td className="num">{run.charactersUnchanged}</td>
+                        <td className="num">{run.snapshotsCreated}</td>
+                        <td className="num">{run.durationMs === null ? "—" : `${run.durationMs} ms`}</td>
+                      </tr>
+                      {run.errors.length > 0 && (
+                        <tr>
+                          <td colSpan={10} className="text-xs">
+                            <ul className="space-y-1">
+                              {run.errors.map((error, index) => (
+                                <li key={index}>
+                                  <span className="font-semibold text-text">{ERROR_LABELS[error.code] ?? error.code}</span>{" "}
+                                  <span className="break-words text-muted">{error.message}</span>
+                                </li>
+                              ))}
+                              {hidden > 0 && <li className="text-faint">et {hidden} de plus</li>}
+                            </ul>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>

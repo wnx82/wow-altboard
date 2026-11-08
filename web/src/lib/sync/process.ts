@@ -8,7 +8,8 @@ import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
 
 export type SyncResult = {
   runId: number;
-  status: "success";
+  /** « partial » : l'agent a signalé des avertissements, conservés dans sync_errors. */
+  status: "success" | "partial";
   accountsReceived: number;
   charactersReceived: number;
   charactersCreated: number;
@@ -155,10 +156,13 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       account.warnings.map((message) => ({ syncRunId: run.id, accountKey: account.accountKey, code: "agent_warning", message })),
     );
     if (warnings.length > 0) await tx.insert(t.syncErrors).values(warnings);
+    const status = warnings.length > 0 ? "partial" : "success";
 
     await tx
       .update(t.syncRuns)
       .set({
+        status,
+        errorsCount: warnings.length,
         finishedAt: new Date(now.getTime() + (Date.now() - started)),
         durationMs: Date.now() - started,
         accountsDetected: payload.accounts.length,
@@ -173,7 +177,7 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
 
     return {
       runId: run.id,
-      status: "success",
+      status,
       accountsReceived: payload.accounts.length,
       charactersReceived: counters.characters,
       charactersCreated: counters.created,

@@ -143,6 +143,11 @@ Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miro
 }
 ```
 
+`status` vaut `partial` quand l'agent a signalé des avertissements (`warnings` d'un compte) : ils
+sont conservés dans `sync_errors`, comptés dans `errors_count` et affichés sous la ligne du journal
+de la page **Machines**. Les données sont enregistrées de la même façon. L'agent ne lit que le code
+HTTP.
+
 `charactersStale` : personnages dont ce PC détient un fichier plus ancien que l'état déjà connu,
 et personnages inconnus du serveur, non vus en jeu depuis la date limite de la dernière
 réinitialisation (voir [DATABASE § Réinitialisation des personnages](DATABASE.md)) : ils ne sont
@@ -159,8 +164,9 @@ pas recréés.
 | 415 | `unsupported_media_type` | corps non JSON |
 | 422 | `unsupported_schema_version` | `schemaVersion` inconnu (`supported` liste les versions acceptées) |
 | 422 | `invalid_payload` | schéma non respecté (`issues` : chemins et codes, jamais les valeurs) |
+| 422 | `future_timestamp` | un horodatage d'un personnage (`lastSeen`, `statsAt`, sacs, banque, temps de jeu, sessions) dépasse de plus d'une heure l'heure du serveur : horloge du PC en avance (`issues` : chemins, vingt au plus) |
 | 429 | `rate_limited` | plus de 60 requêtes en 5 minutes, ou 10 échecs d'authentification en 15 minutes |
-| 500 | `internal_error` | erreur de traitement : la synchronisation entière est annulée |
+| 500 | `internal_error` | erreur de traitement : la synchronisation entière est annulée ; `sync_errors` et le journal n'en gardent que le type et le code PostgreSQL ou réseau |
 | 503 | `service_unavailable` | base injoignable : réessayer plus tard |
 
 Toutes les réponses portent `requestId`, `X-Request-ID` et `Cache-Control: no-store`.

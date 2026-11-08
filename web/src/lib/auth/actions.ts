@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDatabase } from "@/db/client";
 import { adminUsers } from "@/db/schema";
+import { describeError } from "@/lib/errors";
 import { clientKey, RateLimiter } from "@/lib/rate-limit";
 import { verifyAgainstDummy, verifyPassword } from "./password";
 import { clearSessionCookie, createSession, deleteSession, setSessionCookie } from "./session";
@@ -44,7 +45,7 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
     await db.update(adminUsers).set({ lastLoginAt: now }).where(eq(adminUsers.id, user.id));
     console.log(JSON.stringify({ event: "auth.login.succeeded", userId: user.id }));
   } catch (error) {
-    console.error(JSON.stringify({ event: "auth.login.unavailable", error: error instanceof Error ? error.message : "unknown error" }));
+    console.error(JSON.stringify({ event: "auth.login.unavailable", error: describeError(error) }));
     return { error: "Service momentanément indisponible. Réessayez dans un instant." };
   }
 

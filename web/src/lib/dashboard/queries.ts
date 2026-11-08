@@ -379,8 +379,11 @@ export async function listMachines(db: Database) {
   };
 }
 
+/** Erreurs et avertissements affichés sous une synchronisation du journal ; le reste est compté. */
+export const RUN_ERRORS_SHOWN = 10;
+
 export async function listRecentRuns(db: Database, limit = 15) {
-  return db
+  const runs = await db
     .select({
       id: t.syncRuns.id,
       startedAt: t.syncRuns.startedAt,
@@ -402,4 +405,20 @@ export async function listRecentRuns(db: Database, limit = 15) {
     .leftJoin(t.machines, eq(t.machines.id, t.syncRuns.machineId))
     .orderBy(desc(t.syncRuns.startedAt))
     .limit(limit);
+
+  const errors =
+    runs.length === 0
+      ? []
+      : await db
+          .select({ syncRunId: t.syncErrors.syncRunId, code: t.syncErrors.code, message: t.syncErrors.message })
+          .from(t.syncErrors)
+          .where(inArray(t.syncErrors.syncRunId, runs.map((run) => run.id)))
+          .orderBy(asc(t.syncErrors.id));
+  const byRun = new Map<number, { code: string; message: string }[]>();
+  for (const { syncRunId, ...error } of errors) {
+    const list = byRun.get(syncRunId) ?? [];
+    if (list.length < RUN_ERRORS_SHOWN) list.push(error);
+    byRun.set(syncRunId, list);
+  }
+  return runs.map((run) => ({ ...run, errors: byRun.get(run.id) ?? [] }));
 }

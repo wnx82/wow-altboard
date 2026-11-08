@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { Database } from "@/db/client";
 import { findActiveToken, parseBearerToken } from "@/lib/agent-tokens";
+import { describeError } from "@/lib/errors";
 import { clientKey, type RateLimiter } from "@/lib/rate-limit";
+import { futureTimestamps } from "./clock";
 import { processSync, recordFailedRun, TokenMachineMismatchError } from "./process";
 import { SUPPORTED_SCHEMA_VERSION, syncPayloadSchema } from "./schema";
 
@@ -85,7 +87,7 @@ export async function handleSyncRequest(request: Request, deps: SyncDependencies
     tokenId = token === null ? null : await findActiveToken(deps.db, token);
   } catch (error) {
     // Base injoignable : l'agent doit savoir qu'il peut réessayer, pas que son jeton est refusé.
-    log({ event: "sync.unavailable", requestId, error: error instanceof Error ? error.message : "unknown error" });
+    log({ event: "sync.unavailable", requestId, error: describeError(error) });
     return respond(503, { error: "Service momentanément indisponible, réessayez plus tard.", code: "service_unavailable" }, { "Retry-After": "60" });
   }
   if (tokenId === null) {
@@ -128,6 +130,12 @@ export async function handleSyncRequest(request: Request, deps: SyncDependencies
   }
 
   const payload = parsed.data;
+  const future = futureTimestamps(payload, now);
+  if (future.length > 0) {
+    return reject(422, "future_timestamp", "Date postérieure à l'heure du serveur : l'horloge de ce PC est-elle en avance ?", {
+      issues: future.map((path) => ({ path, code: "future_timestamp" })),
+    });
+  }
   const summary = {
     machine: payload.machine.uuid,
     agentVersion: payload.agentVersion,
@@ -144,7 +152,7 @@ export async function handleSyncRequest(request: Request, deps: SyncDependencies
       return reject(403, "token_machine_mismatch", "Ce jeton est déjà lié à une autre machine.");
     }
 
-    const message = error instanceof Error ? error.message : "unknown error";
+    const message = describeError(error);
     log({ event: "sync.failed", requestId, ...summary, durationMs: Date.now() - started, error: message });
     try {
       await recordFailedRun(deps.db, {

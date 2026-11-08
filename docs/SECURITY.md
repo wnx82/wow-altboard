@@ -31,7 +31,8 @@ stocker l'identifiant réel, mais resterait retrouvable par force brute par quic
 | Taille | corps limité à 8 Mio, que `Content-Length` soit présent, absent ou faux |
 | Validation | schéma Zod strict : champs inconnus, types, bornes, longueurs, octet nul |
 | Version | `schemaVersion` inconnu refusé |
-| Réponses et journaux | jamais de valeur reçue, jamais de jeton, jamais de détail technique |
+| Réponses et journaux | jamais de valeur reçue, jamais de jeton, jamais de détail technique. Une erreur n'est journalisée (journal, `sync_errors`) que par son type et son code PostgreSQL ou réseau (`web/src/lib/errors.ts`) : le message d'une requête Drizzle porte le SQL et ses paramètres, celui de PostgreSQL peut citer une valeur reçue |
+| Horloge | un horodatage de personnage plus d'une heure après l'heure du serveur fait refuser le document (`future_timestamp`) : sinon tous les envois suivants de ce personnage seraient ignorés comme plus anciens, jusqu'à cette date |
 
 Les données d'un fichier `AltBoard.lua` sont traitées comme **non fiables** de bout en bout : le
 fichier n'est jamais exécuté, le parser borne sa profondeur et sa taille, l'agent écarte les valeurs

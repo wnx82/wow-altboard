@@ -139,6 +139,17 @@ describe("lecture du tableau de bord", () => {
     assert.equal((await listRecentRuns(database.db)).length, 1);
   });
 
+  test("le journal porte les avertissements de chaque synchronisation, dix au plus, et leur nombre", async () => {
+    const payload = structuredClone(BASE);
+    payload.accounts[0].warnings = Array.from({ length: 12 }, (_, i) => `avertissement ${i + 1}`);
+    await sync(payload);
+
+    const [run] = await listRecentRuns(database.db);
+
+    assert.deepEqual([run.status, run.errorsCount, run.errors.length], ["partial", 12, 10]);
+    assert.deepEqual(run.errors[0], { code: "agent_warning", message: "avertissement 1" });
+  });
+
   test("un nom d'affichage personnalisé remplace le libellé par défaut", async () => {
     await sync(BASE);
     await database.db.update(t.wowAccounts).set({ displayName: "Compte principal" }).where(eq(t.wowAccounts.folderHint, "11…#1"));

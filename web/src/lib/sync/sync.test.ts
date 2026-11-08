@@ -28,7 +28,9 @@ const mageOf = (payload: SyncPayload): CharacterPayload => payload.accounts[0].c
 const onlyAccount = (index: number): SyncPayload => ({ ...clone(), accounts: [clone().accounts[index]] });
 const fromMachine = (payload: SyncPayload, uuid: string, hostname: string): SyncPayload => ({ ...payload, machine: { uuid, hostname } });
 
-type SendOptions = { token?: string | null; contentType?: string; raw?: string; maxBodyBytes?: number; limiter?: RateLimiter; headers?: Record<string, string> };
+type SendOptions = { token?: string | null; contentType?: string; raw?: string; maxBodyBytes?: number; limiter?: RateLimiter; headers?: Record<string, string>; now?: Date };
+/** Envoi fait `seconds` secondes après NOW : un relevé plus récent arrive plus tard. */
+const later = (seconds: number): SendOptions => ({ now: new Date(NOW.getTime() + seconds * 1000) });
 
 async function send(body: unknown, options: SendOptions = {}): Promise<{ status: number; json: Record<string, unknown>; response: Response }> {
   const bearer = options.token === undefined ? token : options.token;
@@ -45,7 +47,7 @@ async function send(body: unknown, options: SendOptions = {}): Promise<{ status:
     {
       db: database.db,
       rateLimiter: options.limiter ?? new RateLimiter(),
-      now: () => NOW,
+      now: () => options.now ?? NOW,
       log: (event) => logs.push(event),
       maxBodyBytes: options.maxBodyBytes,
     },
@@ -276,6 +278,30 @@ describe("refus", () => {
 
     assert.equal(await count(t.characters), 0);
     assert.ok(!JSON.stringify(logs).includes("SECRETE"));
+  });
+
+  test("date postérieure à l'heure du serveur : 422 avec les chemins en cause, rien n'est écrit", async () => {
+    const ahead = Math.floor(NOW.getTime() / 1000) + 2 * 3600;
+    const payload = clone();
+    Object.assign(mageOf(payload), { lastSeen: ahead, statsAt: ahead });
+
+    const { status, json } = await send(payload);
+
+    assert.equal(status, 422);
+    assert.equal(json.code, "future_timestamp");
+    const paths = (json.issues as { path: string }[]).map((issue) => issue.path);
+    assert.ok(paths.some((p) => p.endsWith(".lastSeen")) && paths.some((p) => p.endsWith(".statsAt")), paths.join());
+    assert.ok(!JSON.stringify(json).includes(String(ahead)));
+    assert.equal(await count(t.characters), 0);
+  });
+
+  test("une horloge de PC un peu en avance reste acceptée", async () => {
+    const payload = clone();
+    mageOf(payload).lastSeen = Math.floor(NOW.getTime() / 1000) + 30 * 60;
+
+    await ok(payload);
+
+    assert.equal((await character(MAGE)).sourceLastSeenAt.getTime(), NOW.getTime() + 30 * 60_000);
   });
 
   test("JSON illisible : 400 ; mauvais type de contenu : 415", async () => {
@@ -688,17 +714,17 @@ describe("sessions de jeu (Allemano Ledger)", () => {
     await ok(withSessions(clone(), open(1791112000, 300)));
 
     // La même session, relevée plus tard : elle a avancé.
-    await ok(withSessions(clone(), open(1791115000, 900), 3600));
+    await ok(withSessions(clone(), open(1791115000, 900), 3600), later(3600));
     assert.deepEqual(await brief(), [[START, 900, true]]);
 
     // Un relevé provisoire plus ancien ne la fait pas reculer.
-    await ok(withSessions(clone(), open(1791111000, 100), 7200));
+    await ok(withSessions(clone(), open(1791111000, 100), 7200), later(7200));
     assert.deepEqual(await brief(), [[START, 900, true]]);
 
     // Session close par l'addon : valeurs définitives.
-    await ok(withSessions(clone(), [{ startedAt: START, stoppedAt: 1791118570, durationSeconds: 4770, xpGained: 5300, levels: 1, tag: "Leveling", inProgress: false }], 10_800));
+    await ok(withSessions(clone(), [{ startedAt: START, stoppedAt: 1791118570, durationSeconds: 4770, xpGained: 5300, levels: 1, tag: "Leveling", inProgress: false }], 10_800), later(10_800));
     // Un fichier resté sur la version provisoire ne la rouvre pas.
-    await ok(withSessions(clone(), open(1791119999, 9999), 14_400));
+    await ok(withSessions(clone(), open(1791119999, 9999), 14_400), later(14_400));
 
     assert.deepEqual(await stored(), [
       // La zone, absente de la version terminée, est conservée : une valeur connue n'est jamais remplacée par une absence.
@@ -790,7 +816,10 @@ describe("transactions et contraintes", () => {
     assert.ok(!JSON.stringify(json).includes("panne simulée"));
     const [run] = await database.db.select().from(t.syncRuns);
     assert.deepEqual([run.status, run.errorsCount], ["failed", 1]);
-    assert.equal(await count(t.syncErrors), 1);
+    // Le type de l'erreur seulement : son message peut porter le SQL et les valeurs reçues.
+    const [failure] = await database.db.select().from(t.syncErrors);
+    assert.deepEqual([failure.code, failure.message], ["internal_error", "Error"]);
+    assert.ok(!JSON.stringify(logs).includes("panne simulée"));
     assert.equal(await count(t.characters), 0);
   });
 
@@ -830,5 +859,15 @@ describe("transactions et contraintes", () => {
 
     const [warning] = await database.db.select().from(t.syncErrors);
     assert.deepEqual([warning.syncRunId, warning.code, warning.message], [result.runId, "agent_warning", "champ de personnage inconnu ignoré : talents"]);
+    // Synchronisation faite, avertissements comptés : elle est partielle.
+    const [run] = await database.db.select().from(t.syncRuns);
+    assert.deepEqual([result.status, run.status, run.errorsCount], ["partial", "partial", 1]);
+  });
+
+  test("sans avertissement, la synchronisation est réussie et ne compte aucune erreur", async () => {
+    const result = await ok(clone());
+
+    const [run] = await database.db.select().from(t.syncRuns);
+    assert.deepEqual([result.status, run.status, run.errorsCount], ["success", "success", 0]);
   });
 });
