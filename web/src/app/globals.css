@@ -330,7 +330,18 @@ body {
     white-space: nowrap;
   }
   .data-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid rgb(255 255 255 / 0.05); vertical-align: middle; }
-  .data-table tbody tr:last-child td { border-bottom: 0; }
+  /* En-tête de ligne (scope="row") : une cellule ordinaire pour l'œil, un en-tête pour les lecteurs d'écran. */
+  .data-table tbody th {
+    font-size: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+    color: inherit;
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid rgb(255 255 255 / 0.05);
+    vertical-align: middle;
+    white-space: normal;
+  }
+  .data-table tbody tr:last-child :is(td, th) { border-bottom: 0; }
   .data-table tbody tr { transition: background 120ms ease; }
   .data-table tbody tr:hover { background: rgb(255 255 255 / 0.035); }
   .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
