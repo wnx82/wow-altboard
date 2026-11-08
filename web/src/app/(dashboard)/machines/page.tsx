@@ -48,10 +48,10 @@ export default async function MachinesPage() {
           <div className="min-w-0 text-sm">
             <p className="font-semibold text-text">AltBoardSync{agentVersion ? ` ${agentVersion}` : ""}</p>
             <p className="mt-0.5 text-xs text-muted">
-              Windows 64 bits · archive ZIP de {formatAgentSize(archive.size)}, instructions comprises ·{" "}
+              Windows 64 bits · exécutable de {formatAgentSize(agent.size)}, sans installation ·{" "}
               {/* Liens de téléchargement : les routes d'API ne sont pas des pages, d'où les ancres simples. */}
-              <a className="underline hover:text-text" href={`${basePath}/api/agent`} download>
-                exécutable seul ({formatAgentSize(agent.size)})
+              <a className="underline hover:text-text" href={`${basePath}/api/agent/zip`} download>
+                archive ZIP avec instructions ({formatAgentSize(archive.size)})
               </a>
             </p>
             <p className="mt-1 break-all text-xs text-faint">SHA-256 de AltBoardSync.exe : {agent.sha256}</p>
@@ -62,8 +62,8 @@ export default async function MachinesPage() {
               </p>
             )}
           </div>
-          <a className="button" data-variant="primary" href={`${basePath}/api/agent/zip`} download>
-            Télécharger l&apos;agent
+          <a className="button" data-variant="primary" href={`${basePath}/api/agent`} download>
+            Télécharger AltBoardSync.exe
           </a>
         </section>
       )}
@@ -200,7 +200,7 @@ export default async function MachinesPage() {
               métier).
             </li>
             <li>
-              {agent ? "Téléchargez l'agent, extrayez" : "Copiez"} <code className="text-text">AltBoardSync.exe</code> sur le PC. Aucune
+              {agent ? "Téléchargez" : "Copiez"} <code className="text-text">AltBoardSync.exe</code> sur le PC, dans un dossier à vous. Aucune
               installation, aucun prérequis.
             </li>
             <li>

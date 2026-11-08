@@ -87,7 +87,7 @@ sont simplement pas affichés, et la page **Machines** n'offre pas l'agent au t�
 
 L'image publie l'agent depuis ces sources (étape `agent` de `web/Dockerfile`, image
 `mcr.microsoft.com/dotnet/sdk:10.0`) et le range dans `/app/agent/AltBoardSync.exe` : la page
-**Machines** le propose, en archive ZIP avec ses instructions ou en exécutable seul, avec sa taille
+**Machines** le propose en exécutable direct (bouton principal, depuis le site 0.8.1) ou en archive ZIP avec ses instructions, avec sa taille
 et son empreinte SHA-256, à la version de l'agent affichée en pied de page. L'archive est
 construite par le site au premier téléchargement ou au premier affichage de la page (environ
 0,3 s), puis gardée en mémoire. Publié sous Linux, il porte icône, manifeste et version comme celui de la release

@@ -26,8 +26,8 @@ git tag agent-v0.5.1 && git push origin agent-v0.5.1
 
 ## Installer sur un PC
 
-1. Télécharger l'agent depuis la page **Machines** du tableau de bord (archive ZIP avec ses
-   instructions, ou exécutable seul), ou depuis la dernière release du dépôt, puis copier
+1. Télécharger l'agent depuis la page **Machines** du tableau de bord (bouton **Télécharger
+   AltBoardSync.exe**, ou archive ZIP avec ses instructions), ou depuis la dernière release du dépôt, puis copier
    `AltBoardSync.exe` où l'on veut. Les addons AltBoard et Allemano Ledger doivent être installés
    dans le jeu (`_forever_\Interface\AddOns`).
 2. Créer un jeton dans le tableau de bord (page **Machines**) : il n'est affiché qu'une fois.

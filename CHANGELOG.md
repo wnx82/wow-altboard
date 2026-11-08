@@ -4,6 +4,14 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.8.1 — 2026-11-08
+
+### Modifié
+
+- Page Machines : le bouton principal **Télécharger AltBoardSync.exe** donne directement
+  l'exécutable, sans archive à extraire. L'archive ZIP avec ses instructions reste proposée en lien
+  secondaire.
+
 ## Site 0.8.0 — 2026-11-08
 
 ### Ajouté
