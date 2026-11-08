@@ -41,7 +41,8 @@ désinstallé le même jour : voir [Ancien hôte : contabo](#ancien-hôte--conta
 ## Mettre à jour
 
 Pousser sur `main` suffit. L'action Komodo `wow-altboard-auto-deploy` interroge le dépôt toutes
-les cinq minutes et lance **Deploy** quand le dernier commit de la branche n'est pas celui en place.
+les cinq minutes et lance **Deploy** quand le dernier commit de la branche n'est pas celui en place
+et que sa CI est passée.
 L'image est reconstruite à chaque déploiement, ce qui recrée `web` si elle a changé ; les migrations
 s'appliquent avant son démarrage.
 
@@ -53,8 +54,12 @@ s'appliquent avant son démarrage.
   alertes `ActionFailed` vers un topic de `ntfy.sh`, noté dans Vaultwarden (« ntfy — alertes Komodo
   komodoprox ») et pas dans le dépôt. S'y abonner dans l'application ntfy. **Test Alerter** sur
   l'alerter, dans Komodo, vérifie la chaîne.
-- La CI ne conditionne pas le déploiement : ne pousser sur cette branche que ce qui est passé au
-  vert sur une autre.
+- Seul un commit dont la CI est passée est déployé. L'action lit, sur l'API publique de GitHub,
+  l'exécution de `.github/workflows/ci.yml` lancée par le push du commit sur `main`. CI en cours,
+  absente, en échec, ou GitHub injoignable : le commit attend, sans tentative comptée, et le
+  journal de l'action en donne la raison. Un échec se corrige par un nouveau commit ; **Deploy** à
+  la main sur la pile passe outre. Le délai de mise en ligne devient donc celui de la CI (environ
+  5 minutes) plus un passage de l'action.
 - Pour suspendre le déploiement automatique, désactiver le planning de l'action. Sa définition est
   dans `deploy/proxmox/komodo.toml`.
 
@@ -65,7 +70,12 @@ redémarrage (ajouts d'abord, suppressions dans une version ultérieure).
 
 Le pied de page du tableau de bord affiche ce qui tourne : version du site (`web/package.json`),
 commit construit, date de construction, et version de l'agent (`agent/Directory.Build.props`). Un
-commit poussé est en ligne quand le pied de page le montre.
+commit poussé est en ligne quand le pied de page le montre. Sans session, depuis le réseau local,
+`/api/health` donne la même version et le même commit :
+
+```bash
+curl -s http://10.0.0.15:3016/api/health     # {"status":"ok","version":"…","commit":"…"}
+```
 
 Ces valeurs sont figées à la construction (`web/next.config.ts`). L'image ne recevant que `web/`,
 `compose.yaml` fournit le dépôt cloné comme contexte nommé `repo`, que le `.dockerignore` de la
@@ -271,7 +281,8 @@ réseau local vers l'API Anthropic : prix, crafts, noms d'objets et libellés de
    cochée. Valeur hexadécimale uniquement, elle entre telle quelle dans l'URL de connexion :
    `openssl rand -hex 24`. PostgreSQL ne la lit qu'à la création du volume.
 2. Créer la pile `wow-altboard` d'après `deploy/proxmox/komodo.toml`, puis **Deploy**. Depuis le
-   réseau local, `curl http://10.0.0.15:3016/api/health` répond `{"status":"ok"}`.
+   réseau local, `curl http://10.0.0.15:3016/api/health` répond `{"status":"ok",…}`, avec la
+   version et le commit en service.
 3. Tunnel Cloudflare « proxmox » : entrée `wow.ekreativ.be` vers `http://10.0.0.15:3016`, avant
    la règle finale `http_status:404`.
 4. DNS : `wow.ekreativ.be` en CNAME proxifié vers `<identifiant du tunnel>.cfargotunnel.com`.

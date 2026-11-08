@@ -193,7 +193,15 @@ réutilisé si sa base n'a pas changé.
 
 ## `GET /api/health`
 
-Publique. `200 {"status":"ok"}` si la base répond, `503 {"status":"unavailable"}` sinon. Aucun détail.
+Publique. `200` si la base répond, `503` sinon, avec la construction en service :
+
+```json
+{"status":"ok","version":"0.7.0","commit":"c7b3b7f"}
+```
+
+`status` vaut `unavailable` en `503`. `version` et `commit` valent `null` si la construction ne les
+connaissait pas. Le dépôt étant public, ils ne révèlent rien de plus ; ils permettent de vérifier
+un déploiement sans session. Aucun autre détail.
 
 ## Journal du serveur
 

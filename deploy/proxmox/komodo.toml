@@ -37,11 +37,13 @@ endpoint.params.url = "https://ntfy.sh/<topic Vaultwarden>"
 alert_types = ["ActionFailed"]
 
 # Déploiement automatique : pousser sur la branche suffit. L'action interroge le dépôt au lieu
-# d'attendre un webhook, Komodo n'étant pas joignable depuis GitHub (Cloudflare Access).
+# d'attendre un webhook, Komodo n'étant pas joignable depuis GitHub (Cloudflare Access). Seul un
+# commit dont la CI est passée sur la branche est déployé ; l'API publique de GitHub suffit, le
+# dépôt étant public.
 # Préalable : la variable WOW_ALTBOARD_AUTO_DEPLOY_ATTEMPTED (Settings > Variables), vide.
 [[action]]
 name = "wow-altboard-auto-deploy"
-description = "Déploie la pile wow-altboard quand sa branche a avancé."
+description = "Déploie la pile wow-altboard quand sa branche a avancé et que sa CI est passée."
 
 [action.config]
 schedule_format = "English"
@@ -57,6 +59,28 @@ const STACK = "wow-altboard";
 // MAX_ATTEMPTS, un commit qui ne se déploie pas n'est plus rejoué toutes les cinq minutes.
 const ATTEMPTED = "WOW_ALTBOARD_AUTO_DEPLOY_ATTEMPTED";
 const MAX_ATTEMPTS = 3;
+const REPO = "wnx82/wow-altboard";
+const BRANCH = "main";
+const WORKFLOW = ".github/workflows/ci.yml";
+
+// Résultat de la CI d'un commit poussé sur la branche : « success », « en cours », « absente »,
+// ou la conclusion GitHub d'un échec (failure, cancelled…).
+async function ciOf(commit) {
+  const get = async (path) => {
+    const response = await fetch(`https://api.github.com/repos/${REPO}/${path}`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "komodo-wow-altboard-auto-deploy" },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new Error(`GitHub répond ${response.status} sur ${path.split("?")[0]}`);
+    return response.json();
+  };
+  // Komodo donne le commit abrégé ; le filtre des exécutions veut le commit entier.
+  const { sha } = await get(`commits/${commit}`);
+  const { workflow_runs: runs } = await get(`actions/runs?head_sha=${sha}&branch=${BRANCH}&event=push&per_page=20`);
+  const run = runs.find((candidate) => candidate.path === WORKFLOW);
+  if (!run) return "absente";
+  return run.status === "completed" ? run.conclusion : "en cours";
+}
 
 await komodo.write("RefreshStackCache", { stack: STACK });
 const { info } = await komodo.read("GetStack", { stack: STACK });
@@ -73,6 +97,16 @@ if (!latest) {
 } else if (attempts >= MAX_ATTEMPTS) {
   console.log(`${latest} : ${attempts} tentatives sans succès. Pousser un correctif, ou lancer Deploy à la main.`);
 } else {
+  // GitHub injoignable : on attend, comme pour une CI en cours. Deploy à la main passe outre.
+  const ci = await ciOf(latest).catch((error) => `illisible (${error.message})`);
+  if (ci !== "success") {
+    console.log(`${latest} : CI ${ci}, pas de déploiement (en place : ${deployed ?? "rien"}). Un échec se corrige par un nouveau commit ; Deploy à la main passe outre.`);
+  } else {
+    await deploy();
+  }
+}
+
+async function deploy() {
   const attempt = attempts + 1;
   console.log(`Déploiement de ${latest}, tentative ${attempt} sur ${MAX_ATTEMPTS} (en place : ${deployed ?? "rien"})`);
   await komodo.write("UpdateVariableValue", { name: ATTEMPTED, value: `${latest}:${attempt}` });
