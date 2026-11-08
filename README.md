@@ -53,8 +53,8 @@ dotnet run --project src/AltBoardSync -- sync
 ## Vérifications
 
 ```bash
-cd agent && dotnet test                               # 180 tests
-cd web && npm run typecheck && npm run lint && npm test && npm run build   # 291 tests
+cd agent && dotnet test
+cd web && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
 GitHub Actions relance ces contrôles à chaque push et à chaque pull request, construit l'image Docker
@@ -78,7 +78,7 @@ pas par `wow_altboard` : voir `web/src/db/env.ts`.
 | [ECONOMY-ENGINE](docs/ECONOMY-ENGINE.md) | Règles du moteur économique : prix, confiance, craft, farm, opportunités, assistant |
 | [DATABASE](docs/DATABASE.md) | Schéma PostgreSQL, identifiants, snapshots |
 | [API](docs/API.md) | Contrat de `POST /api/sync` et des autres routes |
-| [AGENT](docs/AGENT.md) | Installation, commandes, automatisation future |
+| [AGENT](docs/AGENT.md) | Installation, commandes, surveillance, fenêtre et démarrage avec Windows |
 | [SERVER-STATUS](docs/SERVER-STATUS.md) | État des serveurs WoW Forever EU : sondes, configuration, limites, diagnostic |
 | [SECURITY](docs/SECURITY.md) | Authentification, validation, confidentialité |
 | [DEPLOYMENT](docs/DEPLOYMENT.md) | Mise en production, domaine, migrations |

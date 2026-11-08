@@ -21,7 +21,7 @@ lance `.github/workflows/release-agent.yml` : tests, publication, puis GitHub Re
 sinon la release est refusée.
 
 ```bash
-git tag agent-v0.5.0 && git push origin agent-v0.5.0
+git tag agent-v0.5.1 && git push origin agent-v0.5.1
 ```
 
 ## Installer sur un PC
@@ -77,7 +77,7 @@ Codes de sortie : `0` réussite, `1` synchronisation échouée ou partielle, `2`
 ## Exemple
 
 ```text
-AltBoard Sync 0.5.0
+AltBoard Sync 0.5.1
 
 Machine : PC-GAMING
 
@@ -223,8 +223,11 @@ parser → document → POST /api/sync (idempotent)
 - **État local** : la dernière empreinte envoyée par compte, dans `state.json`. Perdu, il ne coûte
   qu'un envoi de plus.
 - **Échecs** : nouvel essai après 1 minute, puis une attente doublée à chaque échec, jusqu'à
-  30 minutes ; jamais plus d'un envoi à la fois. Un jeton absent ou un dossier du jeu introuvable
-  suivent la même règle : la surveillance attend qu'on les corrige, elle ne s'arrête pas.
+  30 minutes ; jamais plus d'un envoi à la fois. Un jeton absent ou illisible, un dossier du jeu
+  introuvable, une erreur imprévue (journalisée avec son type) suivent la même règle : la
+  surveillance attend qu'on les corrige, elle ne s'arrête pas (agent 0.5.1).
+- **Délai** : 60 s pour tout l'échange avec le serveur, corps de la réponse compris. Une réponse
+  muette ou coupée compte comme un échec.
 - **Une seule surveillance** par session Windows : une seconde refuse de démarrer.
 
 ### Fenêtre

@@ -4,7 +4,9 @@ Liste de travail : idées de fonctions et constats d'audit. [ROADMAP](ROADMAP.md
 ce qui est validé, preuve à l'appui ; une ligne d'ici y passe une fois implémentée, testée et
 vérifiée.
 
-Audit du 2026-10-11, sur le commit `153d601` (site 0.1.0, agent 0.4.0).
+Audit du 2026-10-11, sur le commit `153d601` (site 0.1.0, agent 0.4.0). Revu le 2026-11-08 (site
+0.7.0, agent 0.5.1) : les lignes faites sont cochées, avec le commit qui les règle ; les autres ont
+été relues dans le code et restent ouvertes.
 
 - Priorité : **P1** à faire en premier (risque réel ou gain immédiat), **P2** utile, **P3** confort.
 - Effort : **S** quelques heures, **M** un à deux jours, **L** davantage.
@@ -48,17 +50,20 @@ sortie officielle (4 novembre 2026) supprime les personnages, donc leurs objecti
 (« Montée en niveau », « Métiers », « Avant le premier raid ») se réapplique en un clic au
 personnage recréé, et à tous les autres.
 
-- [ ] **P1 · M** — Décider la règle d'un objectif automatique : coché pour toujours dès qu'il a
+- [x] **P1 · M** — Décider la règle d'un objectif automatique : coché pour toujours dès qu'il a
   été atteint une fois (date gardée), ou reflet de l'état courant (un objectif « 100 pièces d'or »
-  se décoche après une dépense). Proposition : atteint une fois, avec la date.
-- [ ] **P1 · M** — Tables `goal_templates`, `goal_template_items` et `character_goals`
-  (personnage, position, libellé, sorte, paramètres, date d'atteinte, note), supprimées en cascade
-  avec le personnage ; les modèles survivent à la réinitialisation.
-- [ ] **P1 · M** — Fonction pure d'évaluation d'un objectif à partir du personnage, testée sans
+  se décoche après une dépense). Fait le 2026-11-08 (`c3146ee`) : atteint une fois, avec la date.
+- [x] **P1 · M** — Tables `goal_templates`, `goal_template_items` et `character_goals`
+  (personnage, position, libellé, sorte, paramètres, date d'atteinte), supprimées en cascade
+  avec le personnage ; les modèles survivent à la réinitialisation. Fait le 2026-11-08
+  (`c3146ee`, migration `0007_goals`), sans colonne de note : le libellé en tient lieu.
+- [x] **P1 · M** — Fonction pure d'évaluation d'un objectif à partir du personnage, testée sans
   base ; appelée à la synchronisation pour dater l'atteinte, et à l'affichage pour la progression
-  (« 212 / 300 »).
-- [ ] **P1 · M** — Page personnage : section **Objectifs** (ajouter, cocher, réordonner, supprimer,
-  appliquer un modèle), par des actions serveur comme celles de **Paramètres**.
+  (« 212 / 300 »). Fait le 2026-11-08 (`c3146ee`, `web/src/lib/goals/evaluate.ts`). Sept sortes
+  automatiques ; l'emplacement d'équipement rempli ou enchanté n'en fait pas partie.
+- [x] **P1 · M** — Page personnage : section **Objectifs** (ajouter, cocher, réordonner, supprimer,
+  appliquer un modèle), par des actions serveur comme celles de **Paramètres**. Fait le 2026-11-08
+  (`c3146ee`).
 - [ ] **P2 · S** — Barre de progression sur les cartes et colonne dans le tableau de l'accueil,
   avec un filtre « objectifs en cours ».
 - [ ] **P2 · M** — Page **Objectifs** : un modèle en colonnes, les personnages en lignes, pour voir
@@ -69,12 +74,15 @@ personnage recréé, et à tous les autres.
 
 ### 1.2 Avec les données déjà synchronisées
 
-- [ ] **P1 · S** — **Machines** : signaler un agent en retard. Le site connaît la version du dépôt
+- [x] **P1 · S** — **Machines** : signaler un agent en retard. Le site connaît la version du dépôt
   (`WOW_AGENT_VERSION`, pied de page) et celle de chaque PC (`machines.agent_version`), mais
-  `web/src/app/(dashboard)/machines/page.tsx:56` affiche la seconde sans les comparer.
-- [ ] **P1 · M** — Recherche d'objets sur tous les personnages : « qui possède cet objet, et
+  `web/src/app/(dashboard)/machines/page.tsx:56` affiche la seconde sans les comparer. Fait le
+  2026-11-08 (`127aaf1`) : badge « À mettre à jour » et liste des PC à mettre à jour près du
+  téléchargement.
+- [x] **P1 · M** — Recherche d'objets sur tous les personnages : « qui possède cet objet, et
   combien ? ». La recherche actuelle est limitée à l'inventaire d'un personnage ; les tables
-  `character_items` et `items` suffisent.
+  `character_items` et `items` suffisent. Fait le 2026-11-08 (`190404c`) : page **Objets**, par
+  nom (sans tenir compte des accents) ou identifiant, sacs, banque et équipement.
 - [ ] **P2 · M** — Bloc « À surveiller » sur l'accueil, calculé sans nouvelle donnée : sacs pleins
   (`bag_slots_used` / `bag_slots_total`), banque jamais relevée (`bank_at` vide), personnage non
   relevé depuis N jours, emplacement d'équipement vide, métier arrivé à son maximum.
@@ -111,8 +119,10 @@ Chaque ligne demande une évolution de l'agent, du contrat de `POST /api/sync` e
 Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md)), constaté le
 2026-11-06.
 
-- [ ] **P2 · M** — Audit quotidien rédigé par l'assistant, à partir des seuls faits du moteur : le
-  seul usage autorisé de la roadmap de l'économie qui n'est pas fait.
+- [x] **P2 · M** — Audit quotidien rédigé par l'assistant, à partir des seuls faits du moteur : le
+  seul usage autorisé de la roadmap de l'économie qui n'est pas fait. Fait le 2026-11-08
+  (`361cf52`) : sur demande, un par marché et par jour, conservé (page **Opportunités**). Pas encore
+  essayé en production.
 - [ ] **P2 · M** — Noms des objets jamais possédés : le moteur ne connaît que ceux vus dans un
   inventaire (table `items`) et affiche les autres sous leur identifiant. Source à trouver ;
   Auctionator ne garde pas les noms.
@@ -134,7 +144,8 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
 
 ## 2. Sécurité du site
 
-`npm audit --omit=dev` du 2026-10-11 : aucune vulnérabilité connue.
+`npm audit --omit=dev` du 2026-10-11 : aucune vulnérabilité connue. Celui du 2026-11-08 en
+signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.4.5, zod 4.6.7).
 
 - [x] **P1 · S** — Les pages du tableau de bord répondaient sans session valide. La session
   n'était vérifiée en base que par le layout ; `web/src/proxy.ts` ne contrôle que la présence du
@@ -147,16 +158,19 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
   mêmes 54 requêtes sur la construction corrigée ne renvoient plus aucun contenu. Constaté aussi en
   production le 2026-10-11, par l'origine du réseau local : 45 réponses sur 54 avec contenu sous
   `fcf3750`, aucune sous `5f0098e`.
-- [ ] **P1 · S** — Messages d'erreur journalisés avec les valeurs reçues. Une requête en échec
+- [x] **P1 · S** — Messages d'erreur journalisés avec les valeurs reçues. Une requête en échec
   lève une erreur dont le message contient le SQL et tous ses paramètres
   (`web/node_modules/drizzle-orm/errors.js:12`). Ce message part dans le journal
   (`web/src/lib/sync/handler.ts:147`, `web/src/lib/auth/actions.ts:47`) et dans `sync_errors`
   (`web/src/lib/sync/process.ts:655`), contre la règle « jamais de valeur reçue » de
-  [SECURITY](SECURITY.md). Ne garder que le type de l'erreur et le code PostgreSQL.
-- [ ] **P1 · S** — Horodatages futurs acceptés. Le contrat admet toute date jusqu'à l'an 3000
+  [SECURITY](SECURITY.md). Ne garder que le type de l'erreur et le code PostgreSQL. Fait le
+  2026-11-08 (`127aaf1`, `web/src/lib/errors.ts`) : type, code PostgreSQL ou réseau, contrainte.
+- [x] **P1 · S** — Horodatages futurs acceptés. Le contrat admet toute date jusqu'à l'an 3000
   (`web/src/lib/sync/schema.ts:17`), sans comparaison à l'heure du serveur. Un PC dont l'horloge
   avance envoie un `lastSeen` futur : les envois suivants, réels, sont classés en retard et ignorés
-  jusqu'à cette date. Refuser en 422 au-delà de l'heure du serveur plus une tolérance.
+  jusqu'à cette date. Refuser en 422 au-delà de l'heure du serveur plus une tolérance. Fait le
+  2026-11-08 (`127aaf1`) : 422 `future_timestamp` au-delà d'une heure d'avance, chemins des dates
+  en cause dans la réponse.
 - [ ] **P2 · S** — Changer le mot de passe ne ferme aucune session
   (`web/scripts/create-admin.ts:83`) ; une session dure 30 jours (`web/src/lib/auth/cookie.ts:8`),
   sans action « déconnecter partout ». Supprimer les sessions du compte dans la même transaction.
@@ -189,12 +203,13 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
 
 ### Interface
 
-- [ ] **P1 · S** — Journal des synchronisations muet. Les avertissements de l'agent et la cause
+- [x] **P1 · S** — Journal des synchronisations muet. Les avertissements de l'agent et la cause
   d'un échec sont écrits dans `sync_errors` (`web/src/lib/sync/process.ts:152`, `:655`), table
   qu'aucune page ne lit. Le statut `partial` n'est jamais écrit (`:136`, `:171` : toujours
   `success`) : le badge « Partielle » de **Machines** ne peut pas apparaître, et une ligne
   « Échouée » ne dit pas pourquoi. Afficher les erreurs sous la ligne du journal ; compter les
-  avertissements dans `errors_count` ; écrire `partial` quand il y en a.
+  avertissements dans `errors_count` ; écrire `partial` quand il y en a. Fait le 2026-11-08
+  (`127aaf1`) : dix erreurs au plus sous chaque ligne de **Machines**, puis leur nombre restant.
 - [ ] **P2 · S** — Vue cartes ou tableau et comptes repliés : lus dans `localStorage` après le
   rendu (`web/src/components/character-browser.tsx:107`), le serveur rend toujours le défaut. Qui
   préfère le tableau voit les cartes, puis le basculement. Porter ces préférences dans un cookie lu
@@ -219,7 +234,8 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
   (`web/src/components/trend-chart.tsx:124`, `column-chart.tsx:149`), soit plusieurs centaines
   sur une fiche. Un seul arrêt par graphique, les flèches pour passer d'un point à l'autre.
 - [ ] **P3 · S** — Les tableaux n'ont ni `<caption>` ni en-tête de ligne (`scope="row"`), et leurs
-  conteneurs à défilement horizontal ne sont pas focalisables.
+  conteneurs à défilement horizontal ne sont pas focalisables. Au 2026-11-08, seul le tableau de
+  la page **Objets** a les deux, sur 18.
 
 ### Performance
 
@@ -265,7 +281,7 @@ l'historique grossit.
 - [ ] **P3 · M** — Trois graphiques répètent l'observation de largeur, les graduations, l'infobulle
   et la grille (`column-chart.tsx`, `trend-chart.tsx`, `levels-chart.tsx`) : en extraire un crochet
   et un module d'échelle.
-- [ ] **P3 · S** — Le fuseau `Europe/Brussels` est écrit en dur dans onze fichiers, avec des
+- [ ] **P3 · S** — Le fuseau `Europe/Brussels` est écrit en dur dans quatorze fichiers (2026-11-08), avec des
   formateurs de date redéclarés à l'identique : une constante et des formateurs nommés dans
   `web/src/lib/wow/format.ts`. Même traitement pour les deux `formatDuration` qui n'écrivent pas
   les durées de la même façon (`server-status.tsx:86`, `level-times.ts:134`).
@@ -275,10 +291,11 @@ l'historique grossit.
 
 ### Dépendances
 
-- [ ] **P2 · S** — `npm outdated` du 2026-10-11 : `next` 16.3.8 → 16.4.0, `react` et `react-dom`
+- [x] **P2 · S** — `npm outdated` du 2026-10-11 : `next` 16.3.8 → 16.4.0, `react` et `react-dom`
   19.2.8 → 19.3.0, `drizzle-orm` 0.45.3 → 0.45.4. `@types/react` installé est déjà en 19.3.0,
   devant la bibliothèque : une API absente à l'exécution passerait le typage. Monter ces trois
-  ensemble.
+  ensemble. Fait le 2026-11-08 (`c7b3b7f`) : `next` 16.4.5, `react` et `react-dom` 19.3.1,
+  `drizzle-orm` 0.45.4.
 - [ ] **P3 · M** — Versions majeures disponibles, à traiter une par une : `eslint` 10,
   `typescript` 7.
 
@@ -289,21 +306,23 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 
 ### Robustesse
 
-- [ ] **P1 · S** — Un jeton indéchiffrable arrête tout l'agent. `TokenStore.Read()` lève
+- [x] **P1 · S** — Un jeton indéchiffrable arrête tout l'agent. `TokenStore.Read()` lève
   `InvalidDataException` (`agent/src/AltBoardSync.Core/Config/TokenStore.cs:52`), que la boucle de
   surveillance n'attrape pas (`App/WatchLoop.cs:157`) : fenêtre et icône se ferment, à chaque
   relance. Cas réel : dossier `%APPDATA%\AltBoardSync` copié sur un autre PC, ou mot de passe
   Windows réinitialisé. [AGENT](AGENT.md) promet que la surveillance ne s'arrête pas. Traiter
-  l'erreur comme un jeton absent : message dans la fenêtre, saisie proposée.
-- [ ] **P1 · S** — Aucun filet de dernier recours : `agent/src/AltBoardSync/Program.cs:119`
+  l'erreur comme un jeton absent : message dans la fenêtre, saisie proposée. Fait le 2026-11-08
+  (`e328b01`, agent 0.5.1) : la cause est dite, la surveillance continue.
+- [x] **P1 · S** — Aucun filet de dernier recours : `agent/src/AltBoardSync/Program.cs:119`
   n'attrape que l'annulation. Toute autre exception tue l'agent d'arrière-plan sans ligne au
   journal, par exemple `token.dat` verrouillé un instant par un antivirus. Attraper toute exception
-  d'un cycle, la journaliser, reculer et continuer.
-- [ ] **P1 · S** — Envoi qui peut ne jamais revenir. Le délai de 60 s s'arrête à la réception des
+  d'un cycle, la journaliser, reculer et continuer. Fait le 2026-11-08 (`e328b01`, agent 0.5.1).
+- [x] **P1 · S** — Envoi qui peut ne jamais revenir. Le délai de 60 s s'arrête à la réception des
   en-têtes (`Sync/SyncClient.cs:38`, `ResponseHeadersRead`) ; la lecture du corps n'a aucun délai
   (`:39`), et une coupure pendant cette lecture sort en exception non attrapée (`:53`). Connexion
   muette après les en-têtes : plus aucun envoi jusqu'au redémarrage, la fenêtre affiche toujours
-  « Synchronisation active ». Faire couvrir tout l'échange par le délai.
+  « Synchronisation active ». Faire couvrir tout l'échange par le délai. Fait le 2026-11-08
+  (`e328b01`, agent 0.5.1) : le délai couvre en-têtes et corps, une coupure devient un échec dit.
 - [ ] **P2 · S** — Un compte illisible n'est pas signalé : le cycle rend `null`
   (`App/WatchLoop.cs:141`), sans événement d'échec ni bulle. `AltBoard.lua` devenu non analysable :
   une ligne au journal, tableau de bord figé, pastille au vert.
@@ -329,7 +348,8 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 
 - [ ] **P2 · M** — Rien ne signale un agent périmé : l'agent envoie sa version, la réponse de
   `/api/sync` n'en propose aucune. Ajouter la dernière version à la réponse (le site la connaît),
-  l'afficher dans la fenêtre, et marquer les PC en retard (voir § 1.2).
+  l'afficher dans la fenêtre, et marquer les PC en retard (voir § 1.2). Les PC en retard sont
+  marqués sur **Machines** depuis le 2026-11-08 ; reste la fenêtre de l'agent.
 - [ ] **P2 · M** — Mise à jour à la main piégeuse : lancer le nouvel exécutable ne fait que
   rouvrir la fenêtre de l'ancienne instance (`agent/src/AltBoardSync/Program.cs:25`), et le
   démarrage avec Windows garde l'ancien chemin en se disant « activé »
@@ -363,16 +383,24 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   ([DEPLOYMENT § Surveillance](DEPLOYMENT.md)) : elle ne s'est donc jamais déclenchée. Seule la
   sauvegarde PBS du conteneur, deux fois par semaine, quitte l'hôte `prox`. Rendre
   `backup-gateway` joignable à 03:45 ou changer d'heure, et alerter aussi quand aucune copie n'a
-  jamais réussi.
-- [ ] **P1 · M** — Conditionner le déploiement à la CI. L'action Komodo déploie tout commit de
+  jamais réussi. Revu le 2026-11-08 : toujours en échec (« no route to host »), et plus aucune
+  machine du réseau local ne porte l'adresse du dépôt restic ; les autres sauvegardes du conteneur
+  visent la même. Le serveur de dépôt a sans doute changé de place : à retrouver avec le joueur.
+  Les sauvegardes PBS du conteneur sur un autre hôte existent (2026-11-02 et 2026-11-05).
+- [x] **P1 · M** — Conditionner le déploiement à la CI. L'action Komodo déploie tout commit de
   `main` dans les cinq minutes, sans regarder la CI (`deploy/proxmox/komodo.toml:46` ;
   [DEPLOYMENT § Mettre à jour](DEPLOYMENT.md) le reconnaît). Un test en échec n'empêche pas la mise
   en production. Deux voies : l'action lit l'état du commit par l'API GitHub avant **Deploy**, ou
-  la pile suit une branche `production` que la CI avance quand tout est vert.
-- [ ] **P1 · S** — Exposer le commit en service hors du pied de page, par exemple dans
+  la pile suit une branche `production` que la CI avance quand tout est vert. Fait le 2026-11-08
+  (`dd88ee7`) : l'action lit le résultat de la CI du commit par l'API GitHub et ne déploie qu'un
+  succès ; CI en cours, absente ou illisible : elle attend le passage suivant. Appliqué dans
+  Komodo et lancé une fois le même jour.
+- [x] **P1 · S** — Exposer le commit en service hors du pied de page, par exemple dans
   `/api/health`. Le pied de page n'est lisible que connecté ; après un déploiement, la
   vérification se fait aujourd'hui à la main sur le serveur. L'action Komodo et la sonde
-  Prometheus pourraient alors constater seules que le commit attendu répond.
+  Prometheus pourraient alors constater seules que le commit attendu répond. Fait le 2026-11-08
+  (`dd88ee7`) : `/api/health` rend `version` et `commit`. Ni l'action ni la sonde ne les lisent
+  encore.
 - [ ] **P2 · M** — Essai de restauration réel. Le script vérifie que le dump est lisible
   (`deploy/proxmox/backup/wow-altboard-backup.sh:62`, `pg_restore --list`), jamais qu'il se
   restaure. Restaurer chaque semaine le dernier dump dans une base jetable, compter les lignes de
@@ -380,8 +408,8 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 - [ ] **P2 · S** — Mises à jour de dépendances automatiques (Dependabot ou Renovate) pour `web/`,
   `agent/`, les actions GitHub et les images Docker : `.github/` ne contient que les deux workflows.
 - [ ] **P2 · S** — CI : ajouter `npm audit --omit=dev` et une recherche de secrets (gitleaks).
-- [ ] **P3 · S** — `@types/node` est en `^20` (`web/package.json:28`) alors que la CI et l'image
-  tournent sur Node 24 : aligner.
+- [x] **P3 · S** — `@types/node` est en `^20` (`web/package.json:28`) alors que la CI et l'image
+  tournent sur Node 24 : aligner. Fait le 2026-11-08 (`c7b3b7f`) : `^24`.
 - [ ] **P3 · S** — Images `node:24-alpine` et `postgres:17-alpine` suivies par étiquette flottante :
   une reconstruction peut changer de version mineure sans commit. Fixer la version mineure, que
   l'outil de mise à jour avancera.
@@ -391,22 +419,27 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 
 ## 6. Documentation et dépôt
 
-- [ ] **P1 · S** — Compteurs de tests périmés : `README.md:53-54` annonce 143 (agent) et 156 (web),
+- [x] **P1 · S** — Compteurs de tests périmés : `README.md:53-54` annonce 143 (agent) et 156 (web),
   `docs/ROADMAP.md:17` 152 et 185 ; la suite web en compte 214 au 2026-10-11. Retirer les nombres
-  des documents, ou les faire écrire par la CI.
+  des documents, ou les faire écrire par la CI. Fait le 2026-11-08 : nombres retirés du README et
+  de la ROADMAP, la CI les compte.
 - [ ] **P1 · S** — `docs/ROADMAP.md` : « Dernière mise à jour : 2026-10-08 » alors que P14 cite le
   2026-10-09 ; la synthèse parle de 6 personnages (au moins 12 en base au 2026-10-11) ; dans « Reste à faire », la ligne
   « Icônes, temps par niveau, sessions… : déployer le serveur » est faite depuis le déploiement
-  automatique ; les lignes 🟡 de P7 « Reste la mise en production » sont à réévaluer.
-- [ ] **P2 · S** — `README.md:72` décrit AGENT comme « automatisation future » : `watch`, le
-  démarrage avec Windows et la fenêtre existent depuis les agents 0.2.0 à 0.4.0.
-- [ ] **P2 · S** — Version du site : `web/package.json` est à `0.1.0` depuis l'origine, sans
+  automatique ; les lignes 🟡 de P7 « Reste la mise en production » sont à réévaluer. Fait en
+  partie le 2026-11-08 : date à jour, ligne « déployer le serveur » retirée. Les 6 personnages
+  restent : ils datent la recette de la V1. Reste à revoir en production les lignes 🟡 de P7.
+- [x] **P2 · S** — `README.md:72` décrit AGENT comme « automatisation future » : `watch`, le
+  démarrage avec Windows et la fenêtre existent depuis les agents 0.2.0 à 0.4.0. Fait le
+  2026-11-08.
+- [x] **P2 · S** — Version du site : `web/package.json` est à `0.1.0` depuis l'origine, sans
   `CHANGELOG`. Le pied de page affiche donc un numéro qui ne change jamais ; seuls le commit et la
   date identifient ce qui tourne. À décider : incrémenter à chaque livraison avec un journal des
-  changements, ou retirer le numéro du pied de page.
-- [ ] **P3 · S** — Trois branches locales déjà fusionnées dans `main` (`feat/v1-pipeline`,
+  changements, ou retirer le numéro du pied de page. Fait : le site suit SemVer avec
+  [CHANGELOG](../CHANGELOG.md), 0.7.0 au 2026-11-08.
+- [x] **P3 · S** — Trois branches locales déjà fusionnées dans `main` (`feat/v1-pipeline`,
   `feat/web-design`, `feat/jeton-fenetre-graphiques-niveaux`) : à supprimer, comme le note déjà la
-  feuille de route.
+  feuille de route. Fait le 2026-10-29 : `main` est la seule branche durable.
 
 ## Ce qui n'a pas été vérifié
 

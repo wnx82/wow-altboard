@@ -4,7 +4,7 @@ Trois versions évoluent séparément :
 
 | Version | Où | Valeur actuelle |
 |---|---|---|
-| `agentVersion` | version de l'exécutable (`agent/Directory.Build.props`) | `0.5.0` |
+| `agentVersion` | version de l'exécutable (`agent/Directory.Build.props`) | `0.5.1` |
 | `schemaVersion` | format du document envoyé par l'agent | `1` |
 | schéma AltBoard | `AltBoardDB.schema`, transmis dans `addonSchema` | `2` |
 

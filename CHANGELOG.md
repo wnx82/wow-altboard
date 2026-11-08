@@ -4,6 +4,53 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.7.0 — 2026-11-08
+
+### Ajouté
+
+- **Objectifs** par personnage, en tête de sa page : manuels (cochés à la main) ou automatiques,
+  cochés seuls à la synchronisation et datés (niveau, métier, réputation, objet possédé, or,
+  niveau d'objet, monnaie). Atteint une fois, un objectif le reste. Progression affichée
+  (« 212 / 300 »), ordre modifiable. Modèles réutilisables, qui survivent à la réinitialisation
+  des personnages et s'appliquent sans doublon. Migration `0007_goals`.
+- Page **Objets** : qui possède un objet, et combien, sur tous les personnages (sacs, banque,
+  équipement). Recherche par nom, sans tenir compte des accents ni de la casse, ou par
+  identifiant.
+- **Audit du jour** sur la page Opportunités : sur demande, l'assistant rédige un bilan du marché
+  à partir des seuls faits du moteur, avec la même vérification des nombres. Un par marché et par
+  jour, conservé avec le calcul dont il vient ; les 8 derniers restent lisibles. Migration
+  `0008_economy_audits`.
+- Page **Machines** : badge « À mettre à jour » sur un agent plus ancien que celui du site, et
+  liste des PC concernés près du téléchargement. Sous chaque ligne du journal, les erreurs et
+  avertissements de la synchronisation (dix au plus).
+- `GET /api/health` rend la version et le commit en service.
+
+### Modifié
+
+- Le déploiement automatique ne met en service qu'un commit de `main` dont la CI a réussi ; CI en
+  cours, absente ou illisible : il attend le passage suivant.
+- Une synchronisation avec avertissements est enregistrée `partial`, avec leur nombre.
+
+### Corrigé
+
+- Failles connues de Next.js et de zod : Next.js 16.4.5, React 19.3.1, zod 4.6.7, drizzle-orm
+  0.45.4, `@types/node` aligné sur Node 24.
+- Les journaux et `sync_errors` ne contiennent plus le texte SQL ni les valeurs d'une requête en
+  échec : seuls le type de l'erreur, son code PostgreSQL ou réseau et la contrainte en cause.
+- Une date postérieure à l'heure du serveur de plus d'une heure (horloge d'un PC en avance) est
+  refusée en 422 `future_timestamp`, au lieu de faire ignorer les envois suivants.
+
+## Agent 0.5.1 — 2026-11-08
+
+### Corrigé
+
+- La surveillance ne s'arrête plus sur une erreur imprévue : le cycle est journalisé, signalé et
+  repris au suivant. Avant, toute exception fermait l'agent sans ligne au journal.
+- Un jeton illisible (dossier copié d'un autre PC, mot de passe Windows réinitialisé) est signalé
+  avec sa cause, sans arrêter la surveillance.
+- Le délai de 60 s couvre tout l'échange avec le serveur, corps de la réponse compris. Une réponse
+  muette ou coupée devient un échec dit, au lieu de bloquer les envois jusqu'au redémarrage.
+
 ## Site 0.6.0 — 2026-11-08
 
 ### Ajouté

@@ -4,7 +4,7 @@ Statuts : ⬜ À faire · 🟡 En cours · ✅ Validé · 🔴 Bloqué
 
 Une étape n'est ✅ que si elle est implémentée, testée et vérifiée sur un résultat réel.
 
-Dernière mise à jour : 2026-11-06.
+Dernière mise à jour : 2026-11-08.
 
 ## Synthèse
 
@@ -14,7 +14,7 @@ Dernière mise à jour : 2026-11-06.
 | Chaîne complète PC → agent → HTTPS → PostgreSQL → tableau de bord | ✅ sur les fichiers réels (2 comptes, 6 personnages) |
 | Recette après une vraie modification en jeu | ⬜ à faire par le joueur : jouer, `/reload`, `AltBoardSync.exe sync` |
 | Compte personnel d'accès au tableau de bord | ⬜ à créer par le joueur (mot de passe saisi sur le serveur) |
-| Tests automatisés | 180 (agent) + 291 (web), tous verts |
+| Tests automatisés | agent et web, tous verts ; la CI les relance à chaque envoi et les compte |
 
 Le critère de réussite de la V1 est rempli jusqu'à l'étape 5 (personnage vérifié dans le fichier, la
 base et la page). Les étapes 6 à 10 — modifier une donnée en jeu, resynchroniser, constater la mise
@@ -237,9 +237,8 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 | Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer l'agent 0.4.1, téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
 | Créer son compte d'accès (voir [DEPLOYMENT § Comptes et jetons](DEPLOYMENT.md)) | joueur |
 | Recette après une vraie modification en jeu | joueur |
-| Icônes, temps par niveau, sessions et courbe d'expérience en production : déployer le serveur (voir [DEPLOYMENT § Mettre à jour](DEPLOYMENT.md)), puis republier l'agent et synchroniser | joueur |
 | Agent sur les autres PC : copier `AltBoardSync.exe`, créer un jeton par PC | joueur |
-| Économie : fusionner `feat/economy` et déployer, publier l'agent 0.5.0, régler **Début de l'historique** au 2026-11-04 dans **Paramètres**, puis scanner l'hôtel des ventes chaque jour (Auctionator) et ouvrir chaque métier une fois (NaowhForever) | joueur |
+| Économie : fusion, déploiement et agent 0.5.0 faits le 2026-11-06. Reste à régler **Début de l'historique** au 2026-11-04 dans **Paramètres**, puis scanner l'hôtel des ventes chaque jour (Auctionator) et ouvrir chaque métier une fois (NaowhForever) | joueur |
 | Économie : comparer en jeu quelques prix et un craft avec les pages Marché et Craft, une fois trois jours de scans reçus ; mesurer une vraie session de farm | joueur |
 
 ## Suite
