@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Confidence, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
-import { AssistantForm } from "@/components/economy-forms";
+import { AssistantForm, AssistantRetryButton } from "@/components/economy-forms";
 import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { askAssistantAction } from "@/lib/economy/actions";
-import { assistantConfig, MAX_QUESTION_LENGTH } from "@/lib/economy/assistant";
+import { assistantConfig, MAX_QUESTION_LENGTH, probeAssistant, type AssistantConfig } from "@/lib/economy/assistant";
 import { loadEconomy } from "@/lib/economy/load";
 import { KIND_LABELS, type Opportunity, type OpportunityKind } from "@/lib/economy/opportunities";
 import { ensureOpportunityRun } from "@/lib/economy/runs";
@@ -99,7 +100,10 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
           </p>
           <div className="mt-4">
             {assistant ? (
-              <AssistantForm action={askAssistantAction} marketId={context.market.id} maxLength={MAX_QUESTION_LENGTH} />
+              // Sondé à part : une machine éteinte ne retarde pas le reste de la page.
+              <Suspense fallback={<p role="status">Vérification du serveur de l&apos;assistant…</p>}>
+                <AssistantPanel config={assistant} marketId={context.market.id} />
+              </Suspense>
             ) : (
               <p>
                 Désactivé. Pour Claude, définissez <code className="text-text">WOW_AI_PROVIDER=anthropic</code> et{" "}
@@ -113,6 +117,22 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
       </section>
     </>
   );
+}
+
+/** Formulaire de l'assistant, ou la raison de son absence quand son serveur ne répond pas. */
+async function AssistantPanel({ config, marketId }: { config: AssistantConfig; marketId: number }) {
+  const status = await probeAssistant(config);
+  if (!status.up) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <AssistantRetryButton />
+        <p className="text-danger" role="status">
+          {status.error}
+        </p>
+      </div>
+    );
+  }
+  return <AssistantForm action={askAssistantAction} marketId={marketId} maxLength={MAX_QUESTION_LENGTH} />;
 }
 
 function Header() {

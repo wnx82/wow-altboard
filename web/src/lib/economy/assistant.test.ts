@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { askAssistant, assistantConfig, ungroundedNumbers, type AssistantConfig } from "./assistant";
+import { askAssistant, assistantConfig, probeAssistant, ungroundedNumbers, type AssistantConfig } from "./assistant";
 import type { EconomyFacts } from "./facts";
 
 const FACTS = {
@@ -12,6 +12,12 @@ const FACTS = {
 
 const CONFIG: AssistantConfig = { provider: "openai", url: "http://llm.test/v1", model: "test", apiKey: null, timeoutMs: 1_000, reasoningEffort: null };
 const CLAUDE: AssistantConfig = { provider: "anthropic", url: "https://api.anthropic.test", model: "claude-opus-5-5", apiKey: "sk-ant-test", timeoutMs: 1_000, reasoningEffort: null };
+
+/** Erreur levée par le fetch de Node (undici) quand aucune réponse HTTP n'arrive, avec le code de sa cause. */
+const fetchFailure = (code: string) => Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error(code), { code }) });
+/** Même erreur quand plusieurs adresses du nom ont été essayées (IPv6 puis IPv4). */
+const aggregateFailure = (code: string) =>
+  Object.assign(new TypeError("fetch failed"), { cause: new AggregateError([Object.assign(new Error(code), { code }), Object.assign(new Error(code), { code })]) });
 
 const reply = (content: string, status = 200): typeof fetch =>
   (async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status })) as unknown as typeof fetch;
@@ -131,7 +137,7 @@ describe("assistant", () => {
     assert.match(invented.ok ? "" : invented.error, /987/);
 
     const down = await askAssistant(CONFIG, FACTS, "?", (async () => {
-      throw new Error("ECONNREFUSED");
+      throw new Error("panne inconnue");
     }) as unknown as typeof fetch);
     assert.deepEqual(down, { ok: false, error: "L'assistant ne répond pas." });
 
@@ -166,6 +172,46 @@ describe("assistant", () => {
 
     assert.equal(bodies[0].reasoning_effort, "none");
     assert.equal("reasoning_effort" in bodies[1], false);
+  });
+
+  test("machine éteinte, connexion coupée ou délai dépassé : chaque cause a son message", async () => {
+    const answer = async (error: unknown) => {
+      const result = await askAssistant(CONFIG, FACTS, "?", (async () => {
+        throw error;
+      }) as unknown as typeof fetch);
+      return result.ok ? "" : result.error;
+    };
+
+    for (const error of [fetchFailure("EHOSTUNREACH"), fetchFailure("UND_ERR_CONNECT_TIMEOUT"), fetchFailure("ENOTFOUND"), aggregateFailure("ECONNREFUSED")]) {
+      assert.match(await answer(error), /^Serveur de l'assistant injoignable : la machine qui l'héberge est sans doute éteinte/);
+    }
+    assert.match(await answer(fetchFailure("UND_ERR_SOCKET")), /^Connexion au serveur de l'assistant coupée pendant la réponse/);
+    assert.equal(await answer(new DOMException("The operation was aborted due to timeout", "TimeoutError")), "L'assistant n'a pas répondu en 1 s.");
+  });
+
+  test("sonde : toute réponse HTTP vaut serveur allumé ; machine muette ou injoignable signalée ; Claude jamais sondé", async () => {
+    const urls: string[] = [];
+    const answering = (status: number) =>
+      (async (input: string | URL) => {
+        urls.push(String(input));
+        return new Response("{}", { status });
+      }) as unknown as typeof fetch;
+    const failing = (error: unknown) =>
+      (async () => {
+        throw error;
+      }) as unknown as typeof fetch;
+
+    assert.deepEqual(await probeAssistant(CONFIG, answering(200)), { up: true });
+    assert.deepEqual(await probeAssistant(CONFIG, answering(404)), { up: true });
+    assert.deepEqual(urls, ["http://llm.test/v1/models", "http://llm.test/v1/models"]);
+
+    for (const error of [fetchFailure("EHOSTUNREACH"), new DOMException("The operation was aborted due to timeout", "TimeoutError")]) {
+      const status = await probeAssistant(CONFIG, failing(error));
+      assert.equal(status.up, false);
+      assert.match(status.up ? "" : status.error, /^Serveur de l'assistant injoignable/);
+    }
+
+    assert.deepEqual(await probeAssistant(CLAUDE, failing(fetchFailure("EHOSTUNREACH"))), { up: true });
   });
 
   test("réponse coupée par le serveur (contexte plein) : cause signalée, même avec un début de texte", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useTransition } from "react";
 import type { AssistantState, EconomySettingsState, FarmState } from "@/lib/economy/actions";
 
 type SettingsAction = (previous: EconomySettingsState, formData: FormData) => Promise<EconomySettingsState>;
@@ -129,6 +130,17 @@ export function FarmSessionControls({ action, sessionId }: { action: FarmAction;
 }
 
 type AssistantAction = (previous: AssistantState, formData: FormData) => Promise<AssistantState>;
+
+/** Relance la sonde du serveur de l'assistant : la page est relue sur place, sans navigation. */
+export function AssistantRetryButton() {
+  const router = useRouter();
+  const [pending, startRefresh] = useTransition();
+  return (
+    <button className="button" type="button" disabled={pending} onClick={() => startRefresh(() => router.refresh())}>
+      {pending ? "Vérification…" : "Réessayer"}
+    </button>
+  );
+}
 
 /** Question en langage naturel : la réponse ne cite que les faits du moteur, sinon elle est refusée. */
 export function AssistantForm({ action, marketId, maxLength }: { action: AssistantAction; marketId: number; maxLength: number }) {

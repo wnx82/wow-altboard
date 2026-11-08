@@ -255,6 +255,12 @@ une variante du modèle à contexte plus grand) : les faits complets peuvent dé
 et Ollama tronque alors le début du message sans erreur. Un modèle de cette taille peut attribuer
 un vrai nombre au mauvais objet ; le contrôle des nombres ne le détecte pas.
 
+Un serveur local n'est pas toujours allumé (PC de jeu, double démarrage). Éteint, il ne gêne rien
+d'autre : la page Opportunités l'indique en quelques secondes et masque le formulaire de
+l'assistant ; le bouton « Réessayer » le sonde de nouveau une fois la machine démarrée. Essai réel
+du 2026-11-08 depuis le conteneur `web` : une adresse du réseau local sans machine allumée échoue
+en `EHOSTUNREACH` après 3 s.
+
 Le conteneur `web` appelle cette adresse en sortie, avec les seuls faits du moteur
 ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#faits-et-assistant-p11)). Avec Claude, ces faits sortent du
 réseau local vers l'API Anthropic : prix, crafts, noms d'objets et libellés des sessions de farm.

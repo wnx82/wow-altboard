@@ -135,6 +135,61 @@ export async function askAssistant(
   return { ok: true, answer };
 }
 
+/**
+ * Sonde du serveur local : allumé, il liste ses modèles en moins de 200 ms (Ollama sur le réseau
+ * local, 2026-11-08). Les 3 s couvrent une machine occupée.
+ */
+const PROBE_TIMEOUT_MS = 3_000;
+
+const UNREACHABLE =
+  "Serveur de l'assistant injoignable : la machine qui l'héberge est sans doute éteinte, ou son service arrêté. Réessayez une fois qu'elle est démarrée.";
+const CONNECTION_CUT = "Connexion au serveur de l'assistant coupée pendant la réponse : la machine qui l'héberge s'est peut-être éteinte.";
+
+// Codes vus dans la cause d'un fetch en échec (undici). Machine éteinte : EHOSTUNREACH sous Linux,
+// UND_ERR_CONNECT_TIMEOUT après 10 s sous Windows ou derrière un pare-feu qui ignore la connexion.
+const UNREACHABLE_CODES = new Set(["ECONNREFUSED", "EHOSTUNREACH", "EHOSTDOWN", "ENETUNREACH", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT", "ENOTFOUND", "EAI_AGAIN"]);
+const CUT_CODES = new Set(["ECONNRESET", "EPIPE", "UND_ERR_SOCKET"]);
+
+/** Codes d'erreur réseau d'un fetch en échec, y compris ceux d'une AggregateError (plusieurs adresses essayées). */
+function networkCodes(error: unknown): string[] {
+  const cause = (error as { cause?: { code?: unknown; errors?: { code?: unknown }[] } } | null)?.cause;
+  const codes = [cause?.code, ...(Array.isArray(cause?.errors) ? cause.errors.map((entry) => entry?.code) : [])];
+  return codes.filter((code): code is string => typeof code === "string");
+}
+
+const isTimeout = (error: unknown) => error instanceof Error && error.name === "TimeoutError";
+
+/** Message d'une requête qui n'a reçu aucune réponse HTTP. */
+function failureMessage(error: unknown, timeoutMs: number): string {
+  const codes = networkCodes(error);
+  if (codes.some((code) => UNREACHABLE_CODES.has(code))) return UNREACHABLE;
+  if (codes.some((code) => CUT_CODES.has(code))) return CONNECTION_CUT;
+  if (isTimeout(error)) return `L'assistant n'a pas répondu en ${Math.round(timeoutMs / 1000)} s.`;
+  return "L'assistant ne répond pas.";
+}
+
+export type AssistantStatus = { up: true } | { up: false; error: string };
+
+/**
+ * Le serveur de l'API compatible OpenAI répond-il ? Toute réponse HTTP compte : seule une machine
+ * injoignable rend l'assistant indisponible. Claude, service public, n'est pas sondé.
+ */
+export async function probeAssistant(config: AssistantConfig, fetchImpl: typeof fetch = fetch): Promise<AssistantStatus> {
+  if (config.provider === "anthropic") return { up: true };
+  try {
+    const response = await fetchImpl(`${config.url}/models`, {
+      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    return { up: true };
+  } catch (error) {
+    // Rien en 3 s : aucune machine ne répond à cette adresse.
+    return { up: false, error: isTimeout(error) ? UNREACHABLE : failureMessage(error, PROBE_TIMEOUT_MS) };
+  }
+}
+
 /** API « chat completions » compatible OpenAI. */
 async function completeChat(config: AssistantConfig, system: string, user: string, fetchImpl: typeof fetch): Promise<Completion> {
   let response: Response;
@@ -153,8 +208,8 @@ async function completeChat(config: AssistantConfig, system: string, user: strin
       }),
       signal: AbortSignal.timeout(config.timeoutMs),
     });
-  } catch {
-    return { ok: false, error: "L'assistant ne répond pas." };
+  } catch (error) {
+    return { ok: false, error: failureMessage(error, config.timeoutMs) };
   }
   if (!response.ok) return { ok: false, error: `L'assistant a refusé la demande (HTTP ${response.status}).` };
   const body = (await response.json().catch(() => null)) as { choices?: { message?: { content?: unknown }; finish_reason?: unknown }[] } | null;

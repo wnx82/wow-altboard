@@ -118,7 +118,10 @@ paramètres (dont la date du jour).
     `WOW_AI_MODEL`, `WOW_AI_API_KEY` en option. `WOW_AI_REASONING_EFFORT` (`none`, `minimal`,
     `low`, `medium` ou `high`) est transmis tel quel en `reasoning_effort` ; une autre valeur
     désactive l'assistant. Une réponse coupée par le serveur (contexte plein) est refusée, avec
-    sa cause.
+    sa cause. La page Opportunités sonde ce serveur (`GET /models`, 3 s) sans retarder le reste
+    de la page : machine éteinte ou injoignable, elle le dit, masque le formulaire et propose
+    « Réessayer ». Toute réponse HTTP vaut serveur allumé. Une question posée pendant une panne
+    reçoit sa cause : serveur injoignable, connexion coupée ou délai dépassé.
 
   Il ne reçoit que ces faits, jamais la base ni du SQL. Toute réponse qui cite un nombre absent des
   faits et de la question est **refusée** (petits entiers jusqu'à 10 exceptés). 10 questions par
