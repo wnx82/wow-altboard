@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using AltBoardSync.Core.App;
+using AltBoardSync.Core.Config;
 using AltBoardSync.Core.IO;
 
 namespace AltBoardSync.Tests;
@@ -358,6 +359,42 @@ public class WatchTests
 
         Assert.Contains("noms des objets du cache du jeu (_classic_beta_, frFR, build 70862) : 1 envoyés", h.Log);
         Assert.Contains("\"itemNameHashes\"", File.ReadAllText(Path.Combine(h.Home, "state.json")));
+    }
+
+    [Fact]
+    public async Task A_state_file_written_before_agent_0_7_0_still_lets_the_watch_send()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        DbCacheFile.Write(h.Flavor, DbCacheFile.Build(70862, DbCacheFile.Name(720, "Masque de bandit")));
+        // État laissé par l'agent 0.6.0 : aucune empreinte de cache de noms.
+        Directory.CreateDirectory(h.Home);
+        File.WriteAllText(Path.Combine(h.Home, "state.json"), """{"fingerprints":{"_classic_beta_/autre":"0000"}}""");
+        var server = new RecordingServer();
+
+        h.Start(server);
+        await Eventually(() => !h.Events.IsEmpty, "le premier cycle");
+
+        Assert.IsType<WatchEvent.Synced>(h.Events.First());
+        Assert.Single(server.Bodies);
+        Assert.Contains("\"itemNameHashes\"", File.ReadAllText(Path.Combine(h.Home, "state.json")));
+    }
+
+    [Fact]
+    public void Missing_or_null_maps_of_an_older_state_file_are_read_as_empty()
+    {
+        using var temp = new TempDirectory();
+        var store = new WatchStateStore(temp.Path);
+
+        File.WriteAllText(store.StatePath, """{"fingerprints":{"_retail_/a":"1234"}}""");
+        var older = store.Load();
+        Assert.Equal("1234", older.Fingerprints["_retail_/a"]);
+        Assert.Empty(older.ItemNameHashes);
+
+        File.WriteAllText(store.StatePath, """{"fingerprints":null,"itemNameHashes":null}""");
+        var nulls = store.Load();
+        Assert.Empty(nulls.Fingerprints);
+        Assert.Empty(nulls.ItemNameHashes);
     }
 
     [Fact]

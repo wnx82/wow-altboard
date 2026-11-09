@@ -4,6 +4,16 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Agent 0.7.1 — 2026-11-09
+
+### Corrigé
+
+- La synchronisation échouait à chaque cycle après la mise à jour depuis l'agent 0.6.0 ou plus
+  ancien : « erreur inattendue (ArgumentNullException) : Value cannot be null. (Parameter
+  'dictionary') ». Le `state.json` écrit par ces versions n'a pas d'empreinte du cache de noms,
+  que l'agent 0.7.0 lisait comme nulle au lieu de vide. Une clé manquante ou nulle de
+  `state.json` est maintenant lue comme vide. Remplace la 0.7.0, à ne pas installer.
+
 ## Agent 0.7.0 — 2026-11-09
 
 ### Ajouté

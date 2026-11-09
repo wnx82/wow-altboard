@@ -23,8 +23,12 @@ public sealed class WatchStateStore(string directory)
     {
         try
         {
-            if (File.Exists(StatePath))
-                return JsonSerializer.Deserialize(File.ReadAllText(StatePath), AgentJsonContext.Default.WatchState) ?? new WatchState();
+            if (File.Exists(StatePath) && JsonSerializer.Deserialize(File.ReadAllText(StatePath), AgentJsonContext.Default.WatchState) is { } state)
+            {
+                // Le générateur de sérialisation passe les propriétés init par l'initialiseur d'objet :
+                // une clé absente (état écrit par un agent plus ancien) ou nulle y vaut null, pas new().
+                return state with { Fingerprints = state.Fingerprints ?? [], ItemNameHashes = state.ItemNameHashes ?? [] };
+            }
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)
         {
