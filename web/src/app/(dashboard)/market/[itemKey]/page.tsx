@@ -4,14 +4,18 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { ColumnChart } from "@/components/column-chart";
 import { Change, Confidence, ItemName, Reasons } from "@/components/economy";
+import { PriceAlertForm } from "@/components/economy-forms";
 import { PriceChart } from "@/components/price-chart";
 import { TrendChart } from "@/components/trend-chart";
 import { Money, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
+import { saveAlertsAction } from "@/lib/economy/actions";
+import { listAlerts, type AlertStatus } from "@/lib/economy/alerts";
 import { DECISION_LABELS } from "@/lib/economy/craft";
 import { craftHistory, findPeriod, PERIODS, withinPeriod } from "@/lib/economy/history";
-import { itemLabel, loadEconomy, loadItemsHistory } from "@/lib/economy/load";
+import { itemLabel, itemQuality, loadEconomy, loadItemsHistory } from "@/lib/economy/load";
+import { formatMoneyInput, MONEY_INPUT_HINT } from "@/lib/economy/money-input";
 import { formatChange, formatCopperShort, formatDay, formatPercent, formatShortDay, ITEM_KEY_PATTERN, itemHref, marketParam, marketQuery } from "@/lib/economy/view";
 import { classKey, formatInteger, QUALITY_LABELS } from "@/lib/wow/format";
 
@@ -55,10 +59,14 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
 
   const period = findPeriod(query.period);
   const recipeKeys = new Set([key, ...producing.flatMap((craft) => craft.reagents.map((reagent) => reagent.itemKey))]);
-  const histories = await loadItemsHistory(getDatabase(), context.market.id, [...recipeKeys]);
+  const [histories, alerts] = await Promise.all([
+    loadItemsHistory(getDatabase(), context.market.id, [...recipeKeys]),
+    listAlerts(getDatabase(), { marketId: context.market.id, itemKey: key, historyFrom: context.historyFrom }),
+  ]);
+  const alertOf = (direction: AlertStatus["direction"]) => alerts.find((alert) => alert.direction === direction);
   const days = withinPeriod(histories.get(key) ?? [], period, context.today, context.historyFrom);
   const name = itemLabel(context.names, key);
-  const quality = context.names.get(key)?.quality ?? null;
+  const quality = itemQuality(context.names, key);
   const marketSuffix = marketQuery(context.market, context.markets, "&");
   const itemQuery = marketQuery(context.market, context.markets);
   const owned = context.stock.get(key) ?? 0;
@@ -122,6 +130,20 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
       ) : (
         <div className="panel mt-6 p-5 text-sm text-muted">Aucun prix relevé pour cet objet sur ce marché depuis le début de l&apos;historique.</div>
       )}
+
+      <section aria-label="Alerte de prix" className="mt-6">
+        <SectionTitle aside={<AlertSummary alerts={alerts} />}>Alerte de prix</SectionTitle>
+        <div className="panel p-5">
+          <PriceAlertForm
+            action={saveAlertsAction}
+            marketId={context.market.id}
+            itemKey={key}
+            below={alertOf("below") ? formatMoneyInput(alertOf("below")!.thresholdCopper) : ""}
+            above={alertOf("above") ? formatMoneyInput(alertOf("above")!.thresholdCopper) : ""}
+            hint={`Comparé au dernier prix relevé (${MONEY_INPUT_HINT}). Champ vide : pas de seuil. Une alerte déclenchée s'affiche sur l'accueil et la page Marché, sans notification.`}
+          />
+        </div>
+      </section>
 
       <nav aria-label="Période" className="mt-6 flex flex-wrap gap-2">
         {PERIODS.map((entry) => (
@@ -337,5 +359,17 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
         </section>
       )}
     </>
+  );
+}
+
+/** État des alertes de l'objet, à côté du titre de la section. */
+function AlertSummary({ alerts }: { alerts: AlertStatus[] }) {
+  if (alerts.length === 0) return "aucune alerte";
+  const triggered = alerts.filter((alert) => alert.triggered);
+  if (triggered.length === 0) return alerts[0].latest ? "en attente" : "en attente · aucun prix relevé";
+  return (
+    <span className="badge" data-tone="warn">
+      déclenchée : {triggered[0].direction === "below" ? "sous" : "au-dessus de"} {formatCopperShort(triggered[0].thresholdCopper)}
+    </span>
   );
 }

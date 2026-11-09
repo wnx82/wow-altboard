@@ -5,6 +5,7 @@ import { readSettings } from "@/lib/settings/store";
 import { DEFAULT_CRAFT_OPTIONS, evaluateRecipe, type CraftEvaluation, type Recipe } from "./craft";
 import { addDays, todayInBrussels } from "./days";
 import { farmSignal, type FarmSignal } from "./farm";
+import { fillCatalogNames } from "./item-names";
 import { computeItemStats, type DayObservation, type ItemStats } from "./prices";
 
 // Lecture des relevés en base et calcul complet du moteur pour un hôtel des ventes. Nombre fixe
@@ -66,6 +67,11 @@ export function itemLabel(names: ReadonlyMap<string, ItemName>, itemKey: string)
   const name = names.get(itemKey)?.name ?? names.get(baseItemKey(itemKey))?.name;
   const level = itemKey.startsWith("g:") ? ` (niveau ${itemKey.split(":")[2]})` : "";
   return name ? `${name}${level}` : `Objet ${baseItemKey(itemKey)}${level}`;
+}
+
+/** Qualité d'un objet, celle de sa base à défaut (« g:1234:60 » prend celle de « 1234 »). */
+export function itemQuality(names: ReadonlyMap<string, ItemName>, itemKey: string): number | null {
+  return names.get(itemKey)?.quality ?? names.get(baseItemKey(itemKey))?.quality ?? null;
 }
 
 export async function listMarkets(db: Database): Promise<MarketSummary[]> {
@@ -199,6 +205,13 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
       reagents: reagentsBySpell.get(row.spellId)!,
       characters: knownBySpell.get(row.spellId)!,
     }));
+
+  // Objets jamais possédés : le nom vient de la table du jeu (Paramètres → Noms des objets).
+  await fillCatalogNames(db, names, [
+    ...stats.keys(),
+    ...holdings.keys(),
+    ...recipes.flatMap((recipe) => [String(recipe.outputItemId), ...recipe.reagents.map((reagent) => String(reagent.itemId))]),
+  ]);
 
   const craftOptions = { ...DEFAULT_CRAFT_OPTIONS, auctionCut };
   const crafts = recipes.map((recipe) =>

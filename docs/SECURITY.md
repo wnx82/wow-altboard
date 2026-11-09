@@ -85,6 +85,18 @@ Aussi : `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Po
 `Strict-Transport-Security`, `Cache-Control: private, no-store` sur les pages. Pas de CORS : l'API
 n'est pas appelée depuis un navigateur tiers.
 
+## Import des noms des objets
+
+**Paramètres → Noms des objets** fait télécharger au serveur la table des objets du jeu chez
+wago.tools ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests)).
+
+| Mesure | Détail |
+|---|---|
+| Adresses | fixes, dans le code : `https://wago.tools/api/builds/wowf/latest`, puis le CSV de la version lue. La version doit avoir la forme `1.60.1.70862` ; aucune adresse ne vient d'une saisie. Redirections refusées |
+| Taille et durée | lecture arrêtée au-delà de 40 Mo ; 60 s au plus par requête |
+| Contenu | trois colonnes lues (identifiant, nom, qualité) ; nom de 200 caractères au plus, caractères de contrôle retirés ; écrit en une transaction, tout ou rien. Affiché comme du texte par React, jamais comme du HTML |
+| Accès et débit | session exigée ; 3 imports par quart d'heure et par utilisateur |
+
 ## Sondes vers les serveurs de jeu
 
 La page **Serveurs** fait ouvrir au serveur web des connexions TCP sortantes
@@ -124,8 +136,8 @@ pas versionné.
 Utilisateur non privilégié, système de fichiers en lecture seule, toutes capacités retirées,
 `no-new-privileges`. Le port n'est publié que sur l'adresse du réseau local de l'hôte : le tunnel
 Cloudflare, dans un autre conteneur LXC, est le seul chemin depuis Internet. Connexions sortantes
-hors base : le CDN d'icônes de Blizzard et, si des adresses sont configurées, les sondes vers les
-serveurs de jeu.
+hors base : le CDN d'icônes de Blizzard, wago.tools quand un utilisateur importe les noms des objets
+et, si des adresses sont configurées, les sondes vers les serveurs de jeu.
 
 ## Limites assumées
 

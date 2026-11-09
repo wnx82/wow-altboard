@@ -105,6 +105,24 @@ export const items = pgTable("items", {
   updatedAt: updatedAt(),
 });
 
+// Noms des objets du jeu, pour ceux qu'aucun personnage n'a possédés : l'hôtel des ventes et les
+// recettes citent des objets absents de AltBoardDB.items. Repli seulement : le nom relevé par
+// l'addon (items) l'emporte toujours. source : « wago » (table ItemSparse de wago.tools, importée
+// depuis la page Paramètres) ou « client » (cache du jeu lu par l'agent) ; un import wago ne
+// remplace jamais un nom « client ». build : version du jeu dont vient le nom.
+export const itemNames = pgTable(
+  "item_names",
+  {
+    itemId: integer("item_id").primaryKey(),
+    name: text("name").notNull(),
+    quality: smallint("quality"),
+    source: text("source").notNull(),
+    build: text("build").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("item_names_source_check", sql`${t.source} in ('wago', 'client')`)],
+);
+
 // ---------------------------------------------------------------------------
 // Personnages
 // ---------------------------------------------------------------------------
@@ -671,6 +689,27 @@ export const economyAudits = pgTable(
     writtenAt: ts("written_at").notNull(),
   },
   (t) => [unique("economy_audits_market_day_key").on(t.marketId, t.day)],
+);
+
+// Alerte de prix posée sur un objet d'un marché (web/src/lib/economy/alerts.ts) : déclenchée quand
+// le dernier prix relevé (market_item_latest) passe sous le seuil (below) ou au-dessus (above).
+// Aucun état n'est conservé : l'alerte se relit à chaque affichage, sans notification.
+export const priceAlerts = pgTable(
+  "price_alerts",
+  {
+    id: id(),
+    marketId: marketId(),
+    itemKey: text("item_key").notNull(),
+    direction: text("direction").notNull(),
+    thresholdCopper: bigint("threshold_copper", { mode: "number" }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("price_alerts_market_item_direction_key").on(t.marketId, t.itemKey, t.direction),
+    check("price_alerts_direction_check", sql`${t.direction} in ('below', 'above')`),
+    check("price_alerts_threshold_check", sql`${t.thresholdCopper} > 0`),
+  ],
 );
 
 // ---------------------------------------------------------------------------

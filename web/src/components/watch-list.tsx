@@ -5,6 +5,9 @@ import { classKey } from "@/lib/wow/format";
 /** Personnages affichés par ligne avant « et N autres » : le bloc reste court. */
 const SHOWN = 8;
 
+/** Alerte de prix déclenchée, prête à afficher : nom de l'objet, prix et seuil, lien vers sa fiche. */
+export type WatchAlert = { id: number; label: string; quality: number | null; detail: string; href: string };
+
 function CharacterChips({ entries }: { entries: WatchEntry[] }) {
   const shown = entries.slice(0, SHOWN);
   return (
@@ -35,8 +38,8 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 /** Bloc « À surveiller » de l'accueil ; rien n'est affiché quand il n'y a rien à signaler. */
-export function WatchListPanel({ list }: { list: WatchList }) {
-  const count = watchCount(list);
+export function WatchListPanel({ list, alerts = [] }: { list: WatchList; alerts?: WatchAlert[] }) {
+  const count = watchCount(list) + alerts.length;
   if (count === 0) return null;
   return (
     <section className="mb-8" aria-labelledby="watch-title">
@@ -44,9 +47,30 @@ export function WatchListPanel({ list }: { list: WatchList }) {
         <p id="watch-title" className="eyebrow">
           À surveiller
         </p>
-        <p className="text-xs text-muted">D&apos;après le dernier relevé de chaque personnage</p>
+        <p className="text-xs text-muted">D&apos;après les derniers relevés</p>
       </div>
       <div className="panel divide-y divide-line">
+        {alerts.length > 0 && (
+          <Row label="Alertes de prix" hint="Dernier prix relevé à l'hôtel des ventes">
+            {alerts.slice(0, SHOWN).map((alert) => (
+              <li key={alert.id}>
+                <Link href={alert.href} prefetch={false} className="badge gap-1.5 hover:border-gold/60" data-tone="warn">
+                  <span className="font-semibold" data-quality={alert.quality ?? undefined}>
+                    <span className={alert.quality === null ? undefined : "quality-text"}>{alert.label}</span>
+                  </span>
+                  <span>{alert.detail}</span>
+                </Link>
+              </li>
+            ))}
+            {alerts.length > SHOWN && (
+              <li className="self-center text-xs text-muted">
+                <Link href="/market" prefetch={false} className="hover:underline">
+                  et {alerts.length - SHOWN} autres
+                </Link>
+              </li>
+            )}
+          </Row>
+        )}
         {list.silentMachines.length > 0 && (
           <Row label="PC muets" hint={`Aucun envoi depuis ${SILENT_MACHINE_DAYS} jours ou plus`}>
             {list.silentMachines.map(({ machine, days }) => (

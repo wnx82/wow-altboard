@@ -137,10 +137,32 @@ paramètres (dont la date du jour).
   5 rédactions par 10 minutes et par utilisateur. Essai réel le 2026-11-08 (qwen3.5:9b, Ollama,
   `reasoning_effort` `none`) : 14 à 22 s, aucun nombre hors des faits.
 
+## Alertes de prix (`alerts.ts`)
+
+Sur la fiche d'un objet, deux seuils facultatifs par marché : **prévenir sous** et **prévenir
+au-dessus de**, saisis en or (« 12,5 ») ou en unités (« 12 po 50 pa »), relus par
+`money-input.ts`. Ils sont comparés au dernier prix relevé (`market_item_latest`) : un seuil bas se
+déclenche au prix égal ou inférieur, un seuil haut au prix égal ou supérieur. Un prix antérieur au
+début de l'historique ne compte pas. Le seuil bas doit rester sous le seuil haut ; 500 alertes au
+plus. Rien n'est conservé de l'état : il se recalcule à chaque affichage, sur la fiche de l'objet,
+dans la liste **Alertes de prix** de la page Marché (retrait sur place, badge « alerte » dans le
+tableau) et dans le bloc **À surveiller** de l'accueil. Aucune notification.
+
+## Noms des objets (`item-names.ts`)
+
+L'addon ne nomme que les objets vus dans un inventaire (table `items`). Les autres prennent le nom
+de la table `ItemSparse` du jeu, que wago.tools publie pour chaque version du client WoW Forever
+(produit `wowf`, en `frFR`). **Paramètres → Noms des objets** lance l'import : dernière version
+(`/api/builds/wowf/latest`), puis son fichier CSV (5,5 Mo et 19 324 objets pour 1.60.1.70862). Le
+nom de l'addon reste prioritaire ; une clé `g:1234:60` prend le nom de `1234`, une mascotte
+(`p:…`) ou une clé à suffixe de l'addon (`1234:567`) n'en reçoit pas. Les noms servent au Marché,
+au Craft, au Farm, aux Opportunités, aux faits de l'assistant et aux libellés des objectifs.
+
 ## Limites connues
 
 - Granularité journalière : pas de prix « 24 h » ni d'heure de scan, pas de nombre d'enchères.
 - Un scan partiel fait un jour à peu d'objets : la page Audit le signale (moins de la moitié des
   objets habituels).
-- Noms d'objets : seulement ceux déjà vus dans un inventaire (table `items`).
+- Noms d'objets jamais possédés : ceux de wago.tools, à réimporter après une mise à jour du jeu.
+  La table publiée peut écrire un nom autrement que le jeu (« Etoffe de lin » sans accent).
 - Le moteur ne connaît que les recettes relevées par NaowhForever.

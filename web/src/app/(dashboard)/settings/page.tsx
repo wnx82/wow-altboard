@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
-import { EconomySettingsForm } from "@/components/economy-forms";
+import { EconomySettingsForm, ItemNamesImportForm } from "@/components/economy-forms";
 import { ResetCharactersForm, StatusSettingsForm } from "@/components/settings-forms";
 import { SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { todayInBrussels } from "@/lib/economy/days";
-import { saveEconomySettingsAction } from "@/lib/economy/actions";
+import { importItemNamesAction, saveEconomySettingsAction } from "@/lib/economy/actions";
+import { catalogSummary } from "@/lib/economy/item-names";
 import { resetCharactersAction, saveStatusSettingsAction } from "@/lib/settings/actions";
 import { characterSummary } from "@/lib/settings/reset";
 import { readSettings } from "@/lib/settings/store";
 import { DEFAULT_LABEL, formatTarget, MAX_LABEL_LENGTH, MAX_TARGETS, type ServiceKey } from "@/lib/status/config";
 import { syncStatusRuntime } from "@/lib/status/runtime";
-import { formatDateTime } from "@/lib/wow/format";
+import { formatDateTime, formatInteger } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Paramètres" };
 
 export default async function SettingsPage() {
   await requireSession();
   const db = getDatabase();
-  const [{ config }, settings, summary] = await Promise.all([syncStatusRuntime(), readSettings(db), characterSummary(db)]);
+  const [{ config }, settings, summary, catalog] = await Promise.all([syncStatusRuntime(), readSettings(db), characterSummary(db), catalogSummary(db)]);
   const lines = (service: ServiceKey) => config.targets[service].map(formatTarget).join("\n");
   const fromSite = config.fromSite.auth || config.fromSite.game;
 
@@ -119,6 +120,37 @@ export default async function SettingsPage() {
               cutoffDay={settings.charactersCutoffAt ? todayInBrussels(settings.charactersCutoffAt) : null}
               today={todayInBrussels(new Date())}
             />
+          </div>
+        </section>
+
+        <section aria-label="Noms des objets">
+          <SectionTitle aside="pages Marché, Craft, Farm et Opportunités">Noms des objets</SectionTitle>
+          <div className="panel p-5">
+            <p className="text-sm text-muted">
+              L&apos;addon ne nomme que les objets que vos personnages ont eus en main. Les autres, cités par l&apos;hôtel des ventes et les
+              recettes, prennent leur nom dans la table des objets du jeu que publie wago.tools pour chaque version du client WoW Forever, en
+              français. Le nom relevé par l&apos;addon reste prioritaire.
+            </p>
+            <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="eyebrow">Noms importés</dt>
+                <dd className="mt-0.5 text-lg font-semibold tabular-nums">{formatInteger(catalog.wago.count)}</dd>
+              </div>
+              <div>
+                <dt className="eyebrow">Version du jeu</dt>
+                <dd className="mt-0.5 tabular-nums">{catalog.wago.build ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="eyebrow">Dernier import</dt>
+                <dd className="mt-0.5">{catalog.wago.updatedAt ? formatDateTime(catalog.wago.updatedAt) : "jamais"}</dd>
+              </div>
+            </dl>
+            <div className="mt-5 border-t border-line pt-4">
+              <ItemNamesImportForm action={importItemNamesAction} imported={catalog.wago.count > 0} />
+              <p className="mt-2 text-xs text-faint">
+                À refaire après une mise à jour du jeu qui ajoute des objets. Le serveur télécharge environ 6 Mo depuis wago.tools.
+              </p>
+            </div>
           </div>
         </section>
       </div>

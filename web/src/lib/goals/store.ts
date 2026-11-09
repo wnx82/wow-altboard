@@ -110,17 +110,22 @@ export async function recordAchievements(db: DatabaseOrTransaction, characterIds
   return reached.length;
 }
 
-/** Nom d'un objet connu, pour le libellé proposé d'un objectif « objet possédé ». */
+/**
+ * Nom d'un objet, pour le libellé proposé d'un objectif « objet possédé » : celui relevé par
+ * l'addon, à défaut celui de la table du jeu (objet jamais possédé).
+ */
 async function itemName(db: DatabaseOrTransaction, params: GoalParams): Promise<string | null> {
   const itemId = Number(params.subject);
-  if (!Number.isInteger(itemId)) return null;
+  if (!Number.isInteger(itemId) || itemId < 1 || itemId > 2_147_483_647) return null;
   const [row] = await db
     .select({ name: t.items.name })
     .from(t.items)
     .where(and(eq(t.items.itemId, itemId), sql`${t.items.name} is not null`))
     .orderBy(asc(t.items.itemKey))
     .limit(1);
-  return row?.name ?? null;
+  if (row?.name) return row.name;
+  const [catalog] = await db.select({ name: t.itemNames.name }).from(t.itemNames).where(eq(t.itemNames.itemId, itemId)).limit(1);
+  return catalog?.name ?? null;
 }
 
 async function nextPosition(db: DatabaseOrTransaction, characterId: number): Promise<{ position: number; count: number }> {

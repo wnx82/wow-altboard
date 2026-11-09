@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ItemName, MarketSummary } from "@/lib/economy/load";
-import { itemLabel } from "@/lib/economy/load";
+import { itemLabel, itemQuality } from "@/lib/economy/load";
 import { REASON_LABELS } from "@/lib/economy/opportunities";
 import { confidenceTone, formatChange, itemHref } from "@/lib/economy/view";
 import { formatDateTime } from "@/lib/wow/format";
@@ -29,7 +29,7 @@ export function MarketSelector({ path, market, markets }: { path: string; market
 
 /** Nom d'un objet (couleur de sa qualité quand elle est connue), lié à sa fiche de marché. */
 export function ItemName({ itemKey, names, query = "" }: { itemKey: string; names: ReadonlyMap<string, ItemName>; query?: string }) {
-  const quality = names.get(itemKey)?.quality ?? null;
+  const quality = itemQuality(names, itemKey);
   return (
     <Link href={itemHref(itemKey, query)} prefetch={false} className="font-semibold hover:underline" data-quality={quality ?? undefined}>
       <span className={quality === null ? undefined : "quality-text"}>{itemLabel(names, itemKey)}</span>

@@ -10,7 +10,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (41 tables, 10 migrations, 2026-11-08) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (43 tables, 11 migrations, 2026-11-09) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -70,7 +70,7 @@ recettes viennent de NaowhForever (tables de l'économie).
 
 ### Économie
 
-Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_farm_open_session` et `0008_economy_audits`.
+Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_farm_open_session`, `0008_economy_audits` et `0010_item_names_price_alerts`.
 
 | Table | Clé | Contenu |
 |---|---|---|
@@ -88,6 +88,8 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_fa
 | `opportunity_runs` | `id` | Un calcul d'opportunités : marché, date, version du moteur, paramètres et base (`jsonb`), dernier import, jour des données |
 | `opportunities` | `(run_id, rank)` | Une recommandation : type, objet ou recette, valeur, confiance, horizon, raisons, entrées (`jsonb`) |
 | `economy_audits` | `(market_id, day)` | Audit du jour rédigé par l'assistant : jour (Europe/Brussels), calcul dont viennent ses faits (`run_id`, vidé si ce calcul disparaît), jour des données, modèle, texte, date de rédaction. Réécrit le même jour, il remplace le précédent |
+| `price_alerts` | `id` ; unique `(market_id, item_key, direction)` | Alerte de prix : marché, objet, sens (`below` ou `above`), seuil en pièces de cuivre (strictement positif). Supprimée avec son marché |
+| `item_names` | `item_id` | Nom de repli d'un objet jamais possédé : nom, qualité, source (`wago` ou `client`), version du jeu (`build`). Un import `wago` ne remplace jamais une ligne `client` et supprime ses propres lignes d'une version précédente |
 
 ### Objectifs par personnage
 
@@ -240,6 +242,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0007_goals` | `character_goals`, `goal_templates`, `goal_template_items` et leurs index (ajouts seuls) |
 | `0008_economy_audits` | `economy_audits` (ajout seul) |
 | `0009_account_folder_name` | colonne `wow_accounts.folder_name` (ajout seul, null pour les comptes existants) |
+| `0010_item_names_price_alerts` | `item_names`, `price_alerts` (ajouts seuls) |
 
 ## Checkpoint B
 

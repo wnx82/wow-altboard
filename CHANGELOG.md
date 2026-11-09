@@ -4,6 +4,23 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.10.0 — 2026-11-09
+
+### Ajouté
+
+- **Alertes de prix** : sur la fiche d'un objet, un seuil bas (« prévenir sous ») et un seuil haut
+  (« prévenir au-dessus de »), saisis en or (« 12,5 ») ou en unités (« 12 po 50 pa »). Ils sont
+  comparés au dernier prix relevé. Une alerte déclenchée s'affiche dans le bloc **À surveiller** de
+  l'accueil, en tête de la page Marché (liste des alertes, retrait sur place) et d'un badge dans le
+  tableau des objets. Aucune notification.
+- **Noms des objets jamais possédés** : **Paramètres → Noms des objets** importe la table des
+  objets du jeu publiée par wago.tools pour la dernière version du client WoW Forever, en français
+  (19 324 objets pour 1.60.1.70862). Marché, Craft, Farm, Opportunités, l'assistant et les
+  objectifs « objet possédé » nomment désormais les objets vus seulement à l'hôtel des ventes ou
+  dans une recette. Le nom relevé par l'addon reste prioritaire. La recherche du Marché trouve ces
+  objets par leur nom.
+- Migration `0010_item_names_price_alerts` : tables `item_names` et `price_alerts` (ajouts seuls).
+
 ## Site 0.9.0 — 2026-11-09
 
 ### Ajouté

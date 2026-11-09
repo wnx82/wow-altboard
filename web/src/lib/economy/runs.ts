@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { canonicalJson } from "@/lib/hash";
 import * as t from "@/db/schema";
+import { loadItemNames } from "./item-names";
 import type { EconomyContext } from "./load";
 import { buildOpportunities, DEFAULT_PARAMETERS, ENGINE_VERSION, type Opportunity, type OpportunityKind } from "./opportunities";
 
@@ -125,6 +126,5 @@ export async function latestOpportunities(db: Database, limit = 3) {
   const run = (await readRun(db, last.id))!;
   const top = run.opportunities.filter((o) => o.kind !== "DONT_CRAFT").slice(0, limit);
   const keys = top.flatMap((o) => (o.itemKey ? [o.itemKey] : []));
-  const names = keys.length === 0 ? [] : await db.select({ itemKey: t.items.itemKey, name: t.items.name, quality: t.items.quality }).from(t.items).where(inArray(t.items.itemKey, keys));
-  return { run, top, names: new Map(names.map((row) => [row.itemKey, { name: row.name, quality: row.quality }])) };
+  return { run, top, names: await loadItemNames(db, keys) };
 }

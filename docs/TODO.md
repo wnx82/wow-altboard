@@ -128,9 +128,12 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
   seul usage autorisé de la roadmap de l'économie qui n'est pas fait. Fait le 2026-11-08
   (`361cf52`) : sur demande, un par marché et par jour, conservé (page **Opportunités**). Pas encore
   essayé en production.
-- [ ] **P2 · M** — Noms des objets jamais possédés : le moteur ne connaît que ceux vus dans un
-  inventaire (table `items`) et affiche les autres sous leur identifiant. Source à trouver ;
-  Auctionator ne garde pas les noms.
+- [x] **P2 · M** — Noms des objets jamais possédés : le moteur ne connaissait que ceux vus dans un
+  inventaire (table `items`). Fait le 2026-11-09 (site 0.10.0) : import de la table `ItemSparse`
+  de wago.tools depuis **Paramètres**. Reste le complément par l'agent, qui lirait le cache local du
+  jeu (`Cache/ADB/frFR/DBCache.bin`, environ 5 200 noms) en source `client`.
+- [x] **P2 · M** — Alertes de prix par objet, sous ou au-dessus d'un seuil. Fait le 2026-11-09
+  (site 0.10.0) : fiche de l'objet, page Marché et bloc **À surveiller**, sans notification.
 - [ ] **P2 · S** — Revoir les index de `market_item_days` avec plusieurs semaines d'historique
   réel (environ 2 000 lignes par jour de scan sur le marché « PvE »).
 - [ ] **P3 · M** — Agréger les relevés de plus d'un an, par semaine, si le volume le demande.

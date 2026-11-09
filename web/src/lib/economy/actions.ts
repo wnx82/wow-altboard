@@ -6,9 +6,12 @@ import { requireSession } from "@/lib/auth/session";
 import { RateLimiter } from "@/lib/rate-limit";
 import { parseAuctionCutInput, parseHistoryDayInput } from "@/lib/settings/input";
 import { writeSettings } from "@/lib/settings/store";
+import { deleteAlert, saveItemAlerts } from "./alerts";
 import { askAssistant, assistantConfig, MAX_QUESTION_LENGTH } from "./assistant";
 import { writeDailyAudit } from "./daily-audit";
 import { loadFacts } from "./facts-service";
+import { importItemNames } from "./item-names";
+import { parseMoneyInput } from "./money-input";
 import { cancelFarmSession, endFarmSession, MAX_LABEL_LENGTH, startFarmSession } from "./sessions";
 
 // Chaque action vérifie la session elle-même : une Server Action est un point d'entrée HTTP à part
@@ -119,4 +122,57 @@ export async function writeDailyAuditAction(_previous: DailyAuditState, formData
   if (!result.ok) return { error: result.error };
   revalidatePath("/opportunities");
   return { written: true };
+}
+
+export type AlertsState = { error?: string; saved?: boolean; entered?: { below: string; above: string } };
+
+/** Seuils d'alerte d'un objet sur un marché ; un champ vide retire le seuil correspondant. */
+export async function saveAlertsAction(_previous: AlertsState, formData: FormData): Promise<AlertsState> {
+  await requireSession();
+  const entered = { below: field(formData, "below").slice(0, 40), above: field(formData, "above").slice(0, 40) };
+  const marketId = idField(formData, "market");
+  if (marketId === null) return { error: "Marché introuvable.", entered };
+  const below = parseMoneyInput(entered.below);
+  if (!below.ok) return { error: `Seuil bas — ${below.error}`, entered };
+  const above = parseMoneyInput(entered.above);
+  if (!above.ok) return { error: `Seuil haut — ${above.error}`, entered };
+
+  const result = await saveItemAlerts(getDatabase(), { marketId, itemKey: field(formData, "itemKey"), below: below.value, above: above.value, now: new Date() });
+  if (!result.ok) return { error: result.error, entered };
+  console.log(JSON.stringify({ event: "alerts.saved", marketId, saved: result.saved, removed: result.removed }));
+  revalidatePath("/", "layout");
+  return { saved: true };
+}
+
+export type DeleteAlertState = { error?: string };
+
+export async function deleteAlertAction(_previous: DeleteAlertState, formData: FormData): Promise<DeleteAlertState> {
+  await requireSession();
+  const id = idField(formData, "alertId");
+  if (id === null) return { error: "Alerte introuvable." };
+  const deleted = await deleteAlert(getDatabase(), id);
+  console.log(JSON.stringify({ event: "alerts.deleted", alertId: id, found: deleted !== null }));
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export type ItemNamesState = { error?: string; message?: string };
+
+/** Un import télécharge plusieurs mégaoctets chez wago.tools : quelques essais par quart d'heure. */
+const ITEM_NAMES_LIMIT = { max: 3, windowMs: 15 * 60_000 };
+const itemNamesLimiter = new RateLimiter();
+
+/** Importe les noms des objets du jeu depuis wago.tools (version la plus récente du client). */
+export async function importItemNamesAction(): Promise<ItemNamesState> {
+  const session = await requireSession();
+  if (!itemNamesLimiter.consume(`item-names:${session.userId}`, ITEM_NAMES_LIMIT)) return { error: "Trop d'imports. Réessayez dans quelques minutes." };
+  const started = Date.now();
+  const result = await importItemNames(getDatabase(), { now: new Date() });
+  console.log(
+    JSON.stringify({ event: "item_names.import", userId: session.userId, ok: result.ok, ms: Date.now() - started, ...(result.ok ? { build: result.build, count: result.count, removed: result.removed } : { error: result.error }) }),
+  );
+  if (!result.ok) return { error: result.error };
+  revalidatePath("/", "layout");
+  const removed = result.removed > 0 ? `, ${result.removed} retiré${result.removed > 1 ? "s" : ""}` : "";
+  return { message: `${new Intl.NumberFormat("fr-FR").format(result.count)} noms importés (version ${result.build}${removed}).` };
 }

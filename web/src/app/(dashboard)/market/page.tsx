@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Change, Confidence, ItemName, MarketSelector, MarketSource } from "@/components/economy";
+import { DeleteAlertButton } from "@/components/economy-forms";
 import { Sparkline } from "@/components/sparkline";
 import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { loadEconomy } from "@/lib/economy/load";
+import { deleteAlertAction } from "@/lib/economy/actions";
+import { listAlerts, type AlertStatus } from "@/lib/economy/alerts";
+import { itemLabel, loadEconomy } from "@/lib/economy/load";
 import { buildMarketView, SORTS, type MarketRow, type MarketSort } from "@/lib/economy/market-view";
 import { formatCopperShort, formatDay, marketParam, marketQuery } from "@/lib/economy/view";
 import { formatInteger } from "@/lib/wow/format";
@@ -38,6 +41,8 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
   const sort: MarketSort = SORTS.find((entry) => entry.key === params.sort)?.key ?? "held";
   const pageNumber = /^\d{1,4}$/.test(first(params.page)) ? Number(first(params.page)) : 1;
   const view = buildMarketView(context, { query, owned, sort, page: pageNumber });
+  const alerts = await listAlerts(getDatabase(), { marketId: context.market.id, historyFrom: context.historyFrom });
+  const alerted = new Set(alerts.filter((alert) => alert.triggered).map((alert) => alert.itemKey));
   const marketSuffix = marketQuery(context.market, context.markets, "&");
   const itemQuery = marketQuery(context.market, context.markets);
   const link = (changes: Record<string, string | null>) => {
@@ -69,6 +74,8 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
         <MoverList title="Plus fortes baisses (7 j)" rows={view.falling} names={context.names} query={itemQuery} empty="Aucune baisse mesurable." />
         <MoverList title="Prix anormaux" rows={view.anomalies} names={context.names} query={itemQuery} empty="Aucun prix isolé." anomaly />
       </div>
+
+      {alerts.length > 0 && <AlertList alerts={alerts} names={context.names} query={itemQuery} />}
 
       <section aria-label="Tous les objets" className="mt-8">
         <SectionTitle aside={`${formatInteger(view.total)} objet${view.total > 1 ? "s" : ""}`}>Tous les objets</SectionTitle>
@@ -134,6 +141,11 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
                       {row.stats.outlier && (
                         <span className="badge ml-2" data-tone="warn">
                           anormal
+                        </span>
+                      )}
+                      {alerted.has(row.itemKey) && (
+                        <span className="badge ml-2" data-tone="warn">
+                          alerte
                         </span>
                       )}
                     </td>
@@ -242,6 +254,43 @@ function MoverList({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Alertes posées sur ce marché : déclenchées en tête, chacune retirable sur place. */
+function AlertList({ alerts, names, query }: { alerts: AlertStatus[]; names: Parameters<typeof ItemName>[0]["names"]; query: string }) {
+  const triggered = alerts.filter((alert) => alert.triggered).length;
+  return (
+    <section aria-label="Alertes de prix" className="mt-8">
+      <SectionTitle aside={`${triggered} déclenchée${triggered > 1 ? "s" : ""} sur ${alerts.length}`}>Alertes de prix</SectionTitle>
+      <ul className="panel divide-y divide-line">
+        {alerts.map((alert) => (
+          <li key={alert.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
+            <span className="min-w-0">
+              <ItemName itemKey={alert.itemKey} names={names} query={query} />
+              <span className="ml-2 text-muted">
+                {alert.direction === "below" ? "sous" : "au-dessus de"} {formatCopperShort(alert.thresholdCopper)}
+              </span>
+            </span>
+            <span className="flex flex-wrap items-center gap-3">
+              <span className="tabular-nums text-muted">
+                {alert.latest ? (
+                  <>
+                    <Money copper={alert.latest.minCopper} /> le {formatDay(alert.latest.day)}
+                  </>
+                ) : (
+                  "aucun prix relevé"
+                )}
+              </span>
+              <span className="badge" data-tone={alert.triggered ? "warn" : undefined}>
+                {alert.triggered ? "déclenchée" : "en attente"}
+              </span>
+              <DeleteAlertButton action={deleteAlertAction} alertId={alert.id} label={`Retirer l'alerte sur ${itemLabel(names, alert.itemKey)}`} />
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

@@ -5,15 +5,18 @@ import { Confidence, ItemName } from "@/components/economy";
 import { ServerStatusTiles } from "@/components/server-status";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { Money, StatTile } from "@/components/ui";
-import { WatchListPanel } from "@/components/watch-list";
+import { WatchListPanel, type WatchAlert } from "@/components/watch-list";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { buildGoldHistory, GOLD_HISTORY_DAYS } from "@/lib/dashboard/gold-history";
 import { getOverview, listCharacters, listMoneySnapshots } from "@/lib/dashboard/queries";
 import { buildWatchList, loadWatchFacts, loadWatchMachines } from "@/lib/dashboard/watch";
+import { listAlerts } from "@/lib/economy/alerts";
+import { loadItemNames } from "@/lib/economy/item-names";
+import { itemLabel, itemQuality } from "@/lib/economy/load";
 import { KIND_LABELS } from "@/lib/economy/opportunities";
 import { latestOpportunities } from "@/lib/economy/runs";
-import { formatDay } from "@/lib/economy/view";
+import { formatCopperShort, formatDay, itemHref } from "@/lib/economy/view";
 import { isConfigured } from "@/lib/status/config";
 import { syncStatusRuntime } from "@/lib/status/runtime";
 import { getServiceSummaries } from "@/lib/status/view";
@@ -29,7 +32,7 @@ export default async function CharactersPage() {
   const now = new Date();
   const { config } = await syncStatusRuntime();
   const goldSince = new Date(now.getTime() - GOLD_HISTORY_DAYS * 24 * 3600 * 1000);
-  const [characters, overview, servers, opportunities, moneySnapshots, machines] = await Promise.all([
+  const [characters, overview, servers, opportunities, moneySnapshots, machines, alerts] = await Promise.all([
     listCharacters(db),
     getOverview(db),
     // Sans serveur surveillé, ni requête ni miniature : il n'y aurait que de l'« Inconnu » à montrer.
@@ -37,12 +40,27 @@ export default async function CharactersPage() {
     latestOpportunities(db),
     listMoneySnapshots(db, goldSince),
     loadWatchMachines(db),
+    listAlerts(db),
   ]);
-  const watchFacts = await loadWatchFacts(
-    db,
-    characters.map((character) => character.id),
-  );
+  const triggered = alerts.filter((alert) => alert.triggered);
+  const [watchFacts, alertNames] = await Promise.all([
+    loadWatchFacts(
+      db,
+      characters.map((character) => character.id),
+    ),
+    loadItemNames(
+      db,
+      triggered.map((alert) => alert.itemKey),
+    ),
+  ]);
   const watch = buildWatchList(characters, watchFacts, machines, now);
+  const watchAlerts: WatchAlert[] = triggered.map((alert) => ({
+    id: alert.id,
+    label: itemLabel(alertNames, alert.itemKey),
+    quality: itemQuality(alertNames, alert.itemKey),
+    detail: `${formatCopperShort(alert.latest!.minCopper)} ${alert.direction === "below" ? "≤" : "≥"} ${formatCopperShort(alert.thresholdCopper)}`,
+    href: itemHref(alert.itemKey, `?market=${alert.marketId}`),
+  }));
   const goldPoints: TrendPoint[] = buildGoldHistory(moneySnapshots, goldSince, now).map((day) => ({
     at: `${day.day}T12:00:00Z`,
     value: day.copper / 10_000,
@@ -109,7 +127,7 @@ export default async function CharactersPage() {
         />
       </div>
 
-      <WatchListPanel list={watch} />
+      <WatchListPanel list={watch} alerts={watchAlerts} />
 
       {goldPoints.length > 1 && (
         <section className="mb-8" aria-label="Or cumulé">
