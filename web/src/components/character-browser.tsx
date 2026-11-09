@@ -69,10 +69,22 @@ type Filters = {
   faction: string;
   profession: string;
   machine: string;
+  goals: string;
   minLevel: string;
   maxLevel: string;
 };
-const NO_FILTERS: Filters = { account: "", realm: "", classToken: "", race: "", faction: "", profession: "", machine: "", minLevel: "", maxLevel: "" };
+const NO_FILTERS: Filters = { account: "", realm: "", classToken: "", race: "", faction: "", profession: "", machine: "", goals: "", minLevel: "", maxLevel: "" };
+
+const GOAL_FILTERS = [
+  ["open", "Objectifs en cours"],
+  ["done", "Objectifs tous atteints"],
+  ["none", "Sans objectif"],
+] as const;
+
+function goalState(goals: CharacterListItem["goals"]): (typeof GOAL_FILTERS)[number][0] {
+  if (goals.total === 0) return "none";
+  return goals.done < goals.total ? "open" : "done";
+}
 
 /** Options dont la valeur et le libellé sont identiques. */
 const same = (values: string[]) => values.map((value) => [value, value] as const);
@@ -135,6 +147,7 @@ export function CharacterBrowser({ characters, now }: { characters: CharacterLis
       if (filters.faction && c.faction !== filters.faction) return false;
       if (filters.profession && !c.professions.some((p) => p.name === filters.profession)) return false;
       if (filters.machine && !c.machines.some((m) => String(m.id) === filters.machine)) return false;
+      if (filters.goals && goalState(c.goals) !== filters.goals) return false;
       if (minLevel !== null && (c.level === null || c.level < minLevel)) return false;
       if (maxLevel !== null && (c.level === null || c.level > maxLevel)) return false;
       if (!needle) return true;
@@ -236,7 +249,7 @@ export function CharacterBrowser({ characters, now }: { characters: CharacterLis
           </div>
         </div>
 
-        <div id="character-filters" className={filtersOpen ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-9" : "hidden"}>
+        <div id="character-filters" className={filtersOpen ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10" : "hidden"}>
           <FilterSelect label="Compte" value={filters.account} onChange={setFilter("account")} options={options.accounts} />
           <FilterSelect label="Royaume" value={filters.realm} onChange={setFilter("realm")} options={same(options.realms)} />
           <FilterSelect
@@ -254,6 +267,7 @@ export function CharacterBrowser({ characters, now }: { characters: CharacterLis
             options={same(options.professions)}
           />
           <FilterSelect label="PC" value={filters.machine} onChange={setFilter("machine")} options={options.machines} />
+          <FilterSelect label="Objectifs" value={filters.goals} onChange={setFilter("goals")} options={[...GOAL_FILTERS]} />
           <input
             type="number"
             min={0}
@@ -411,6 +425,18 @@ function CharacterCard({ character, now }: { character: CharacterListItem; now: 
         </div>
       )}
 
+      {character.goals.total > 0 && (
+        <div className="mt-3">
+          <div className="mb-1 flex items-baseline justify-between text-xs text-muted">
+            <span>Objectifs</span>
+            <span className="tabular-nums">
+              {character.goals.done} / {character.goals.total}
+            </span>
+          </div>
+          <Meter value={character.goals.done} max={character.goals.total} label={`Objectifs atteints de ${character.name}`} tone="gold" />
+        </div>
+      )}
+
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="eyebrow">Niveau d&apos;objet</dt>
@@ -457,7 +483,7 @@ function CharacterCard({ character, now }: { character: CharacterListItem; now: 
 function CharacterTable({ characters, now }: { characters: CharacterListItem[]; now: Date }) {
   return (
     <div className="panel overflow-x-auto">
-      <table className="data-table min-w-[980px]">
+      <table className="data-table min-w-[1060px]">
         <thead>
           <tr>
             <th scope="col">Personnage</th>
@@ -472,6 +498,9 @@ function CharacterTable({ characters, now }: { characters: CharacterListItem[]; 
               Or
             </th>
             <th scope="col">Métiers</th>
+            <th scope="col" className="num">
+              Objectifs
+            </th>
             <th scope="col">Royaume</th>
             <th scope="col">PC</th>
             <th scope="col">Vu en jeu</th>
@@ -511,6 +540,7 @@ function CharacterTable({ characters, now }: { characters: CharacterListItem[]; 
                       </span>
                     ))}
               </td>
+              <td className="num tabular-nums">{character.goals.total === 0 ? "—" : `${character.goals.done} / ${character.goals.total}`}</td>
               <td>
                 {character.realm}
                 <span className="block text-xs text-muted">{character.faction}</span>

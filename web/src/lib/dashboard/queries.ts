@@ -2,6 +2,9 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-or
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import type { ActivitySnapshot } from "./activity";
+import type { MoneySnapshot } from "./gold-history";
+import type { PlaytimeRow, SessionFact } from "./playtime";
+import type { ReputationRow } from "./reputations";
 import type { LevelRow } from "./levels";
 
 // Chaque page lit ses données en un nombre fixe de requêtes, indépendant du nombre de personnages.
@@ -32,6 +35,8 @@ export type CharacterListItem = {
   account: Named;
   machines: Named[];
   professions: { skillLine: number; name: string; rank: number | null; maxRank: number | null; isPrimary: boolean }[];
+  /** Objectifs atteints (datés) sur le total ; total 0 sans objectif. */
+  goals: { done: number; total: number };
   /** Dernière collecte par l'addon (lastSeen) : la donnée n'est jamais du temps réel. */
   sourceLastSeenAt: string;
   lastSyncAt: string;
@@ -67,7 +72,7 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
   if (rows.length === 0) return [];
 
   const ids = rows.map((row) => row.id);
-  const [professions, machines] = await Promise.all([
+  const [professions, machines, goals] = await Promise.all([
     db
       .select({
         characterId: t.characterProfessions.characterId,
@@ -91,10 +96,20 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
       .innerJoin(t.machines, eq(t.machines.id, t.characterMachines.machineId))
       .where(inArray(t.characterMachines.characterId, ids))
       .orderBy(asc(t.machines.id)),
+    db
+      .select({
+        characterId: t.characterGoals.characterId,
+        total: sql<number>`count(*)::int`,
+        done: sql<number>`count(${t.characterGoals.achievedAt})::int`,
+      })
+      .from(t.characterGoals)
+      .where(inArray(t.characterGoals.characterId, ids))
+      .groupBy(t.characterGoals.characterId),
   ]);
 
   const professionsBy = Map.groupBy(professions, (profession) => profession.characterId);
   const machinesBy = Map.groupBy(machines, (machine) => machine.characterId);
+  const goalsBy = new Map(goals.map((row) => [row.characterId, { done: row.done, total: row.total }]));
 
   return rows.map((row) => ({
     id: row.id,
@@ -114,6 +129,7 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
     account: { id: row.accountId, label: accountLabel({ displayName: row.accountDisplayName, folderHint: row.accountFolderHint }) },
     machines: (machinesBy.get(row.id) ?? []).map((machine) => ({ id: machine.id, label: machineLabel(machine) })),
     professions: (professionsBy.get(row.id) ?? []).map(({ skillLine, name, rank, maxRank, isPrimary }) => ({ skillLine, name, rank, maxRank, isPrimary })),
+    goals: goalsBy.get(row.id) ?? { done: 0, total: 0 },
     sourceLastSeenAt: row.sourceLastSeenAt.toISOString(),
     lastSyncAt: row.lastSyncAt.toISOString(),
   }));
@@ -241,6 +257,15 @@ const lastSnapshotBefore = (since: Date) => sql`${t.characterSnapshots.id} in (
     where earlier.captured_at < ${since.toISOString()}::timestamptz
     order by earlier.character_id, earlier.captured_at desc
   )`;
+
+/** Or de chaque relevé depuis `since`, plus le dernier relevé d'avant de chaque personnage (valeur de départ). */
+export async function listMoneySnapshots(db: Database, since: Date): Promise<MoneySnapshot[]> {
+  return db
+    .select({ characterId: t.characterSnapshots.characterId, capturedAt: t.characterSnapshots.capturedAt, moneyCopper: t.characterSnapshots.moneyCopper })
+    .from(t.characterSnapshots)
+    .where(or(gte(t.characterSnapshots.capturedAt, since), lastSnapshotBefore(since)))
+    .orderBy(asc(t.characterSnapshots.capturedAt));
+}
 
 /**
  * Relevés de tous les personnages depuis `since`, plus, pour chacun, le dernier relevé d'avant :
@@ -422,4 +447,69 @@ export async function listRecentRuns(db: Database, limit = 15) {
     byRun.set(syncRunId, list);
   }
   return runs.map((run) => ({ ...run, errors: byRun.get(run.id) ?? [] }));
+}
+
+export type ReputationCharacter = { id: number; name: string; class: string | null; level: number | null; account: string };
+
+/** Réputations de tous les personnages, rangés par niveau décroissant. */
+export async function listReputationRows(db: Database): Promise<ReputationRow<ReputationCharacter>[]> {
+  const rows = await db
+    .select({
+      factionId: t.characterReputations.factionId,
+      name: t.characterReputations.name,
+      groupName: t.characterReputations.groupName,
+      reaction: t.characterReputations.reaction,
+      currentValue: t.characterReputations.currentValue,
+      minValue: t.characterReputations.minValue,
+      maxValue: t.characterReputations.maxValue,
+      id: t.characters.id,
+      characterName: t.characters.name,
+      class: t.characters.class,
+      level: t.characters.level,
+      accountDisplayName: t.wowAccounts.displayName,
+      accountFolderHint: t.wowAccounts.folderHint,
+    })
+    .from(t.characterReputations)
+    .innerJoin(t.characters, eq(t.characters.id, t.characterReputations.characterId))
+    .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
+    .orderBy(desc(t.characters.level), asc(t.characters.name));
+  return rows.map(({ id, characterName, class: classToken, level, accountDisplayName, accountFolderHint, ...reputation }) => ({
+    ...reputation,
+    character: { id, name: characterName, class: classToken, level, account: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }) },
+  }));
+}
+
+/** Dernier /played connu de chaque personnage, avec son compte ; null si jamais mesuré. */
+export async function listPlaytimeRows(db: Database): Promise<PlaytimeRow[]> {
+  const rows = await db
+    .select({
+      characterId: t.characters.id,
+      accountId: t.wowAccounts.id,
+      accountDisplayName: t.wowAccounts.displayName,
+      accountFolderHint: t.wowAccounts.folderHint,
+      totalSeconds: t.characterPlaytime.totalSeconds,
+    })
+    .from(t.characters)
+    .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
+    .leftJoin(t.characterPlaytime, eq(t.characterPlaytime.characterId, t.characters.id));
+  return rows.map(({ accountDisplayName, accountFolderHint, ...row }) => ({
+    ...row,
+    accountLabel: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }),
+  }));
+}
+
+/** Sessions de tous les personnages commencées depuis `since`. */
+export async function listSessionFacts(db: Database, since: Date): Promise<SessionFact[]> {
+  return db
+    .select({
+      characterId: t.characterSessions.characterId,
+      startedAt: t.characterSessions.startedAt,
+      durationSeconds: t.characterSessions.durationSeconds,
+      xpGained: t.characterSessions.xpGained,
+      levels: t.characterSessions.levels,
+      tag: t.characterSessions.tag,
+    })
+    .from(t.characterSessions)
+    .where(gte(t.characterSessions.startedAt, since))
+    .orderBy(asc(t.characterSessions.startedAt));
 }

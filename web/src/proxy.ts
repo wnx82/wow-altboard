@@ -7,7 +7,8 @@ import { sessionCookieName } from "@/lib/auth/cookie";
 //    filtre, que les requêtes de préchargement ne traversent pas (voir matcher) : la session est
 //    réellement vérifiée en base par chaque page, par requireSession().
 
-const PUBLIC_PATHS = new Set(["/login", "/robots.txt"]);
+// Manifeste et icônes du site installable : le système les lit parfois sans la session du site.
+const PUBLIC_PATHS = new Set(["/login", "/robots.txt", "/app.webmanifest"]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -50,7 +51,7 @@ export const config = {
   matcher: [
     {
       // Les routes d'API s'authentifient elles-mêmes ; les fichiers statiques n'ont pas de CSP.
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|icons/|apple-icon).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

@@ -98,9 +98,9 @@ describe("lecture du tableau de bord", () => {
       return queries;
     };
 
-    assert.equal(await measure(1), 3);
-    assert.equal(await measure(5), 3);
-    assert.equal(await measure(50), 3);
+    assert.equal(await measure(1), 4);
+    assert.equal(await measure(5), 4);
+    assert.equal(await measure(50), 4);
   });
 
   test("la fiche rassemble toutes les sections", async () => {

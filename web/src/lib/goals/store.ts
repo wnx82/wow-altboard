@@ -230,6 +230,9 @@ export async function saveTemplate(db: DatabaseOrTransaction, characterId: numbe
   return { ok: true, id: template.id, goals: goals.length };
 }
 
+/** Identité d'un objectif dans un modèle : même sorte, mêmes paramètres, même libellé. */
+export const goalKey = (goal: { label: string; kind: string; params: unknown }) => JSON.stringify([goal.kind, goal.label, readParams(goal.params)]);
+
 /**
  * Ajoute à un personnage les objectifs d'un modèle qu'il n'a pas déjà (même sorte, mêmes
  * paramètres, même libellé) : réappliquer un modèle ne crée aucun doublon.
@@ -247,10 +250,9 @@ export async function applyTemplate(db: DatabaseOrTransaction, characterId: numb
       .where(eq(t.characterGoals.characterId, characterId)),
   ]);
   if (items.length === 0) return { ok: false, error: "Modèle inconnu ou vide." };
-  const key = (goal: { label: string; kind: string; params: unknown }) => JSON.stringify([goal.kind, goal.label, readParams(goal.params)]);
-  const known = new Set(current.map(key));
+  const known = new Set(current.map(goalKey));
   const missing = items
-    .filter((item) => !known.has(key(item)))
+    .filter((item) => !known.has(goalKey(item)))
     .map((item): GoalInput => ({ kind: readKind(item.kind), params: readParams(item.params), label: item.label }));
   return addGoals(db, characterId, missing, now);
 }

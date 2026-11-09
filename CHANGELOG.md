@@ -4,6 +4,29 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.9.0 — 2026-11-09
+
+### Ajouté
+
+- Accueil : bloc **À surveiller**, calculé à partir des données déjà synchronisées : PC muets depuis
+  7 jours, sacs pleins ou à 2 places près, métiers arrivés au maximum de leur palier, équipement
+  incomplet (à partir du niveau 10), personnages pas vus en jeu depuis 14 jours, banque jamais
+  relevée. Les personnages masqués dans l'addon n'y figurent pas.
+- Accueil : courbe de l'**or cumulé** de tous les personnages sur 90 jours. Entre deux relevés,
+  chaque personnage garde sa dernière valeur connue.
+- Objectifs : progression « Objectifs 2/5 » sur chaque carte, colonne dans le tableau et filtre
+  (en cours, tous atteints, sans objectif). Nouvelle page **Objectifs** : un tableau par modèle, ses
+  objectifs en colonnes, les personnages en lignes.
+- Page **Réputations** : chaque faction avec les personnages qui la connaissent, du meilleur palier
+  au moins bon, groupée comme dans le jeu.
+- Page **Temps de jeu** : total par compte, résumé des 12 dernières semaines (heures, sessions,
+  expérience, répartition par étiquette) et carte jour × heure, à l'heure de Bruxelles.
+- Page **Machines** : un PC sans synchronisation depuis 7 jours est signalé (« Muet depuis N
+  jours »), avec une liste en tête de page.
+- Site installable sur le téléphone : manifeste `app.webmanifest`, icônes (dont une icône
+  adaptative et une pour iOS), couleur de thème. Le manifeste et les icônes répondent sans session,
+  le système les lisant parfois sans le cookie du site.
+
 ## Site 0.8.2 — 2026-11-09
 
 ### Ajouté

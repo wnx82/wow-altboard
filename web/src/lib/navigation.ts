@@ -1,4 +1,4 @@
-// Navigation principale : quatorze pages en trois groupes, pour que l'en-tête tienne sur une ligne
+// Navigation principale : dix-sept pages en trois groupes, pour que l'en-tête tienne sur une ligne
 // à toutes les largeurs. Chaque groupe s'ouvre en liste déroulante ; sur téléphone, un seul bouton
 // ouvre les trois groupes à la fois.
 
@@ -11,9 +11,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Personnages",
     items: [
       { href: "/", label: "Personnages" },
+      { href: "/goals", label: "Objectifs" },
       { href: "/items", label: "Objets" },
       { href: "/professions", label: "Métiers" },
+      { href: "/reputations", label: "Réputations" },
       { href: "/levels", label: "Niveaux" },
+      { href: "/playtime", label: "Temps de jeu" },
       { href: "/activity", label: "Activité" },
     ],
   },

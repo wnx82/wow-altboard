@@ -7,6 +7,7 @@ import { agentDirectory, archiveAgent, findAgent, formatAgentSize } from "@/lib/
 import { requireSession } from "@/lib/auth/session";
 import { createTokenAction, renameMachineAction, revokeTokenAction } from "@/lib/dashboard/actions";
 import { listMachines, listRecentRuns, machineLabel } from "@/lib/dashboard/queries";
+import { SILENT_MACHINE_DAYS, silentDays } from "@/lib/dashboard/watch";
 import { isOutdated } from "@/lib/versions";
 import { formatDateTime, formatRelative } from "@/lib/wow/format";
 
@@ -33,6 +34,10 @@ export default async function MachinesPage() {
   const archive = agent ? await archiveAgent(agent, agentVersion) : null;
   const basePath = process.env.WOW_BASE_PATH ?? "";
   const outdated = machines.filter((machine) => isOutdated(machine.agentVersion, agentVersion));
+  const silent = machines.flatMap((machine) => {
+    const days = silentDays(machine.lastSeenAt, now);
+    return days === null ? [] : [{ machine, days }];
+  });
 
   return (
     <>
@@ -68,6 +73,14 @@ export default async function MachinesPage() {
         </section>
       )}
 
+      {silent.length > 0 && (
+        <p className="panel mt-6 border-warn/40 px-5 py-3 text-sm text-warn" role="status">
+          {silent.length > 1 ? "PC muets" : "PC muet"} depuis {SILENT_MACHINE_DAYS} jours ou plus :{" "}
+          {silent.map(({ machine, days }) => `${machine.label} (${days} jours)`).join(", ")}. Vérifiez que l&apos;agent tourne sur ce PC et
+          que le jeu y a été lancé.
+        </p>
+      )}
+
       <section className="mt-6" aria-label="Machines connues">
         {machines.length === 0 ? (
           <EmptyState title="Aucune machine n'a encore synchronisé">Créez un jeton ci-dessous, puis suivez les instructions.</EmptyState>
@@ -77,9 +90,16 @@ export default async function MachinesPage() {
               <li key={machine.id} className="panel p-5">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h2 className="display text-xl font-bold text-gold">{machine.label}</h2>
-                  <time className="text-sm text-muted" dateTime={machine.lastSeenAt.toISOString()} title={formatDateTime(machine.lastSeenAt)}>
-                    Dernière synchro {formatRelative(machine.lastSeenAt, now)}
-                  </time>
+                  <span className="flex flex-wrap items-baseline gap-2">
+                    {silentDays(machine.lastSeenAt, now) !== null && (
+                      <span className="badge" data-tone="warn">
+                        Muet depuis {silentDays(machine.lastSeenAt, now)} jours
+                      </span>
+                    )}
+                    <time className="text-sm text-muted" dateTime={machine.lastSeenAt.toISOString()} title={formatDateTime(machine.lastSeenAt)}>
+                      Dernière synchro {formatRelative(machine.lastSeenAt, now)}
+                    </time>
+                  </span>
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                   <div>

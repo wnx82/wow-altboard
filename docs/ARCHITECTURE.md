@@ -51,13 +51,15 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 |---|---|
 | `src/db` | Schéma Drizzle (source unique), migrations SQL générées, garde-fou de cible |
 | `src/lib/sync` | Schéma Zod du document, traitement transactionnel, gestionnaire HTTP |
-| `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, suppression d'un compte, actions serveur |
+| `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, suppression d'un compte, actions serveur ; calculs purs testés sans base : bloc « À surveiller », or cumulé, temps de jeu, réputations comparées |
+| `src/lib/goals` | Objectifs par personnage : évaluation, modèles, tableau d'un modèle par personnage |
 | `src/lib/auth` | Mots de passe scrypt, sessions en base, cookie, mot de passe redemandé avant une suppression définitive |
 | `src/lib/xlsx` | Écriture XLSX sans dépendance |
 | `src/lib/status` | État des serveurs de jeu : sonde TCP, moniteur périodique, historique ([SERVER-STATUS](SERVER-STATUS.md)) |
 | `src/lib/settings` | Page **Paramètres** : réglages en base, validation des saisies, réinitialisation des personnages |
 | `src/lib/economy` | Import des prix et des recettes, moteur économique déterministe (prix, craft, farm, opportunités), faits structurés, assistant facultatif ([ECONOMY-ENGINE](ECONOMY-ENGINE.md)) |
-| `src/app` | Pages et routes ; `src/proxy.ts` pose la CSP et filtre les requêtes sans session |
+| `src/app` | Pages et routes, manifeste du site installable (`app.webmanifest`) ; `src/proxy.ts` pose la CSP et filtre les requêtes sans session |
+| `scripts` | Outils lancés à la main, dont `generate-icons.ts` qui redessine les icônes du site installable |
 | `src/instrumentation.ts` | Lance le moniteur d'état au démarrage du serveur |
 
 ## Décisions

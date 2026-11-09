@@ -514,6 +514,15 @@ body {
   /* État des serveurs. La pastille reprend la couleur du badge ; creuse pour « Inconnu ». */
   .status-dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: currentColor; }
   .badge[data-status="unknown"] .status-dot { background: transparent; box-shadow: 0 0 0 1.5px currentColor inset; }
+  /* Carte jour × heure du temps de jeu : cinq paliers d'intensité, relatifs à l'heure la plus jouée. */
+  .heatmap { border-collapse: separate; border-spacing: 2px; width: 100%; }
+  .heatmap-cell { height: 1.4rem; min-width: 1.1rem; border-radius: 0.2rem; background: rgb(255 255 255 / 0.05); }
+  .heatmap-cell[data-level="1"] { background: color-mix(in srgb, var(--gold) 18%, transparent); }
+  .heatmap-cell[data-level="2"] { background: color-mix(in srgb, var(--gold) 36%, transparent); }
+  .heatmap-cell[data-level="3"] { background: color-mix(in srgb, var(--gold) 54%, transparent); }
+  .heatmap-cell[data-level="4"] { background: color-mix(in srgb, var(--gold) 74%, transparent); }
+  .heatmap-cell[data-level="5"] { background: var(--gold); }
+
   /* Frise des 24 dernières heures : une case par heure, grise sans mesure. */
   .status-strip { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; }
   .status-cell { height: 1.6rem; border-radius: 0.2rem; background: rgb(255 255 255 / 0.07); }

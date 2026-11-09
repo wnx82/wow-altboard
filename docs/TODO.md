@@ -64,10 +64,10 @@ personnage recréé, et à tous les autres.
 - [x] **P1 · M** — Page personnage : section **Objectifs** (ajouter, cocher, réordonner, supprimer,
   appliquer un modèle), par des actions serveur comme celles de **Paramètres**. Fait le 2026-11-08
   (`c3146ee`).
-- [ ] **P2 · S** — Barre de progression sur les cartes et colonne dans le tableau de l'accueil,
-  avec un filtre « objectifs en cours ».
-- [ ] **P2 · M** — Page **Objectifs** : un modèle en colonnes, les personnages en lignes, pour voir
-  d'un coup qui en est où.
+- [x] **P2 · S** — Barre de progression sur les cartes et colonne dans le tableau de l'accueil,
+  avec un filtre « objectifs en cours ». Fait le 2026-11-09 (site 0.9.0).
+- [x] **P2 · M** — Page **Objectifs** : un modèle en colonnes, les personnages en lignes, pour voir
+  d'un coup qui en est où. Fait le 2026-11-09 (site 0.9.0).
 - [ ] **P3 · S** — Liste récurrente (remise à zéro chaque jour ou chaque semaine), manuelle
   seulement : l'addon ne relève aucun verrou.
 - [ ] **P3 · S** — Feuille « Objectifs » dans l'export XLSX.
@@ -83,21 +83,26 @@ personnage recréé, et à tous les autres.
   combien ? ». La recherche actuelle est limitée à l'inventaire d'un personnage ; les tables
   `character_items` et `items` suffisent. Fait le 2026-11-08 (`190404c`) : page **Objets**, par
   nom (sans tenir compte des accents) ou identifiant, sacs, banque et équipement.
-- [ ] **P2 · M** — Bloc « À surveiller » sur l'accueil, calculé sans nouvelle donnée : sacs pleins
+- [x] **P2 · M** — Bloc « À surveiller » sur l'accueil, calculé sans nouvelle donnée : sacs pleins
   (`bag_slots_used` / `bag_slots_total`), banque jamais relevée (`bank_at` vide), personnage non
-  relevé depuis N jours, emplacement d'équipement vide, métier arrivé à son maximum.
-- [ ] **P2 · M** — Courbe de l'or cumulé de tous les personnages, à partir des relevés. Chaque
+  relevé depuis N jours, emplacement d'équipement vide, métier arrivé à son maximum. Fait le
+  2026-11-09 (site 0.9.0), avec les PC muets ; l'équipement n'est signalé qu'à partir du niveau 10.
+- [x] **P2 · M** — Courbe de l'or cumulé de tous les personnages, à partir des relevés. Chaque
   personnage garde sa dernière valeur connue entre deux relevés : un relevé n'est créé qu'à une
-  progression.
-- [ ] **P2 · S** — Page **Réputations** comparées, sur le modèle de la page **Métiers**.
+  progression. Fait le 2026-11-09 (site 0.9.0) : 90 jours, sur l'accueil.
+- [x] **P2 · S** — Page **Réputations** comparées, sur le modèle de la page **Métiers**. Fait le
+  2026-11-09 (site 0.9.0).
 - [ ] **P2 · M** — Temps de jeu : total par compte et tous personnages confondus ; temps du niveau N
-  comparé d'un personnage à l'autre.
-- [ ] **P2 · M** — Sessions : résumé par semaine (heures jouées, expérience), répartition par
-  étiquette (`Leveling`, `Dungeon`, `Farming`), carte jour × heure.
+  comparé d'un personnage à l'autre. Le total par compte est fait le 2026-11-09 (site 0.9.0, page
+  **Temps de jeu**) ; la comparaison du temps par niveau reste à faire.
+- [x] **P2 · M** — Sessions : résumé par semaine (heures jouées, expérience), répartition par
+  étiquette (`Leveling`, `Dungeon`, `Farming`), carte jour × heure. Fait le 2026-11-09 (site
+  0.9.0, page **Temps de jeu**).
 - [ ] **P3 · M** — Comparaison de deux personnages côte à côte (statistiques, équipement).
 - [ ] **P3 · S** — Notes libres et étiquettes par personnage (principal, reroll, banque), saisies
   sur le site.
-- [ ] **P3 · S** — Site installable sur le téléphone (manifeste et icônes).
+- [x] **P3 · S** — Site installable sur le téléphone (manifeste et icônes). Fait le 2026-11-09
+  (site 0.9.0).
 
 ### 1.3 Avec de nouvelles données
 

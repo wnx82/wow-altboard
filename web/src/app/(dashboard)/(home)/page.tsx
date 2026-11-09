@@ -3,32 +3,52 @@ import Link from "next/link";
 import { CharacterBrowser } from "@/components/character-browser";
 import { Confidence, ItemName } from "@/components/economy";
 import { ServerStatusTiles } from "@/components/server-status";
+import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { Money, StatTile } from "@/components/ui";
+import { WatchListPanel } from "@/components/watch-list";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { getOverview, listCharacters } from "@/lib/dashboard/queries";
+import { buildGoldHistory, GOLD_HISTORY_DAYS } from "@/lib/dashboard/gold-history";
+import { getOverview, listCharacters, listMoneySnapshots } from "@/lib/dashboard/queries";
+import { buildWatchList, loadWatchFacts, loadWatchMachines } from "@/lib/dashboard/watch";
 import { KIND_LABELS } from "@/lib/economy/opportunities";
 import { latestOpportunities } from "@/lib/economy/runs";
 import { formatDay } from "@/lib/economy/view";
 import { isConfigured } from "@/lib/status/config";
 import { syncStatusRuntime } from "@/lib/status/runtime";
 import { getServiceSummaries } from "@/lib/status/view";
-import { formatDateTime, formatRelative } from "@/lib/wow/format";
+import { formatDateTime, formatMoney, formatRelative } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Mes personnages" };
+
+const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
 
 export default async function CharactersPage() {
   await requireSession();
   const db = getDatabase();
   const now = new Date();
   const { config } = await syncStatusRuntime();
-  const [characters, overview, servers, opportunities] = await Promise.all([
+  const goldSince = new Date(now.getTime() - GOLD_HISTORY_DAYS * 24 * 3600 * 1000);
+  const [characters, overview, servers, opportunities, moneySnapshots, machines] = await Promise.all([
     listCharacters(db),
     getOverview(db),
     // Sans serveur surveillé, ni requête ni miniature : il n'y aurait que de l'« Inconnu » à montrer.
     isConfigured(config) ? getServiceSummaries(db, config, now) : null,
     latestOpportunities(db),
+    listMoneySnapshots(db, goldSince),
+    loadWatchMachines(db),
   ]);
+  const watchFacts = await loadWatchFacts(
+    db,
+    characters.map((character) => character.id),
+  );
+  const watch = buildWatchList(characters, watchFacts, machines, now);
+  const goldPoints: TrendPoint[] = buildGoldHistory(moneySnapshots, goldSince, now).map((day) => ({
+    at: `${day.day}T12:00:00Z`,
+    value: day.copper / 10_000,
+    label: `${formatMoney(day.copper)} (${day.characters} personnage${day.characters > 1 ? "s" : ""})`,
+    dateLabel: shortDate.format(new Date(`${day.day}T12:00:00Z`)),
+  }));
 
   const levels = characters.map((character) => character.level).filter((level): level is number => level !== null);
   const averageLevel = levels.length > 0 ? levels.reduce((total, level) => total + level, 0) / levels.length : null;
@@ -88,6 +108,14 @@ export default async function CharactersPage() {
           hint={professions > 0 ? `${distinctProfessions} différent${distinctProfessions > 1 ? "s" : ""}` : undefined}
         />
       </div>
+
+      <WatchListPanel list={watch} />
+
+      {goldPoints.length > 1 && (
+        <section className="mb-8" aria-label="Or cumulé">
+          <TrendChart title={`Or cumulé de tous les personnages, ${GOLD_HISTORY_DAYS} derniers jours`} series="gold" points={goldPoints} />
+        </section>
+      )}
 
       {opportunities && opportunities.top.length > 0 && (
         <section className="mb-8" aria-labelledby="opportunities-title">
