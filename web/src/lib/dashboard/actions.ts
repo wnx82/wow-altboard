@@ -6,7 +6,9 @@ import * as z from "zod";
 import { getDatabase } from "@/db/client";
 import { machines, wowAccounts } from "@/db/schema";
 import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
+import { confirmPassword } from "@/lib/auth/confirm-password";
 import { requireSession } from "@/lib/auth/session";
+import { deleteAccount } from "./delete-account";
 
 // Chaque action vérifie la session elle-même : une Server Action est un point d'entrée HTTP à part
 // entière, joignable sans passer par la page qui l'affiche.
@@ -40,6 +42,26 @@ export async function renameMachineAction(_previous: ActionState, formData: Form
     .where(eq(machines.id, parsed.data.id));
   revalidatePath("/", "layout");
   return { saved: true };
+}
+
+export type DeleteAccountState = { error?: string };
+
+/** Supprime un compte et ses personnages. Suppression définitive : le mot de passe est redemandé. */
+export async function deleteAccountAction(_previous: DeleteAccountState, formData: FormData): Promise<DeleteAccountState> {
+  const session = await requireSession();
+  const parsed = id.safeParse(formData.get("id"));
+  if (!parsed.success) return { error: "Compte inconnu." };
+  const password = formData.get("password");
+
+  const db = getDatabase();
+  const refused = await confirmPassword(db, session, typeof password === "string" ? password : "", "account.delete");
+  if (refused) return { error: refused };
+
+  const deleted = await deleteAccount(db, parsed.data);
+  if (!deleted) return { error: "Ce compte n'existe plus." };
+  console.log(JSON.stringify({ event: "account.deleted", userId: session.userId, accountId: parsed.data, ...deleted }));
+  revalidatePath("/", "layout");
+  return {};
 }
 
 export type TokenState = { error?: string; token?: string; label?: string };

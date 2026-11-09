@@ -1,5 +1,5 @@
 import { eq, lt, max, min, notExists, sql } from "drizzle-orm";
-import type { Database } from "@/db/client";
+import type { Database, DatabaseOrTransaction } from "@/db/client";
 import { characters, realms } from "@/db/schema";
 import { SYNC_LOCK_KEY } from "@/lib/sync/process";
 import { writeSettings } from "./store";
@@ -20,12 +20,16 @@ export async function resetCharacters(db: Database, cutoff: Date, now: Date): Pr
     // Verrou des synchronisations : aucune ne s'intercale entre la suppression et la date limite.
     await tx.execute(sql`select pg_advisory_xact_lock(${SYNC_LOCK_KEY})`);
     const deleted = await tx.delete(characters).where(lt(characters.sourceLastSeenAt, cutoff)).returning({ id: characters.id });
-    // Un royaume sans personnage n'apparaît nulle part : celui de la bêta ne reste pas en base.
-    await tx.delete(realms).where(notExists(tx.select({ id: characters.id }).from(characters).where(eq(characters.realmId, realms.id))));
+    await deleteEmptyRealms(tx);
     const [remaining] = await tx.select({ count: sql<number>`count(*)::int` }).from(characters);
     await writeSettings(tx, { charactersCutoffAt: cutoff, charactersResetAt: now }, now);
     return { deleted: deleted.length, kept: remaining.count };
   });
+}
+
+/** Un royaume sans personnage n'apparaît nulle part : après une suppression, il ne reste pas en base. */
+export async function deleteEmptyRealms(db: DatabaseOrTransaction): Promise<void> {
+  await db.delete(realms).where(notExists(db.select({ id: characters.id }).from(characters).where(eq(characters.realmId, realms.id))));
 }
 
 export type CharacterSummary = { count: number; oldestSeenAt: Date | null; newestSeenAt: Date | null };

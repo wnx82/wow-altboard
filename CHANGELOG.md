@@ -4,6 +4,20 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.8.2 — 2026-11-09
+
+### Ajouté
+
+- Page Comptes : **Supprimer ce compte…** sur chaque fiche. La confirmation rappelle ce qui
+  disparaît (personnages et leur historique, relevés de marché, liens aux PC) et redemande le mot de
+  passe. Les prix déjà relevés restent. Prévu pour la copie d'un dossier `WTF\Account` vue une
+  seule fois ([DATABASE](docs/DATABASE.md#suppression-dun-compte)).
+
+### Modifié
+
+- La réinitialisation des personnages et la suppression d'un compte partagent la même vérification
+  du mot de passe, chacune avec son propre compteur de tentatives.
+
 ## Site 0.8.1 — 2026-11-08
 
 ### Modifié

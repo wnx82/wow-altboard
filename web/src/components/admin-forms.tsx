@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import type { ActionState, TokenState } from "@/lib/dashboard/actions";
+import type { ActionState, DeleteAccountState, TokenState } from "@/lib/dashboard/actions";
 
 type RenameAction = (previous: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -19,6 +19,66 @@ export function RenameForm({ id, name, placeholder, action, label }: { id: numbe
         {state.error && <span className="text-danger">{state.error}</span>}
         {state.saved && <span className="text-ok">Enregistré.</span>}
       </span>
+    </form>
+  );
+}
+
+type DeleteAccountAction = (previous: DeleteAccountState, formData: FormData) => Promise<DeleteAccountState>;
+
+/**
+ * Suppression d'un compte en deux temps : le bouton ouvre la confirmation, qui rappelle ce qui
+ * disparaît et redemande le mot de passe. Une fois le compte supprimé, la page ne l'affiche plus.
+ */
+export function DeleteAccountForm({ id, label, reference, characters, action }: { id: number; label: string; reference: string | null; characters: number; action: DeleteAccountAction }) {
+  const [state, formAction, pending] = useActionState(action, {});
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button className="button" data-variant="danger" type="button" onClick={() => setOpen(true)}>
+        Supprimer ce compte…
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={formAction}
+      className="space-y-3 rounded-xl border border-danger/40 bg-danger/5 p-4"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !pending) setOpen(false);
+      }}
+    >
+      <input type="hidden" name="id" value={id} />
+      <p className="text-sm font-semibold text-danger">
+        Supprimer définitivement « {label} »{reference ? ` (${reference})` : ""} ?
+      </p>
+      <ul className="list-disc space-y-1 pl-5 text-xs text-muted">
+        <li>
+          Sont supprimés :{" "}
+          {characters === 0 ? "le compte, sans personnage" : characters === 1 ? "son personnage et son historique" : `ses ${characters} personnages et leur historique`},
+          ses relevés de marché et ses liens aux PC. Les prix déjà relevés restent.
+        </li>
+        <li>
+          Si le dossier existe encore dans <code className="text-text">WTF\Account</code> d&apos;un PC, supprimez-le d&apos;abord : sinon l&apos;agent
+          recrée le compte dès que le fichier change.
+        </li>
+      </ul>
+      <label className="block">
+        <span className="eyebrow">Mot de passe</span>
+        <input className="field mt-1.5 block w-full max-w-xs" type="password" name="password" autoComplete="current-password" required autoFocus />
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="button" data-variant="danger" type="submit" disabled={pending}>
+          {pending ? "Suppression…" : "Supprimer définitivement"}
+        </button>
+        <button className="button" type="button" disabled={pending} onClick={() => setOpen(false)}>
+          Annuler
+        </button>
+        <span className="text-sm" role="status">
+          {state.error && <span className="text-danger">{state.error}</span>}
+        </span>
+      </div>
     </form>
   );
 }

@@ -131,7 +131,24 @@ et fin d'une session de farm), plus l'index unique partiel des sessions de farm 
 dans `pg_constraint` de la base de test le 2026-11-06.
 
 Suppression d'un personnage : ses tables filles et ses snapshots suivent (`ON DELETE CASCADE`).
-Un compte, un royaume ou une machine référencé ne peut pas être supprimé.
+Un compte, un royaume ou une machine référencé ne peut pas être supprimé directement : la
+suppression d'un compte (ci-dessous) retire d'abord ce qui le référence.
+
+## Suppression d'un compte
+
+Sur la page **Comptes**, mot de passe à l'appui, par exemple pour la copie d'un dossier
+`WTF\Account` qu'un PC n'a envoyée qu'une fois. Une transaction, sous le verrou des
+synchronisations :
+
+| Étape | Effet |
+|---|---|
+| Personnages | ceux du compte, avec leurs tables filles et leurs snapshots |
+| Marché | les `market_imports` du compte ; `market_item_latest.import_id` passe à null. Les prix de `market_item_days` restent : fusionnés jour par jour avec ceux des autres comptes, ils ne s'en séparent plus |
+| Liens | les lignes `machine_accounts` du compte, puis le compte lui-même |
+| Royaumes | un royaume resté sans personnage est supprimé |
+
+Un PC qui garde le dossier recrée le compte quand l'agent renvoie le fichier, c'est-à-dire dès
+qu'il change : supprimer d'abord le dossier sur le PC.
 
 ## Réinitialisation des personnages
 

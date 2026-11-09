@@ -54,6 +54,7 @@ hors limites, le serveur revalide tout.
 | Connexion | 5 tentatives / 15 min par client et par adresse ; message identique quel que soit le motif ; un hachage est calculé même pour un compte inexistant, pour que la durée de réponse ne le révèle pas |
 | Redirection après connexion | chemin interne uniquement (pas de redirection ouverte) |
 | Réinitialisation des personnages | suppression définitive (**Paramètres**) : le mot de passe est redemandé, une session seule ne suffit pas ; 5 tentatives / 15 min par compte ; journalisée sans donnée de personnage (`settings.characters.reset`) |
+| Suppression d'un compte | suppression définitive (**Comptes**) : confirmation en deux temps et mot de passe redemandé ; 5 tentatives / 15 min, compteur distinct ; journalisée avec le seul identifiant interne et les nombres supprimés (`account.deleted`), sans référence de compte |
 | CSRF | les actions serveur de Next.js vérifient l'origine ; cookie `SameSite=Lax` ; aucune mutation par `GET` |
 | XSS | échappement de React ; aucune insertion de HTML brut ; CSP à nonce |
 | Injection SQL | requêtes paramétrées (Drizzle) ; identifiants d'URL validés avant usage |

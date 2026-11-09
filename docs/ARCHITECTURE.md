@@ -51,8 +51,8 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 |---|---|
 | `src/db` | Schéma Drizzle (source unique), migrations SQL générées, garde-fou de cible |
 | `src/lib/sync` | Schéma Zod du document, traitement transactionnel, gestionnaire HTTP |
-| `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, actions serveur |
-| `src/lib/auth` | Mots de passe scrypt, sessions en base, cookie |
+| `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, suppression d'un compte, actions serveur |
+| `src/lib/auth` | Mots de passe scrypt, sessions en base, cookie, mot de passe redemandé avant une suppression définitive |
 | `src/lib/xlsx` | Écriture XLSX sans dépendance |
 | `src/lib/status` | État des serveurs de jeu : sonde TCP, moniteur périodique, historique ([SERVER-STATUS](SERVER-STATUS.md)) |
 | `src/lib/settings` | Page **Paramètres** : réglages en base, validation des saisies, réinitialisation des personnages |

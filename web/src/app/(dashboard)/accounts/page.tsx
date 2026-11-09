@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { AccountReference } from "@/components/account-reference";
-import { RenameForm } from "@/components/admin-forms";
+import { DeleteAccountForm, RenameForm } from "@/components/admin-forms";
 import { EmptyState, Money } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { renameAccountAction } from "@/lib/dashboard/actions";
+import { deleteAccountAction, renameAccountAction } from "@/lib/dashboard/actions";
 import { listAccounts } from "@/lib/dashboard/queries";
 import { formatDateTime, formatRelative } from "@/lib/wow/format";
 
@@ -73,13 +73,20 @@ export default async function AccountsPage() {
                 </ul>
               </div>
 
-              <div className="mt-4 border-t border-line pt-4">
+              <div className="mt-4 space-y-3 border-t border-line pt-4">
                 <RenameForm
                   id={account.id}
                   name={account.displayName}
                   placeholder={`Compte ${account.folderHint ?? ""}`}
                   action={renameAccountAction}
                   label={`Nom d'affichage de ${account.label}`}
+                />
+                <DeleteAccountForm
+                  id={account.id}
+                  label={account.label}
+                  reference={account.folderName ?? account.folderHint}
+                  characters={account.characters}
+                  action={deleteAccountAction}
                 />
               </div>
             </li>

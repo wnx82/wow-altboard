@@ -1,12 +1,9 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/db/client";
-import { adminUsers } from "@/db/schema";
-import { verifyPassword } from "@/lib/auth/password";
+import { confirmPassword } from "@/lib/auth/confirm-password";
 import { requireSession } from "@/lib/auth/session";
-import { RateLimiter } from "@/lib/rate-limit";
 import { syncStatusRuntime } from "@/lib/status/runtime";
 import { pruneChecks } from "@/lib/status/store";
 import { parseCutoffInput, parseLabelInput, parseTargetsInput } from "./input";
@@ -73,9 +70,6 @@ export async function saveStatusSettingsAction(_previous: StatusSettingsState, f
 
 export type ResetState = { error?: string; deleted?: number; kept?: number };
 
-const RESET_ATTEMPTS = { max: 5, windowMs: 15 * 60_000 };
-const limiter = new RateLimiter();
-
 /**
  * Réinitialise les personnages. Suppression définitive : le mot de passe est redemandé, une
  * session seule ne suffit pas.
@@ -85,16 +79,10 @@ export async function resetCharactersAction(_previous: ResetState, formData: For
   const now = new Date();
   const cutoff = parseCutoffInput(field(formData, "cutoff"), now);
   if (!cutoff.ok) return { error: cutoff.error };
-  const password = field(formData, "password");
-  if (!password || password.length > 1024) return { error: "Saisissez votre mot de passe pour confirmer." };
-  if (!limiter.consume(`reset:${session.userId}`, RESET_ATTEMPTS)) return { error: "Trop de tentatives. Réessayez dans quelques minutes." };
 
   const db = getDatabase();
-  const [user] = await db.select({ passwordHash: adminUsers.passwordHash }).from(adminUsers).where(eq(adminUsers.id, session.userId));
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    console.warn(JSON.stringify({ event: "settings.characters.reset_refused", userId: session.userId }));
-    return { error: "Mot de passe incorrect." };
-  }
+  const refused = await confirmPassword(db, session, field(formData, "password"), "settings.characters.reset");
+  if (refused) return { error: refused };
 
   const result = await resetCharacters(db, cutoff.value, now);
   console.log(JSON.stringify({ event: "settings.characters.reset", userId: session.userId, deleted: result.deleted, kept: result.kept }));
