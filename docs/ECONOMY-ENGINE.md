@@ -158,6 +158,13 @@ nom de l'addon reste prioritaire ; une clé `g:1234:60` prend le nom de `1234`, 
 (`p:…`) ou une clé à suffixe de l'addon (`1234:567`) n'en reçoit pas. Les noms servent au Marché,
 au Craft, au Farm, aux Opportunités, aux faits de l'assistant et aux libellés des objectifs.
 
+L'agent 0.7.0 complète ces noms avec ceux du cache local du client (`DBCache.bin`), envoyés à la
+synchronisation quand ce cache change (`storeClientNames`). Ce sont les enregistrements que le
+serveur du jeu a transmis au client, correctifs compris : plus récents que la table de wago.tools,
+ils la remplacent (source `client`, qualité déjà connue gardée), et un import wago.tools ne les
+écrase pas. Seule la langue `frFR` est retenue. Sur les données réelles du 2026-11-09, wago.tools
+seul nomme 59 % des objets d'Auctionator ; avec le cache, 98,5 %.
+
 ## Limites connues
 
 - Granularité journalière : pas de prix « 24 h » ni d'heure de scan, pas de nombre d'enchères.

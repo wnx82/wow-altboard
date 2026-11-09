@@ -120,6 +120,31 @@ const session = z.strictObject({
   inProgress: z.boolean(),
 });
 
+// Finances par jour relevées par Allemano Ledger, envoyées depuis l'agent 0.7.0. Jour : date locale
+// du client de jeu. Montants en pièces de cuivre ; une source absente vaut 0. Les transferts entre
+// personnages du même joueur ne sont ni des revenus ni des dépenses.
+export const INCOME_SOURCES = ["loot", "vendor", "quest", "ah", "mail", "trade", "other"] as const;
+export const EXPENSE_SOURCES = ["repair", "vendor", "training", "travel", "ah", "mail", "trade", "other"] as const;
+const ledgerCopper = z.int().min(0).max(10_000_000_000_000);
+const amounts = <const T extends readonly string[]>(sources: T) =>
+  z.strictObject(Object.fromEntries(sources.map((source) => [source, ledgerCopper.optional()])) as { [K in T[number]]: z.ZodOptional<typeof ledgerCopper> });
+const ledgerDay = z.strictObject({
+  day: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((day) => {
+      const date = new Date(`${day}T00:00:00Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(day);
+    }, { message: "date invalide" }),
+  income: amounts(INCOME_SOURCES),
+  expense: amounts(EXPENSE_SOURCES),
+  transferIn: ledgerCopper,
+  transferOut: ledgerCopper,
+  lootValue: ledgerCopper.optional(),
+  gold: ledgerCopper.optional(),
+  playedSeconds: count.optional(),
+});
+
 const character = z.strictObject({
   guid: z.string().regex(/^[A-Za-z0-9-]{1,64}$/),
   name,
@@ -147,6 +172,11 @@ const character = z.strictObject({
   bank: container.optional(),
   playtime: playtime.optional(),
   sessions: z.array(session).max(60).optional(),
+  finances: z
+    .array(ledgerDay)
+    .max(800)
+    .refine((days) => new Set(days.map((d) => d.day)).size === days.length, { message: "jour en double" })
+    .optional(),
 });
 
 const item = z.strictObject({
@@ -242,9 +272,25 @@ export const syncPayloadSchema = z.strictObject({
     displayName: text(120).optional(),
   }),
   accounts: z.array(account).max(50),
+  // Noms d'objets du cache local d'un client (DBCache.bin), envoyés depuis l'agent 0.7.0 quand ce
+  // cache a changé. Un client par entrée.
+  itemNames: z
+    .array(
+      z.strictObject({
+        flavor: text(40),
+        locale: z.string().regex(/^[a-z]{2}[A-Z]{2}$/),
+        build: positiveId,
+        file: sourceFile,
+        names: z.array(z.strictObject({ id: positiveId, name: text(200) })).max(100_000),
+      }),
+    )
+    .max(10)
+    .optional(),
 });
 
 export type SyncPayload = z.infer<typeof syncPayloadSchema>;
+export type ItemNamesPayload = NonNullable<SyncPayload["itemNames"]>[number];
+export type LedgerDayPayload = NonNullable<CharacterPayload["finances"]>[number];
 export type AccountPayload = SyncPayload["accounts"][number];
 export type CharacterPayload = AccountPayload["characters"][number];
 export type ItemPayload = AccountPayload["items"][number];

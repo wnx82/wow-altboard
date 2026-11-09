@@ -14,9 +14,11 @@ export type EconomyCounters = {
   marketsUnchanged: number;
   marketObservations: number;
   recipeCharacters: number;
+  /** Noms d'objets du cache du jeu ajoutés ou modifiés (agent 0.7.0). */
+  itemNamesStored: number;
 };
 
-export const emptyEconomyCounters = (): EconomyCounters => ({ marketsImported: 0, marketsUnchanged: 0, marketObservations: 0, recipeCharacters: 0 });
+export const emptyEconomyCounters = (): EconomyCounters => ({ marketsImported: 0, marketsUnchanged: 0, marketObservations: 0, recipeCharacters: 0, itemNamesStored: 0 });
 
 type Scope = { accountId: number; machineId: number; runId: number; now: Date };
 

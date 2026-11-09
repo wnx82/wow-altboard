@@ -129,9 +129,10 @@ export default async function SettingsPage() {
             <p className="text-sm text-muted">
               L&apos;addon ne nomme que les objets que vos personnages ont eus en main. Les autres, cités par l&apos;hôtel des ventes et les
               recettes, prennent leur nom dans la table des objets du jeu que publie wago.tools pour chaque version du client WoW Forever, en
-              français. Le nom relevé par l&apos;addon reste prioritaire.
+              français. L&apos;agent 0.7.0 y ajoute les noms du cache de votre client de jeu, plus récents : ils remplacent ceux de wago.tools.
+              Le nom relevé par l&apos;addon reste prioritaire.
             </p>
-            <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+            <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
               <div>
                 <dt className="eyebrow">Noms importés</dt>
                 <dd className="mt-0.5 text-lg font-semibold tabular-nums">{formatInteger(catalog.wago.count)}</dd>
@@ -143,6 +144,13 @@ export default async function SettingsPage() {
               <div>
                 <dt className="eyebrow">Dernier import</dt>
                 <dd className="mt-0.5">{catalog.wago.updatedAt ? formatDateTime(catalog.wago.updatedAt) : "jamais"}</dd>
+              </div>
+              <div>
+                <dt className="eyebrow">Cache du jeu</dt>
+                <dd className="mt-0.5 text-lg font-semibold tabular-nums">{formatInteger(catalog.client.count)}</dd>
+                <dd className="text-xs text-muted">
+                  {catalog.client.updatedAt ? `reçus le ${formatDateTime(catalog.client.updatedAt)}` : "aucun envoi de l'agent"}
+                </dd>
               </div>
             </dl>
             <div className="mt-5 border-t border-line pt-4">

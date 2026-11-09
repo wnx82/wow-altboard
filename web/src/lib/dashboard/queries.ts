@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-or
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import type { ActivitySnapshot } from "./activity";
+import type { LedgerDayRow } from "./finances";
 import type { MoneySnapshot } from "./gold-history";
 import type { PlaytimeRow, SessionFact } from "./playtime";
 import type { ReputationRow } from "./reputations";
@@ -512,4 +513,64 @@ export async function listSessionFacts(db: Database, since: Date): Promise<Sessi
     .from(t.characterSessions)
     .where(gte(t.characterSessions.startedAt, since))
     .orderBy(asc(t.characterSessions.startedAt));
+}
+
+export type FinanceCharacter = { id: number; name: string; class: string | null; account: string };
+
+/** Journées d'Allemano Ledger depuis `from` (tout l'historique si null), et les personnages concernés. */
+export async function listLedgerDays(db: Database, from: string | null): Promise<{ rows: LedgerDayRow[]; characters: Map<number, FinanceCharacter> }> {
+  const days = t.characterLedgerDays;
+  const rows = await db
+    .select({
+      characterId: days.characterId,
+      machineId: days.machineId,
+      day: days.day,
+      income: days.income,
+      expense: days.expense,
+      transferIn: days.transferIn,
+      transferOut: days.transferOut,
+      lootValue: days.lootValue,
+      playedSeconds: days.playedSeconds,
+      name: t.characters.name,
+      class: t.characters.class,
+      accountDisplayName: t.wowAccounts.displayName,
+      accountFolderHint: t.wowAccounts.folderHint,
+    })
+    .from(days)
+    .innerJoin(t.characters, eq(t.characters.id, days.characterId))
+    .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
+    .where(from === null ? undefined : gte(days.day, from))
+    .orderBy(asc(days.day), asc(days.characterId), asc(days.machineId));
+
+  const characters = new Map<number, FinanceCharacter>();
+  for (const row of rows) {
+    if (!characters.has(row.characterId)) {
+      characters.set(row.characterId, {
+        id: row.characterId,
+        name: row.name,
+        class: row.class,
+        account: accountLabel({ displayName: row.accountDisplayName, folderHint: row.accountFolderHint }),
+      });
+    }
+  }
+  return {
+    rows: rows.map((row) => ({
+      characterId: row.characterId,
+      machineId: row.machineId,
+      day: row.day,
+      income: row.income,
+      expense: row.expense,
+      transferIn: row.transferIn,
+      transferOut: row.transferOut,
+      lootValue: row.lootValue,
+      playedSeconds: row.playedSeconds,
+    })),
+    characters,
+  };
+}
+
+/** Une journée d'Allemano Ledger existe-t-elle, toutes périodes confondues ? */
+export async function hasLedgerDays(db: Database): Promise<boolean> {
+  const [row] = await db.select({ day: t.characterLedgerDays.day }).from(t.characterLedgerDays).limit(1);
+  return row !== undefined;
 }

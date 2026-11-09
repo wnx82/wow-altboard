@@ -13,6 +13,12 @@ public sealed record SyncPayload(
     IReadOnlyList<AccountPayload> Accounts)
 {
     public const int CurrentSchemaVersion = 1;
+
+    /// <summary>
+    /// Noms des objets lus dans le cache local du jeu, un ensemble par client ; absents quand le cache
+    /// n'a pas changé depuis le dernier envoi accepté (voir <see cref="Economy.ItemNameCache"/>).
+    /// </summary>
+    public IReadOnlyList<ItemNamesPayload>? ItemNames { get; init; }
 }
 
 public sealed record MachinePayload(Guid Uuid, string Hostname, string? DisplayName);
@@ -101,6 +107,9 @@ public sealed record CharacterPayload
 
     /// <summary>Sessions de jeu relevées par l'addon Allemano Ledger ; absent si l'addon n'en a enregistré aucune.</summary>
     public IReadOnlyList<SessionPayload>? Sessions { get; init; }
+
+    /// <summary>Or gagné et dépensé par jour et par source, relevé par Allemano Ledger ; absent sans jour enregistré.</summary>
+    public IReadOnlyList<LedgerDayPayload>? Finances { get; init; }
 }
 
 public sealed record StatsPayload
@@ -159,6 +168,31 @@ public sealed record LevelTimePayload(int Level, int? PlayedSeconds, int? WallSe
 /// InProgress : session encore ouverte quand le jeu a écrit le fichier, donc valeurs provisoires.
 /// </summary>
 public sealed record SessionPayload(long StartedAt, long? StoppedAt, int? DurationSeconds, int? XpGained, int? Levels, string? Zone, string? Tag, bool InProgress);
+
+/// <summary>
+/// Une journée d'Allemano Ledger sur ce PC, datée à l'heure locale du jeu (AAAA-MM-JJ). Montants en
+/// pièces de cuivre. Income et Expense : par source (clés de <see cref="AltBoard.LedgerReader.IncomeSources"/>
+/// et <see cref="AltBoard.LedgerReader.ExpenseSources"/>). TransferIn et TransferOut : or échangé avec
+/// les autres personnages du joueur, ni gain ni dépense. LootValue : valeur marchande des objets
+/// ramassés. Gold : or détenu au dernier mouvement du jour. PlayedSeconds : temps connecté ce jour-là.
+/// </summary>
+public sealed record LedgerDayPayload(
+    string Day,
+    IReadOnlyDictionary<string, long> Income,
+    IReadOnlyDictionary<string, long> Expense,
+    long TransferIn,
+    long TransferOut,
+    long? LootValue,
+    long? Gold,
+    int? PlayedSeconds);
+
+/// <summary>
+/// Noms d'objets du cache local d'un client (<c>Cache\ADB\&lt;langue&gt;\DBCache.bin</c>) : ceux que le
+/// serveur du jeu a envoyés, absents des fichiers livrés avec le client. Build : version du client.
+/// </summary>
+public sealed record ItemNamesPayload(string Flavor, string Locale, int Build, SourceFilePayload File, IReadOnlyList<ItemNamePayload> Names);
+
+public sealed record ItemNamePayload(int Id, string Name);
 
 public sealed record ItemPayload(string Key, int ItemId, int? SuffixId, string? Name, int? Quality, int? Icon, string? Link);
 

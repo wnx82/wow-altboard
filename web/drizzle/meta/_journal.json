@@ -78,6 +78,13 @@
       "when": 1794209010722,
       "tag": "0010_item_names_price_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794210950633,
+      "tag": "0011_character_ledger_days",
+      "breakpoints": true
     }
   ]
 }

@@ -33,6 +33,59 @@ AllemanoLedgerDB = {
 ["zone"] = "Loch Modan",
 },
 },
+["days"] = {
+["2026-10-04"] = {
+["xferIn"] = 0,
+["exp"] = {
+["repair"] = 198,
+["training"] = 1940,
+["mail"] = 30,
+},
+["xp"] = 14172,
+["rep"] = {
+["Forgefer"] = 200,
+},
+["items"] = {
+116,
+5,
+[0] = 15,
+},
+["kills"] = 149,
+["loot"] = 2629,
+["gold"] = 1924,
+["time"] = 8041,
+["inc"] = {
+["loot"] = 277,
+["quest"] = 800,
+["vendor"] = 1123,
+["bounty"] = 50,
+["other"] = 130,
+},
+["xferOut"] = 5000,
+},
+["2026-10-03"] = {
+["xferIn"] = 10000,
+["exp"] = {
+},
+["xp"] = 0,
+["loot"] = 0,
+["time"] = 600,
+["inc"] = {
+},
+["xferOut"] = 0,
+},
+["2026-10-02"] = {
+["xferIn"] = 0,
+["exp"] = {
+},
+["xp"] = 0,
+["loot"] = 0,
+["time"] = 0,
+["inc"] = {
+},
+["xferOut"] = 0,
+},
+},
 ["history"] = {
 {
 ["start"] = 1791090000,
@@ -85,8 +138,6 @@ AllemanoLedgerDB = {
 ["zone"] = "Loch Modan",
 ["startMoney"] = 200,
 ["money"] = 389,
-},
-["days"] = {
 },
 },
 ["Player-9999-00000009"] = {

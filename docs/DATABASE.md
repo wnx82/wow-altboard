@@ -10,7 +10,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (43 tables, 11 migrations, 2026-11-09) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (44 tables, 12 migrations, 2026-11-09) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -56,6 +56,7 @@ Conventions : clés `bigint` générées, dates en `timestamptz`, argent en piè
 | `character_playtime` | `character_id` | Dernier `/played` connu, date de la mesure, début du niveau en cours (addon Allemano Ledger) |
 | `character_level_times` | `(character_id, level)` | Un niveau terminé : temps de jeu, temps réel, date, zone (addon Allemano Ledger) |
 | `character_sessions` | `(character_id, started_at)` | Une session de jeu : fin, temps connecté, expérience gagnée, niveaux, zone, étiquette, session encore ouverte (addon Allemano Ledger) |
+| `character_ledger_days` | `(character_id, machine_id, day)` | Finances d'une journée relevées sur un PC : revenus et dépenses par source (`jsonb`, pièces de cuivre), transferts entre personnages, valeur marchande du butin, or en fin de journée, temps connecté (addon Allemano Ledger, agent 0.7.0). Index sur `day` |
 
 Colonnes volontairement absentes, faute de donnée dans AltBoard : genre, région, quêtes. Les
 recettes viennent de NaowhForever (tables de l'économie).
@@ -188,6 +189,8 @@ En cas d'erreur, tout est annulé, puis l'échec est journalisé à part (`sync_
 | Niveau terminé (`playtime.levels`) | Ajouté, jamais retiré ; une valeur connue n'est jamais remplacée par une absence. Appliqué même quand `lastSeen` est plus ancien : chaque PC ne connaît que les niveaux gagnés chez lui |
 | Total `/played` et niveau en cours | Remplacés seulement par une mesure au moins aussi récente (`measured_at`) |
 | Session de jeu (`sessions`) | Ajoutée, jamais retirée, même quand `lastSeen` est plus ancien. Une session close remplace sa version ouverte ; une version ouverte n'en remplace une autre que si elle est au moins aussi récente, et jamais une session close |
+| Journée de finances (`finances`) | Rangée par PC : le fichier d'un PC remplace ses propres journées, même quand `lastSeen` est plus ancien, et ne touche pas celles d'un autre PC. Un jour sorti du fichier reste en base. La page additionne les PC, sauf une journée identique reçue de deux PC (dossier `WTF` copié), comptée une fois |
+| Noms du cache du jeu (`itemNames`) | Langue `frFR` seulement ; remplace le nom existant (source `client`), garde la qualité connue |
 
 Tous les hash sont calculés sur un JSON **canonique** (clés triées) : le client WoW réécrit ses
 tables dans un ordre différent à chaque sauvegarde.
@@ -243,6 +246,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0008_economy_audits` | `economy_audits` (ajout seul) |
 | `0009_account_folder_name` | colonne `wow_accounts.folder_name` (ajout seul, null pour les comptes existants) |
 | `0010_item_names_price_alerts` | `item_names`, `price_alerts` (ajouts seuls) |
+| `0011_character_ledger_days` | `character_ledger_days` et son index (ajout seul) |
 
 ## Checkpoint B
 

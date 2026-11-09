@@ -782,6 +782,143 @@ describe("sessions de jeu (Allemano Ledger)", () => {
   });
 });
 
+describe("finances par jour (Allemano Ledger)", () => {
+  type Finances = NonNullable<CharacterPayload["finances"]>;
+  const DAY: Finances[number] = {
+    day: "2026-10-04",
+    income: { loot: 277, quest: 800, vendor: 1123, other: 130 },
+    expense: { repair: 198, training: 1940, mail: 30 },
+    transferIn: 0,
+    transferOut: 5000,
+    lootValue: 2629,
+    gold: 1924,
+    playedSeconds: 8041,
+  };
+  const withFinances = (payload: SyncPayload, finances: Finances, lastSeenOffset = 0): SyncPayload => {
+    const mage = mageOf(payload);
+    mage.finances = finances;
+    mage.lastSeen += lastSeenOffset;
+    return payload;
+  };
+  const stored = async () =>
+    (
+      await database.db
+        .select({ machineId: t.characterLedgerDays.machineId, day: t.characterLedgerDays.day, income: t.characterLedgerDays.income, expense: t.characterLedgerDays.expense, out: t.characterLedgerDays.transferOut, gold: t.characterLedgerDays.gold, played: t.characterLedgerDays.playedSeconds })
+        .from(t.characterLedgerDays)
+        .orderBy(asc(t.characterLedgerDays.machineId), asc(t.characterLedgerDays.day))
+    ).map(({ machineId, ...row }) => ({ ...row, machine: machineId }));
+
+  test("un document sans finances reste accepté et ne crée rien", async () => {
+    await ok(clone());
+
+    assert.equal(await count(t.characterLedgerDays), 0);
+  });
+
+  test("chaque journée est enregistrée, sans les sources nulles", async () => {
+    await ok(withFinances(clone(), [{ day: "2026-10-03", income: { quest: 0 }, expense: {}, transferIn: 10_000, transferOut: 0, playedSeconds: 600 }, DAY]));
+
+    const [machine] = await database.db.select({ id: t.machines.id }).from(t.machines);
+    assert.deepEqual(await stored(), [
+      { day: "2026-10-03", income: {}, expense: {}, out: 0, gold: null, played: 600, machine: machine.id },
+      { day: "2026-10-04", income: { loot: 277, other: 130, quest: 800, vendor: 1123 }, expense: { mail: 30, repair: 198, training: 1940 }, out: 5000, gold: 1924, played: 8041, machine: machine.id },
+    ]);
+  });
+
+  test("une journée qui avance remplace sa version précédente ; une journée sortie du fichier reste", async () => {
+    await ok(withFinances(clone(), [{ ...DAY, day: "2026-10-03" }, DAY]));
+
+    await ok(withFinances(clone(), [{ ...DAY, income: { ...DAY.income, quest: 1600 }, playedSeconds: 9000 }], 3600), later(3600));
+
+    const rows = await stored();
+    assert.deepEqual(rows.map((row) => [row.day, row.income.quest, row.played]), [["2026-10-03", 800, 8041], ["2026-10-04", 1600, 9000]]);
+  });
+
+  test("chaque PC garde ses journées, même quand son fichier AltBoard est en retard", async () => {
+    const token2 = (await createAgentToken(database.db, "PC 2")).token;
+    await ok(withFinances(onlyAccount(0), [DAY]));
+
+    const result = await ok(withFinances(fromMachine(onlyAccount(0), PC2, "PC-2"), [{ ...DAY, income: { ah: 50_000 }, expense: {}, transferOut: 0 }], -86_400), { token: token2 });
+
+    assert.equal(result.charactersStale, 1);
+    const rows = await stored();
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows.map((row) => row.income), [DAY.income, { ah: 50_000 }]);
+    assert.notEqual(rows[0].machine, rows[1].machine);
+  });
+
+  test("des finances mal formées font refuser le document", async () => {
+    for (const finances of [
+      [{ ...DAY, day: "2026-02-30" }],
+      [{ ...DAY, day: "04/10/2026" }],
+      [{ ...DAY, income: { bounty: 50 } }],
+      [{ ...DAY, expense: { repair: -1 } }],
+      [{ ...DAY, transferIn: undefined }],
+      [DAY, DAY],
+      Array.from({ length: 801 }, () => DAY),
+    ]) {
+      const payload = clone();
+      (mageOf(payload) as { finances: unknown }).finances = finances;
+      assert.equal((await send(payload)).status, 422, JSON.stringify(finances).slice(0, 80));
+    }
+    assert.equal(await count(t.characters), 0);
+  });
+
+  test("supprimer un personnage supprime ses journées", async () => {
+    await ok(withFinances(clone(), [DAY]));
+
+    await database.db.delete(t.characters);
+
+    assert.equal(await count(t.characterLedgerDays), 0);
+  });
+});
+
+describe("noms des objets du cache du jeu (agent 0.7.0)", () => {
+  const FILE = { hash: "a".repeat(64), modifiedAt: "2026-10-04T12:00:00+00:00", size: 1234 };
+  const withNames = (payload: SyncPayload, names: { id: number; name: string }[], locale = "frFR"): SyncPayload => ({
+    ...payload,
+    itemNames: [{ flavor: "_forever_", locale, build: 70862, file: FILE, names }],
+  });
+  const catalog = async () =>
+    database.db
+      .select({ id: t.itemNames.itemId, name: t.itemNames.name, quality: t.itemNames.quality, source: t.itemNames.source, build: t.itemNames.build })
+      .from(t.itemNames)
+      .orderBy(asc(t.itemNames.itemId));
+
+  test("les noms remplacent ceux de wago.tools, la qualité connue est gardée", async () => {
+    await database.db.insert(t.itemNames).values([
+      { itemId: 720, name: "Masque de bandit (ancien)", quality: 2, source: "wago", build: "1.60.1.70000" },
+      { itemId: 900, name: "Inchangé", quality: 1, source: "wago", build: "1.60.1.70000" },
+    ]);
+
+    const result = await ok(withNames(clone(), [{ id: 720, name: "Masque de bandit" }, { id: 13345, name: "  Étoffe runique " }]));
+
+    assert.equal(result.itemNamesStored, 2);
+    assert.deepEqual(await catalog(), [
+      { id: 720, name: "Masque de bandit", quality: 2, source: "client", build: "70862" },
+      { id: 900, name: "Inchangé", quality: 1, source: "wago", build: "1.60.1.70000" },
+      { id: 13345, name: "Étoffe runique", quality: null, source: "client", build: "70862" },
+    ]);
+
+    // Renvoyés à l'identique : rien n'est réécrit.
+    assert.equal((await ok(withNames(clone(), [{ id: 720, name: "Masque de bandit" }]))).itemNamesStored, 0);
+  });
+
+  test("une autre langue que celle du site est ignorée ; une liste mal formée fait refuser le document", async () => {
+    assert.equal((await ok(withNames(clone(), [{ id: 720, name: "Bandit's Mask" }], "enUS"))).itemNamesStored, 0);
+    assert.equal(await count(t.itemNames), 0);
+
+    for (const payload of [
+      withNames(clone(), [{ id: 0, name: "Zéro" }]),
+      withNames(clone(), [{ id: 720, name: "" }]),
+      withNames(clone(), [{ id: 720, name: "x".repeat(201) }]),
+      withNames(clone(), [{ id: 720, name: "Masque" }], "français"),
+      { ...withNames(clone(), []), itemNames: [{ flavor: "_forever_", locale: "frFR", build: 70862, file: FILE, names: [], extra: 1 }] },
+    ]) {
+      assert.equal((await send(payload)).status, 422, JSON.stringify(payload.itemNames).slice(0, 120));
+    }
+  });
+});
+
 describe("progression d'expérience", () => {
   test("le relevé garde l'expérience du niveau, sans laquelle l'expérience ne se situe pas", async () => {
     await ok(clone());

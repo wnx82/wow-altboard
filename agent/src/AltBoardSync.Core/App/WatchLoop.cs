@@ -179,12 +179,29 @@ internal sealed class WatchLoop(
 
         if (token is null) return TokenStore.MissingMessage;
 
+        // Noms d'objets du cache du jeu : joints à l'envoi seulement quand le cache a changé. Un cache
+        // modifié seul ne déclenche pas d'envoi : il part avec la synchronisation suivante.
+        var itemNames = new List<ItemNamesReadResult>();
+        foreach (var (flavor, flavorPath) in PayloadBuilder.Flavors(sources))
+        {
+            var read = await builder.ReadItemNamesAsync(flavor, flavorPath, state.ItemNameHashes.GetValueOrDefault(flavor), cancellationToken).ConfigureAwait(false);
+            if (read is null) continue;
+            if (read.Error is not null) log.Warn(read.Error);
+            itemNames.Add(read);
+        }
+
         var document = PayloadBuilder.Build(
-            new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), readable.Select(r => r.Payload!), version, env.Now());
+            new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName),
+            readable.Select(r => r.Payload!),
+            version,
+            env.Now(),
+            itemNames.Where(read => read.Payload is not null).Select(read => read.Payload!).ToList());
         var outcome = await client.SendAsync(endpoint, token, document, cancellationToken).ConfigureAwait(false);
         if (!outcome.Succeeded) return outcome.Error ?? "réponse inattendue du serveur";
 
         foreach (var result in readable) state.Fingerprints[StateKey(result)] = result.Fingerprint!;
+        foreach (var read in itemNames.Where(read => read.FileHash is not null)) state.ItemNameHashes[read.Flavor] = read.FileHash!;
+        foreach (var names in document.ItemNames ?? []) log.Info($"noms des objets du cache du jeu ({names.Flavor}, {names.Locale}, build {names.Build}) : {names.Names.Count} envoyés");
         try
         {
             _stateStore.Save(state);

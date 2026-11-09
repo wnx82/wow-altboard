@@ -183,10 +183,72 @@ public class LedgerReaderTests
         // Champ sans valeur : omis, jamais null.
         using var warlock = JsonDocument.Parse(JsonSerializer.Serialize(withLedger.Characters[1], SyncJsonContext.Default.CharacterPayload));
         Assert.False(warlock.RootElement.GetProperty("sessions")[0].TryGetProperty("zone", out _));
+        Assert.False(warlock.RootElement.TryGetProperty("finances", out _));
+        // Finances : sources en clés minuscules, telles que l'addon les nomme.
+        var finances = json.RootElement.GetProperty("finances");
+        Assert.Equal(2, finances.GetArrayLength());
+        Assert.Equal("2026-10-04", finances[1].GetProperty("day").GetString());
+        Assert.Equal(800, finances[1].GetProperty("income").GetProperty("quest").GetInt64());
+        Assert.Equal(1940, finances[1].GetProperty("expense").GetProperty("training").GetInt64());
+        Assert.Equal(5000, finances[1].GetProperty("transferOut").GetInt64());
+        Assert.False(finances[0].TryGetProperty("gold", out _));
 
         using var bare = JsonDocument.Parse(JsonSerializer.Serialize(withoutLedger.Characters[0], SyncJsonContext.Default.CharacterPayload));
         Assert.False(bare.RootElement.TryGetProperty("playtime", out _));
         Assert.False(bare.RootElement.TryGetProperty("sessions", out _));
+        Assert.False(bare.RootElement.TryGetProperty("finances", out _));
+    }
+
+    [Fact]
+    public void Finances_are_read_per_day_oldest_first()
+    {
+        var ledger = LedgerReader.Read(Fixture.Parse("ledger-two-characters.lua"), []);
+
+        // Journée sans mouvement ni temps de jeu (2026-10-02) : ignorée.
+        var days = ledger["Player-9999-00000002"].Finances;
+        Assert.Equal(["2026-10-03", "2026-10-04"], days.Select(d => d.Day));
+
+        var transfer = days[0];
+        Assert.Empty(transfer.Income);
+        Assert.Empty(transfer.Expense);
+        Assert.Equal((10000L, 0L, 0L, (long?)null, 600), (transfer.TransferIn, transfer.TransferOut, transfer.LootValue!.Value, transfer.Gold, transfer.PlayedSeconds!.Value));
+
+        var day = days[1];
+        // Source inconnue de l'agent (« bounty ») : comptée dans « other ».
+        Assert.Equal(
+            [("loot", 277L), ("other", 180L), ("quest", 800L), ("vendor", 1123L)],
+            day.Income.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => (e.Key, e.Value)));
+        Assert.Equal(
+            [("mail", 30L), ("repair", 198L), ("training", 1940L)],
+            day.Expense.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => (e.Key, e.Value)));
+        Assert.Equal((0L, 5000L, 2629L, 1924L, 8041), (day.TransferIn, day.TransferOut, day.LootValue!.Value, day.Gold!.Value, day.PlayedSeconds!.Value));
+
+        Assert.Empty(ledger["Player-9999-00000009"].Finances);
+    }
+
+    [Fact]
+    public void Malformed_days_are_dropped_and_only_the_most_recent_are_kept()
+    {
+        var finances = Read("""
+            AllemanoLedgerDB = { chars = { ["Player-1-A"] = { days = {
+              ["hier"] = { time = 60 },
+              ["2026-13-01"] = { time = 60 },
+              ["2026-11-02"] = "pas une table",
+              ["2026-11-03"] = { time = -5, inc = { loot = -10, vendor = 1.5e20, quest = "beaucoup", ah = 40 }, exp = { repair = 0 }, gold = -1 },
+            } } } }
+            """)["Player-1-A"].Finances;
+        var day = Assert.Single(finances);
+        Assert.Equal("2026-11-03", day.Day);
+        Assert.Equal([("ah", 40L)], day.Income.Select(e => (e.Key, e.Value)));
+        Assert.Empty(day.Expense);
+        Assert.Null(day.Gold);
+        Assert.Null(day.PlayedSeconds);
+
+        var many = string.Join(", ", Enumerable.Range(0, 810).Select(i => $"[\"{new DateOnly(2024, 1, 1).AddDays(i):yyyy-MM-dd}\"] = {{ time = 60 }}"));
+        var kept = Read($"AllemanoLedgerDB = {{ chars = {{ [\"Player-1-A\"] = {{ days = {{ {many} }} }} }} }}")["Player-1-A"].Finances;
+        Assert.Equal(800, kept.Count);
+        Assert.Equal(new DateOnly(2024, 1, 1).AddDays(10).ToString("yyyy-MM-dd"), kept[0].Day);
+        Assert.Equal(new DateOnly(2024, 1, 1).AddDays(809).ToString("yyyy-MM-dd"), kept[^1].Day);
     }
 
     [Fact]

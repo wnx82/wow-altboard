@@ -188,9 +188,25 @@ public sealed class AgentApp(AgentEnvironment env)
             }
         }
 
+        var itemNames = new List<ItemNamesPayload>();
+        foreach (var (flavor, flavorPath) in PayloadBuilder.Flavors(sources))
+        {
+            var read = await builder.ReadItemNamesAsync(flavor, flavorPath, knownHash: null, cancellationToken).ConfigureAwait(false);
+            if (read?.Error is { } error)
+            {
+                env.Out.WriteLine($"avertissement : {error}");
+                _log.Warn(error);
+            }
+            else if (read?.Payload is { } names)
+            {
+                env.Out.WriteLine($"Noms des objets du cache du jeu ({flavor}) : {Plural(names.Names.Count, "objet", "objets")}");
+                itemNames.Add(names);
+            }
+        }
+
         env.Out.WriteLine();
 
-        var document = PayloadBuilder.Build(new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), accounts, Version, env.Now());
+        var document = PayloadBuilder.Build(new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), accounts, Version, env.Now(), itemNames);
         if (outFile is not null)
         {
             await File.WriteAllBytesAsync(outFile, JsonSerializer.SerializeToUtf8Bytes(document, SyncJsonContext.Default.SyncPayload), cancellationToken).ConfigureAwait(false);

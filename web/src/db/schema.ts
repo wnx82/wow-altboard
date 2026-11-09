@@ -356,6 +356,38 @@ export const characterSessions = pgTable(
   ],
 );
 
+/**
+ * Finances d'un personnage par jour (Allemano Ledger, agent 0.7.0), par machine : chaque PC ne
+ * connaît que les sessions jouées chez lui. day est la date locale du client de jeu. income et
+ * expense : montant par source en pièces de cuivre (sources absentes : 0).
+ */
+export const characterLedgerDays = pgTable(
+  "character_ledger_days",
+  {
+    characterId: characterId(),
+    machineId: bigint("machine_id", { mode: "number" })
+      .notNull()
+      .references(() => machines.id),
+    day: date("day", { mode: "string" }).notNull(),
+    income: jsonb("income").$type<Record<string, number>>().notNull(),
+    expense: jsonb("expense").$type<Record<string, number>>().notNull(),
+    transferIn: bigint("transfer_in", { mode: "number" }).notNull().default(0),
+    transferOut: bigint("transfer_out", { mode: "number" }).notNull().default(0),
+    lootValue: bigint("loot_value", { mode: "number" }),
+    gold: bigint("gold", { mode: "number" }),
+    playedSeconds: integer("played_seconds"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.characterId, t.machineId, t.day] }),
+    index("character_ledger_days_day_idx").on(t.day),
+    check(
+      "character_ledger_days_values_check",
+      sql`${t.transferIn} >= 0 and ${t.transferOut} >= 0 and ${t.lootValue} >= 0 and ${t.gold} >= 0 and ${t.playedSeconds} >= 0`,
+    ),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Journal des synchronisations
 // ---------------------------------------------------------------------------

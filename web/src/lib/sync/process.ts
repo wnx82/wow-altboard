@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { storeClientNames } from "@/lib/economy/item-names";
 import { recordAchievements } from "@/lib/goals/store";
 import { canonicalHash } from "@/lib/hash";
 import { readSettings } from "@/lib/settings/store";
@@ -152,6 +153,7 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       await applyAuctionator(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
       await applyRecipes(tx, account, now, economy);
     }
+    if (payload.itemNames) economy.itemNamesStored = await storeClientNames(tx, payload.itemNames, now);
 
     // Une fois toutes les données appliquées : un objectif que ce document fait atteindre est daté
     // de cette synchronisation.
@@ -328,7 +330,7 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
         .returning({ id: t.characters.id });
       characterId = created.id;
       await replaceDetails(tx, characterId, character, { stats: true, bags: true, bank: true });
-      await applyLedger(tx, characterId, character);
+      await applyLedger(tx, characterId, character, scope);
       counters.created++;
       counters.snapshots += await addSnapshot(tx, characterId, character, scope);
     } else {
@@ -336,7 +338,7 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
       if (lastSeen.getTime() < known.sourceLastSeenAt.getTime()) {
         // Ce PC détient un fichier plus ancien que l'état déjà connu : on ne régresse pas.
         // Ses temps par niveau restent utiles : ils ont pu être relevés sur ce PC seulement.
-        await applyLedger(tx, characterId, character);
+        await applyLedger(tx, characterId, character, scope);
         counters.stale++;
       } else if (hash === known.contentHash) {
         counters.unchanged++;
@@ -362,7 +364,7 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
           })
           .where(eq(t.characters.id, characterId));
         await replaceDetails(tx, characterId, character, blocks);
-        await applyLedger(tx, characterId, character);
+        await applyLedger(tx, characterId, character, scope);
         counters.updated++;
         if (lastSnapshotHash.get(characterId) !== snapshotHash(character)) {
           counters.snapshots += await addSnapshot(tx, characterId, character, scope);
@@ -531,9 +533,64 @@ async function replaceDetails(tx: Transaction, characterId: number, character: C
 }
 
 /** Données de l'addon Allemano Ledger : appliquées même quand le fichier AltBoard est en retard. */
-async function applyLedger(tx: Transaction, characterId: number, character: CharacterPayload): Promise<void> {
+async function applyLedger(tx: Transaction, characterId: number, character: CharacterPayload, scope: Scope): Promise<void> {
   await applyPlaytime(tx, characterId, character);
   await applySessions(tx, characterId, character);
+  await applyFinances(tx, characterId, character, scope);
+}
+
+/**
+ * Finances par jour (Allemano Ledger), rangées par machine : chaque PC ne compte que les sessions
+ * jouées chez lui, et le fichier d'un PC fait foi pour ses propres journées. Un jour disparu du
+ * fichier (l'addon en garde 800) reste en base.
+ */
+async function applyFinances(tx: Transaction, characterId: number, character: CharacterPayload, scope: Scope): Promise<void> {
+  const days = uniqueBy(character.finances ?? [], (entry) => entry.day);
+  const stored = t.characterLedgerDays;
+  for (const batch of chunks(days, BATCH)) {
+    await tx
+      .insert(stored)
+      .values(
+        batch.map((entry) => ({
+          characterId,
+          machineId: scope.machineId,
+          day: entry.day,
+          income: positiveAmounts(entry.income),
+          expense: positiveAmounts(entry.expense),
+          transferIn: entry.transferIn,
+          transferOut: entry.transferOut,
+          lootValue: entry.lootValue ?? null,
+          gold: entry.gold ?? null,
+          playedSeconds: entry.playedSeconds ?? null,
+          updatedAt: scope.now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [stored.characterId, stored.machineId, stored.day],
+        set: {
+          income: sql`excluded.income`,
+          expense: sql`excluded.expense`,
+          transferIn: sql`excluded.transfer_in`,
+          transferOut: sql`excluded.transfer_out`,
+          lootValue: sql`excluded.loot_value`,
+          gold: sql`excluded.gold`,
+          playedSeconds: sql`excluded.played_seconds`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+        // Une journée inchangée n'est pas réécrite.
+        setWhere: sql`(${stored.income}, ${stored.expense}, ${stored.transferIn}, ${stored.transferOut}, ${stored.lootValue}, ${stored.gold}, ${stored.playedSeconds})
+          is distinct from (excluded.income, excluded.expense, excluded.transfer_in, excluded.transfer_out, excluded.loot_value, excluded.gold, excluded.played_seconds)`,
+      });
+  }
+}
+
+/** Montants par source, sans les sources nulles, dans un ordre stable. */
+function positiveAmounts(amounts: Record<string, number | undefined>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(amounts)
+      .filter((entry): entry is [string, number] => entry[1] !== undefined && entry[1] > 0)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
 }
 
 /**

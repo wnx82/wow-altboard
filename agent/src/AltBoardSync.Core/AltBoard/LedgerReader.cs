@@ -3,14 +3,15 @@ using AltBoardSync.Core.Sync;
 
 namespace AltBoardSync.Core.AltBoard;
 
-/// <summary>Ce que Ledger sait d'un personnage : temps de jeu par niveau et sessions.</summary>
-public sealed record LedgerCharacter(PlaytimePayload? Playtime, IReadOnlyList<SessionPayload> Sessions);
+/// <summary>Ce que Ledger sait d'un personnage : temps de jeu par niveau, sessions et finances par jour.</summary>
+public sealed record LedgerCharacter(PlaytimePayload? Playtime, IReadOnlyList<SessionPayload> Sessions, IReadOnlyList<LedgerDayPayload> Finances);
 
 /// <summary>
 /// Lit ce qu'enregistre l'addon Allemano Ledger (structure documentée dans
 /// docs/LEDGER-DATA-MODEL.md) : <c>AllemanoLedgerDB.chars[guid]</c>, mêmes GUID qu'AltBoard.
 /// Sont lus <c>played</c>, <c>levelStart</c>, <c>levelLog</c> (temps de jeu), <c>history</c> et
-/// <c>current</c> (sessions : dates, durée, expérience). L'or et son détail ne sont pas transmis.
+/// <c>current</c> (sessions : dates, durée, expérience), et <c>days</c> (or gagné et dépensé par jour
+/// et par source). Les « runs » d'instance, la réputation et les objets ramassés ne sont pas transmis.
 /// </summary>
 public static class LedgerReader
 {
@@ -20,6 +21,14 @@ public static class LedgerReader
     // L'addon garde 50 sessions par personnage, plus celle en cours.
     private const int MaxSessions = 60;
     private const int MaxTag = 40;
+    // L'addon garde 800 jours par personnage.
+    private const int MaxDays = 800;
+
+    /// <summary>Sources de revenus de l'addon (<c>Ledger.IN</c>) ; une source inconnue est comptée dans « other ».</summary>
+    public static readonly IReadOnlyList<string> IncomeSources = ["loot", "vendor", "quest", "ah", "mail", "trade", "other"];
+
+    /// <summary>Sources de dépenses de l'addon (<c>Ledger.OUT</c>) ; une source inconnue est comptée dans « other ».</summary>
+    public static readonly IReadOnlyList<string> ExpenseSources = ["repair", "vendor", "training", "travel", "ah", "mail", "trade", "other"];
 
     /// <summary>Données par GUID. Vide si l'addon n'a encore rien enregistré.</summary>
     public static IReadOnlyDictionary<string, LedgerCharacter> Read(IReadOnlyDictionary<string, LuaValue> globals, ICollection<string> warnings)
@@ -38,7 +47,8 @@ public static class LedgerReader
             if (key.Kind != LuaKeyKind.String || value is not LuaTable character) continue;
             var playtime = ReadPlaytime(character);
             var sessions = ReadSessions(character);
-            if (playtime is not null || sessions.Count > 0) result[key.Text!] = new LedgerCharacter(playtime, sessions);
+            var finances = ReadDays(character);
+            if (playtime is not null || sessions.Count > 0 || finances.Count > 0) result[key.Text!] = new LedgerCharacter(playtime, sessions, finances);
         }
 
         return result;
@@ -130,6 +140,53 @@ public static class LedgerReader
         if (ordered.Count > MaxSessions) ordered.RemoveRange(0, ordered.Count - MaxSessions);
         return ordered;
     }
+
+    /// <summary>
+    /// Journées de <c>days["AAAA-MM-JJ"]</c>, de la plus ancienne à la plus récente. Une clé qui n'est
+    /// pas une date, ou une journée sans aucun mouvement ni temps de jeu, est ignorée.
+    /// </summary>
+    private static List<LedgerDayPayload> ReadDays(LuaTable character)
+    {
+        var days = new List<LedgerDayPayload>();
+        if (character.Get("days") is not LuaTable table) return days;
+        foreach (var (key, value) in table.Entries)
+        {
+            if (key.Kind != LuaKeyKind.String || value is not LuaTable day) continue;
+            if (!DateOnly.TryParseExact(key.Text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _)) continue;
+
+            var income = Amounts(day.Get("inc") as LuaTable, IncomeSources);
+            var expense = Amounts(day.Get("exp") as LuaTable, ExpenseSources);
+            var transferIn = Copper(day.Get("xferIn")) ?? 0;
+            var transferOut = Copper(day.Get("xferOut")) ?? 0;
+            var loot = Copper(day.Get("loot"));
+            var played = AltBoardReader.NonNegative(day.Get("time")?.AsInt32());
+            if (income.Count == 0 && expense.Count == 0 && transferIn == 0 && transferOut == 0 && (loot ?? 0) == 0 && (played ?? 0) == 0) continue;
+
+            days.Add(new LedgerDayPayload(key.Text!, income, expense, transferIn, transferOut, loot, Copper(day.Get("gold")), played));
+        }
+
+        days.Sort((a, b) => string.CompareOrdinal(a.Day, b.Day));
+        if (days.Count > MaxDays) days.RemoveRange(0, days.Count - MaxDays);
+        return days;
+    }
+
+    /// <summary>Montants strictement positifs par source connue ; une source inconnue s'ajoute à « other ».</summary>
+    private static Dictionary<string, long> Amounts(LuaTable? table, IReadOnlyList<string> sources)
+    {
+        var amounts = new Dictionary<string, long>(StringComparer.Ordinal);
+        if (table is null) return amounts;
+        foreach (var (key, value) in table.Entries)
+        {
+            if (key.Kind != LuaKeyKind.String || Copper(value) is not { } amount || amount == 0) continue;
+            var source = sources.Contains(key.Text!) ? key.Text! : "other";
+            amounts[source] = amounts.GetValueOrDefault(source) + amount;
+        }
+
+        return amounts;
+    }
+
+    /// <summary>Montant en pièces de cuivre : entier positif ou nul, jusqu'à 10¹³ (au-delà, valeur écartée).</summary>
+    private static long? Copper(LuaValue? value) => value?.AsInt64() is { } copper and >= 0 and <= 10_000_000_000_000 ? copper : null;
 
     /// <summary>
     /// Temps connecté d'une session en cours, comme le calcule l'addon : les connexions précédentes

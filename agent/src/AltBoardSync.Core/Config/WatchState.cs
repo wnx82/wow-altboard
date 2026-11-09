@@ -6,6 +6,9 @@ namespace AltBoardSync.Core.Config;
 public sealed record WatchState
 {
     public Dictionary<string, string> Fingerprints { get; init; } = new();
+
+    /// <summary>Empreinte du cache de noms d'objets envoyé, par client : un cache inchangé n'est pas renvoyé.</summary>
+    public Dictionary<string, string> ItemNameHashes { get; init; } = new();
 }
 
 /// <summary>

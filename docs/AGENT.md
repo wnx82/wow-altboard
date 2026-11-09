@@ -113,7 +113,7 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 |---|---|
 | `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl` — aucun secret |
 | `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant |
-| `state.json` | dernière empreinte envoyée par compte, pour `watch` ; ni contenu ni nom réel de dossier de compte |
+| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; ni contenu ni nom réel de dossier de compte |
 | `journal.jsonl` | journal affiché par la fenêtre : une entrée par envoi, panne ou événement, avec ce qui a changé par personnage ; les 200 dernières sont gardées |
 | `characters.json` | ce que l'agent retient de chaque personnage envoyé (niveau, or, métiers, empreintes) pour dire ce qui change à l'envoi suivant |
 | `logs\altboardsync.log` | journal technique ; ni jeton ni nom réel de dossier de compte ; rotation à 1 Mo |
@@ -156,8 +156,8 @@ fichiers `.bak` sont ignorés. Zéro compte n'est pas une erreur.
 
 Si le même dossier contient `AllemanoLedger.lua` (addon Allemano Ledger), l'agent y lit le temps
 de jeu des personnages connus d'AltBoard : dernier `/played`, début du niveau en cours, niveaux
-terminés, et leurs sessions de jeu : dates, durée, expérience gagnée
-([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)). Fichier facultatif : absent, rien ne change ;
+terminés, leurs sessions de jeu (dates, durée, expérience gagnée) et, depuis 0.7.0, leurs
+finances par jour ([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)). Fichier facultatif : absent, rien ne change ;
 illisible, un avertissement est joint au document et la synchronisation continue.
 
 Deux autres fichiers voisins alimentent le moteur économique, avec la même règle (facultatifs,
@@ -167,6 +167,13 @@ jamais bloquants) :
   marchands ([AUCTIONATOR-DATA-MODEL](AUCTIONATOR-DATA-MODEL.md)) ;
 - `NaowhForever.lua` (addon NaowhForever) : recettes connues de chaque personnage, relevées à
   l'ouverture de la fenêtre d'un métier ([PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md)).
+
+Depuis 0.7.0, l'agent lit aussi, une fois par client, le cache local du jeu
+`Cache\ADB\<langue>\DBCache.bin` (langue de `SET textLocale` dans `WTF\Config.wtf`, sinon le seul
+cache présent) : il n'en garde que les noms d'objets (table `ItemSparse`, environ 5 200 noms sur un
+client joué), envoyés quand le fichier a changé depuis le dernier envoi accepté
+([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests)). Format lu : « XFTH » version 9 ;
+une autre version donne un avertissement, sans bloquer la synchronisation.
 
 Pour des prix à jour : scan à l'hôtel des ventes avec Auctionator, `/reload`, puis synchroniser.
 `scan --out <fichier>` montre ce qui serait envoyé, prix et recettes compris.

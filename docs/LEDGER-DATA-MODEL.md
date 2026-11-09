@@ -1,4 +1,4 @@
-# Modèle de données Allemano Ledger — temps de jeu et sessions
+# Modèle de données Allemano Ledger — temps de jeu, sessions et finances
 
 > AltBoard ne relève ni temps de jeu ni sessions. Le temps passé sur chaque niveau et l'expérience
 > gagnée par session viennent d'un second addon du même auteur, **Allemano Ledger** (ancien Session
@@ -77,8 +77,36 @@ Le source de l'addon est sous droits réservés : il n'est ni copié ni versionn
 | `levels` | niveaux gagnés (`level` − `startLevel` pour une session ouverte) |
 | `zone`, `tag` | zone du dernier gain d'or de la session (à défaut, zone de départ) ; étiquette anglaise fixe (`Leveling`, `Dungeon`, `Farming`…), traduite à l'affichage |
 
-Le reste (or par source, détail des recettes et dépenses, objets, réputation, réglages, erreurs)
-n'est ni lu ni transmis.
+### Finances par jour (agent 0.7.0)
+
+Relevé sur les fichiers réels du 2026-11-09 (Allemano Ledger 0.7.3 : 18 personnages, 78 journées) :
+
+```lua
+["days"] = {
+  ["2026-11-08"] = {                  -- date locale du client de jeu
+    ["inc"]  = { ["quest"] = 1735, ["vendor"] = 2786, ["loot"] = 236 },
+    ["exp"]  = { ["training"] = 650, ["mail"] = 1500 },
+    ["xferIn"] = 0, ["xferOut"] = 0,  -- or échangé avec ses propres personnages
+    ["loot"] = 134,                   -- prix de vente au marchand des objets ramassés
+    ["gold"] = 8039,                  -- or à la dernière note du jour (parfois absent)
+    ["time"] = 6079,                  -- secondes connectées
+    ["xp"] = 14172, ["kills"] = 149, ["rep"] = { … }, ["items"] = { … },
+  },
+},
+```
+
+| Champ | Transmis | Remarque |
+|---|---|---|
+| `inc.loot`, `vendor`, `quest`, `ah`, `mail`, `trade`, `other` | `income` | pièces de cuivre ; une source inconnue est comptée dans `other` |
+| `exp.repair`, `vendor`, `training`, `travel`, `ah`, `mail`, `trade`, `other` | `expense` | idem |
+| `xferIn`, `xferOut` | `transferIn`, `transferOut` | ni revenu ni dépense |
+| `loot` | `lootValue` | valeur estimée, pas de l'or encaissé |
+| `gold` | `gold` | enregistré, pas encore affiché |
+| `time` | `playedSeconds` | |
+| `xp`, `xpQuest`, `kills`, `deaths`, `rep`, `items` | non | |
+
+L'addon garde 800 jours. Une journée entièrement vide est écartée. Les objets, la réputation, les
+réglages et les erreurs de l'addon ne sont ni lus ni transmis.
 
 ## 3. Comportement de l'addon ayant un impact
 
@@ -116,10 +144,14 @@ n'est ni lu ni transmis.
 | Agent | Sessions : `history` sans les runs, puis `current`, de la plus ancienne à la plus récente ; une entrée sans début valide est écartée ; au plus 60 |
 | Serveur | Sessions : ajoutées, jamais retirées — elles s'accumulent au-delà des 50 de l'addon. Identité : `(personnage, début)` |
 | Serveur | Une session close remplace sa version ouverte. Une version ouverte n'en remplace une autre que si elle est au moins aussi récente, et jamais une session close |
+| Agent | Finances : jour au format `AAAA-MM-JJ` valide, montants entiers positifs ; une source inconnue va dans `other` ; les 800 jours les plus récents |
+| Serveur | Finances : une journée par personnage, PC et jour ; le fichier d'un PC remplace ses journées, même en retard ; un jour disparu du fichier reste en base |
+| Page | Finances : les PC s'additionnent ; une journée identique reçue de deux PC est comptée une fois. Bilan par heure à partir de 30 minutes de jeu, temps cumulé de tous les personnages (plusieurs comptes joués en même temps s'additionnent) |
 | Page | Seule la dernière session peut être affichée « en cours ». Expérience par heure calculée seulement si la durée atteint une minute |
 | Page | Niveau en cours affiché seulement s'il est égal au niveau du personnage ; durée = `played.total − levelStart.playedTotal`, donc arrêtée au dernier relevé |
 | Page | Le tableau liste tous les niveaux jusqu'à celui du personnage ; un niveau jamais relevé y figure « non mesuré ». Le graphique ne trace que les niveaux relevés |
 | Page | Temps cumulé = `/played` total à la fin du niveau : `played.total` pour le niveau en cours, puis on retranche le temps de chaque niveau en remontant ; à défaut, addition depuis le niveau 1. Un niveau sans temps mesuré n'a pas de cumul et interrompt le calcul |
 
-Tables : `character_playtime`, `character_level_times` et `character_sessions`
-([DATABASE](DATABASE.md)). Contrat : champs `playtime` et `sessions` du personnage ([API](API.md)).
+Tables : `character_playtime`, `character_level_times`, `character_sessions` et
+`character_ledger_days` ([DATABASE](DATABASE.md)). Contrat : champs `playtime`, `sessions` et
+`finances` du personnage ([API](API.md)).

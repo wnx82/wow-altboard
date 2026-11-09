@@ -21,9 +21,12 @@ type Props = {
   title: string;
   note: string;
   /** La série fixe la couleur (feuille de style). */
-  series: "level" | "xp";
-  /** Unité de l'axe : durées en secondes (affichées en minutes ou en heures), ou quantités entières. */
-  scale: "duration" | "count";
+  series: "level" | "xp" | "gold";
+  /**
+   * Unité de l'axe : durées en secondes (affichées en minutes ou en heures), quantités entières, ou
+   * montants en pièces de cuivre (affichés en pièces d'or, d'argent ou de cuivre).
+   */
+  scale: "duration" | "count" | "money";
   columns: Column[];
 };
 
@@ -70,9 +73,21 @@ export function ColumnChart({ title, note, series, scale, columns }: Props) {
 
   const layout = useMemo(() => {
     const highest = Math.max(0, ...columns.map((column) => column.value ?? 0));
-    // Durées : minutes tant que tout tient en moins de deux heures, heures au-delà.
-    const unit = scale === "count" ? { size: 1, suffix: "" } : highest < 2 * 3600 ? { size: 60, suffix: " min" } : { size: 3600, suffix: " h" };
-    const ticks = ticksUpTo(highest / unit.size, scale === "count");
+    // Durées : minutes tant que tout tient en moins de deux heures, heures au-delà. Montants : la
+    // plus grande pièce que la colonne la plus haute atteint.
+    const unit =
+      scale === "count"
+        ? { size: 1, suffix: "" }
+        : scale === "money"
+          ? highest >= 10_000
+            ? { size: 10_000, suffix: " po" }
+            : highest >= 100
+              ? { size: 100, suffix: " pa" }
+              : { size: 1, suffix: " pc" }
+          : highest < 2 * 3600
+            ? { size: 60, suffix: " min" }
+            : { size: 3600, suffix: " h" };
+    const ticks = ticksUpTo(highest / unit.size, scale === "count" || (scale === "money" && unit.size === 1));
     const top = ticks[ticks.length - 1];
     const plotWidth = width - MARGIN.left - MARGIN.right;
     const plotHeight = HEIGHT - MARGIN.top - MARGIN.bottom;

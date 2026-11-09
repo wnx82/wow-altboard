@@ -176,6 +176,42 @@ export async function importItemNames(db: Database, options: { now: Date; fetch?
   return { ok: true, build: build.value, count: parsed.value.length, removed };
 }
 
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type ClientNames = { locale: string; build: number; names: readonly { id: number; name: string }[] };
+
+/**
+ * Noms lus par l'agent dans le cache local du jeu (DBCache.bin) : ceux que le serveur du jeu a
+ * envoyés au client, correctifs compris, plus récents que la table publiée par wago.tools. Ils
+ * remplacent tout nom existant ; la qualité déjà connue est gardée. Seule la langue du site est
+ * retenue. Renvoie le nombre de noms ajoutés ou modifiés.
+ */
+export async function storeClientNames(tx: Transaction, entries: readonly ClientNames[], now: Date): Promise<number> {
+  const names = new Map<number, { name: string; build: string }>();
+  for (const entry of entries) {
+    if (entry.locale !== CATALOG_LOCALE) continue;
+    for (const { id, name } of entry.names) {
+      const trimmed = name.trim();
+      if (id >= 1 && id <= MAX_ITEM_ID && trimmed.length > 0 && trimmed.length <= MAX_NAME_LENGTH) names.set(id, { name: trimmed, build: String(entry.build) });
+    }
+  }
+
+  let stored = 0;
+  const rows = [...names].map(([itemId, value]) => ({ itemId, name: value.name, quality: null, source: "client", build: value.build, updatedAt: now }));
+  for (let start = 0; start < rows.length; start += BATCH) {
+    const changed = await tx
+      .insert(t.itemNames)
+      .values(rows.slice(start, start + BATCH))
+      .onConflictDoUpdate({
+        target: t.itemNames.itemId,
+        set: { name: sql`excluded.name`, source: sql`excluded.source`, build: sql`excluded.build`, updatedAt: sql`excluded.updated_at` },
+        setWhere: sql`(${t.itemNames.name}, ${t.itemNames.source}, ${t.itemNames.build}) is distinct from (excluded.name, excluded.source, excluded.build)`,
+      })
+      .returning({ itemId: t.itemNames.itemId });
+    stored += changed.length;
+  }
+  return stored;
+}
+
 export type CatalogSummary = { source: "wago" | "client"; count: number; build: string | null; updatedAt: Date | null };
 
 /** Noms enregistrés par source : nombre, version la plus récente, date du dernier import. */

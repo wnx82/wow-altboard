@@ -4,6 +4,38 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Agent 0.7.0 — 2026-11-09
+
+### Ajouté
+
+- Lit les **finances par jour** d'Allemano Ledger (`days`) : revenus et dépenses par source,
+  transferts entre personnages, valeur marchande du butin, or en fin de journée, temps connecté.
+  800 jours au plus par personnage.
+- Lit les **noms des objets** du cache local de chaque client (`Cache\ADB\<langue>\DBCache.bin`,
+  langue de `WTF\Config.wtf`) et les envoie quand ce cache a changé (empreinte gardée dans
+  `state.json`). Un cache seul modifié ne déclenche pas d'envoi : il part avec le suivant. Cache
+  absent ou illisible : avertissement, la synchronisation continue.
+- Exige le site 0.11.0 : un serveur antérieur refuse ces nouveaux champs.
+
+## Site 0.11.0 — 2026-11-09
+
+### Ajouté
+
+- Page **Finances** (menu Économie) : revenus, dépenses, bilan, bilan par heure de jeu, butin
+  ramassé et transferts entre personnages sur 7, 30 ou 90 jours ou depuis le début ; revenus par
+  jour (par mois sur tout l'historique), détail par source, par personnage et par jour. Données
+  d'Allemano Ledger, transmises par l'agent 0.7.0.
+- Noms des objets du **cache du jeu** envoyés par l'agent 0.7.0 : ils remplacent ceux de
+  wago.tools (correctifs du serveur de jeu compris) ; seule la langue du site (`frFR`) est gardée.
+  **Paramètres → Noms des objets** en donne le nombre.
+- Contrat de `POST /api/sync` : champs facultatifs `finances` (personnage) et `itemNames`
+  (document) ; la réponse ajoute `itemNamesStored`.
+- Migration `0011_character_ledger_days` : table `character_ledger_days` (ajout seul).
+
+### Déploiement
+
+- Déployer ce site **avant** d'installer l'agent 0.7.0 sur les PC.
+
 ## Site 0.10.0 — 2026-11-09
 
 ### Ajouté

@@ -108,8 +108,9 @@ personnage recréé, et à tous les autres.
 
 Chaque ligne demande une évolution de l'agent, du contrat de `POST /api/sync` et du schéma.
 
-- [ ] **P2 · L** — Finances : or gagné et dépensé par source. Allemano Ledger le relève, l'agent ne
-  le lit pas ([LEDGER-DATA-MODEL § 2](LEDGER-DATA-MODEL.md), dernière phrase).
+- [x] **P2 · L** — Finances : or gagné et dépensé par source. Fait le 2026-11-09 (agent 0.7.0,
+  site 0.11.0) : page **Finances**, à partir des journées d'Allemano Ledger. L'or en fin de journée
+  (`gold`) est enregistré mais pas encore affiché.
 - [ ] **P3 · M** — Donjons : les « runs » d'instance de Ledger (`kind = "run"`), aujourd'hui
   écartés par `agent/src/AltBoardSync.Core/AltBoard/LedgerReader.cs:98`. À stocker à part des
   sessions, dont ils recoupent l'expérience.
@@ -130,8 +131,8 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
   essayé en production.
 - [x] **P2 · M** — Noms des objets jamais possédés : le moteur ne connaissait que ceux vus dans un
   inventaire (table `items`). Fait le 2026-11-09 (site 0.10.0) : import de la table `ItemSparse`
-  de wago.tools depuis **Paramètres**. Reste le complément par l'agent, qui lirait le cache local du
-  jeu (`Cache/ADB/frFR/DBCache.bin`, environ 5 200 noms) en source `client`.
+  de wago.tools depuis **Paramètres**, complété par les noms du cache local du jeu
+  (`Cache/ADB/frFR/DBCache.bin`) que l'agent 0.7.0 envoie (source `client`).
 - [x] **P2 · M** — Alertes de prix par objet, sous ou au-dessus d'un seuil. Fait le 2026-11-09
   (site 0.10.0) : fiche de l'objet, page Marché et bloc **À surveiller**, sans notification.
 - [ ] **P2 · S** — Revoir les index de `market_item_days` avec plusieurs semaines d'historique

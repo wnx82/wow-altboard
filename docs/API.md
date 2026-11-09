@@ -85,15 +85,43 @@ Règles :
 - `sessions` est absent quand Allemano Ledger n'en a enregistré aucune. `startedAt` identifie la
   session ; `durationSeconds` est le temps connecté, pauses exclues ; `inProgress` signale une
   session encore ouverte, aux valeurs provisoires. Au plus 60 sessions par personnage ;
+- `finances` (agent 0.7.0) : journées d'Allemano Ledger, absentes sans l'addon. Une entrée par
+  jour (`day`, date locale du client de jeu, `AAAA-MM-JJ`, unique) : `income` et `expense`, montants
+  par source en pièces de cuivre (sources `loot`, `vendor`, `quest`, `ah`, `mail`, `trade`, `other`
+  pour les revenus ; `repair`, `vendor`, `training`, `travel`, `ah`, `mail`, `trade`, `other` pour
+  les dépenses ; une source absente vaut 0, une source inconnue fait refuser le document),
+  `transferIn` et `transferOut` (or échangé avec ses propres personnages), et, s'ils sont connus,
+  `lootValue` (prix de vente au marchand des objets ramassés), `gold` (or à la dernière note du
+  jour), `playedSeconds` (temps connecté). Au plus 800 jours :
+
+  ```json
+  "finances": [{ "day": "2026-11-08", "income": { "quest": 1735, "vendor": 2786 }, "expense": { "training": 650 },
+                 "transferIn": 0, "transferOut": 0, "lootValue": 134, "gold": 8039, "playedSeconds": 6079 }]
+  ```
 - `folderName` (agent 0.6.0) : nom complet du dossier `WTF\Account`, affiché sur la page Comptes.
   ASCII imprimable sans espace, 64 caractères au plus ; l'agent l'omet sinon. Le serveur recalcule
   l'empreinte à partir de ce nom (`SHA-256("wow-altboard-account:" + NOM EN MAJUSCULES)`) et refuse
   le document (`422`) si elle diffère d'`accountKey`. Un envoi sans `folderName` n'efface pas le nom
   déjà reçu.
 
-Compatibilité : `playtime`, `sessions` et `folderName` sont des ajouts facultatifs à la version 1. Les objets étant
+Compatibilité : `playtime`, `sessions`, `folderName`, `finances` et `itemNames` sont des ajouts facultatifs à la version 1. Les objets étant
 stricts, un serveur antérieur refuserait un document qui les contient : **le serveur se met à jour avant les
 agents**. Un agent antérieur reste accepté par le nouveau serveur.
+
+### Noms des objets du cache du jeu (facultatif)
+
+Champ `itemNames` du document, ajouté par l'agent 0.7.0 quand le cache local d'un client a changé
+depuis le dernier envoi accepté ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests)) :
+
+```json
+"itemNames": [{ "flavor": "_forever_", "locale": "frFR", "build": 70862,
+                "file": { "hash": "<SHA-256>", "modifiedAt": "2026-11-09T10:12:00+00:00", "size": 6822109 },
+                "names": [{ "id": 38, "name": "Chemise de recrue" }] }]
+```
+
+Un client par entrée, 10 au plus ; 100 000 noms au plus par entrée, 200 caractères au plus par nom.
+Seule la langue du site (`frFR`) est enregistrée ; la réponse ajoute `itemNamesStored`, le nombre
+de noms ajoutés ou modifiés.
 
 ### Prix et recettes (facultatifs)
 

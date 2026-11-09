@@ -231,6 +231,11 @@ configuration. Elles se remplissent dès qu'un agent 0.5.0 ou plus récent envoi
 `Auctionator.lua` (prix) et un `NaowhForever.lua` (recettes). Les migrations `0005_economy` et
 `0006_farm_open_session` créent leurs tables ([DATABASE](DATABASE.md)).
 
+La page **Finances** se remplit dès qu'un agent 0.7.0 ou plus récent envoie les journées
+d'Allemano Ledger ; le même agent envoie les noms d'objets du cache du jeu. Ces champs étant
+refusés par un serveur antérieur, le site 0.11.0 (migration `0011_character_ledger_days`) est
+déployé **avant** l'installation de l'agent 0.7.0 sur les PC.
+
 - **Début de l'historique** (page **Paramètres**, section « Moteur économique ») : sans réglage,
   le moteur part de la date limite de la réinitialisation des personnages. Les jours antérieurs au
   2026-11-04, date de la sortie officielle, viennent de la bêta : régler le 2026-11-04 les écarte.

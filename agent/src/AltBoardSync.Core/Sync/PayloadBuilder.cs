@@ -19,14 +19,22 @@ public sealed record AccountReadResult(AccountSource Source, AccountPayload? Pay
     public string? Fingerprint { get; init; }
 }
 
+/// <summary>
+/// Lecture du cache de noms d'un client. FileHash : empreinte du fichier lu (null si la lecture a
+/// échoué) ; Payload : les noms à envoyer, null si le fichier n'a pas changé depuis knownHash ou ne
+/// contient aucun nom ; Error : la cause d'un échec.
+/// </summary>
+public sealed record ItemNamesReadResult(string Flavor, string? FileHash, ItemNamesPayload? Payload, string? Error);
+
 public sealed class PayloadBuilder(StableFileReader reader)
 {
     /// <summary>
     /// Préfixe de <see cref="AccountReadResult.Fingerprint"/>, à changer quand le document gagne un champ :
     /// les empreintes enregistrées par l'agent précédent ne correspondent plus, et chaque compte est
     /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
+    /// 3 : finances par jour d'Allemano Ledger (0.7.0).
     /// </summary>
-    public const string PayloadFormat = "2";
+    public const string PayloadFormat = "3";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -80,13 +88,20 @@ public sealed class PayloadBuilder(StableFileReader reader)
             var warnings = new List<string>();
             var ledger = LedgerReader.Read(SavedVariablesParser.Parse(snapshot.Content), warnings);
             var completed = characters
-                .Select(c => ledger.TryGetValue(c.Guid, out var known) ? c with { Playtime = known.Playtime, Sessions = known.Sessions.Count > 0 ? known.Sessions : null } : c)
+                .Select(c => ledger.TryGetValue(c.Guid, out var known)
+                    ? c with
+                    {
+                        Playtime = known.Playtime,
+                        Sessions = known.Sessions.Count > 0 ? known.Sessions : null,
+                        Finances = known.Finances.Count > 0 ? known.Finances : null,
+                    }
+                    : c)
                 .ToList();
             return (completed, warnings, Convert.ToHexStringLower(SHA256.HashData(snapshot.Content)));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
         {
-            var message = $"Allemano Ledger illisible, temps de jeu et sessions non transmis : {e.Message}";
+            var message = $"Allemano Ledger illisible, temps de jeu, sessions et finances non transmis : {e.Message}";
             return (characters, [message.Length > 300 ? message[..300] : message], null);
         }
     }
@@ -133,11 +148,52 @@ public sealed class PayloadBuilder(StableFileReader reader)
         }
     }
 
+    /// <summary>
+    /// Noms d'objets du cache local d'un client (<see cref="ItemNameCache"/>). Source facultative : null
+    /// sans cache ; une lecture en échec ne fait jamais échouer la synchronisation. Le fichier n'est
+    /// analysé que si son empreinte diffère de knownHash, celle du dernier envoi accepté.
+    /// </summary>
+    public async Task<ItemNamesReadResult?> ReadItemNamesAsync(string flavor, string flavorPath, string? knownHash, CancellationToken cancellationToken = default)
+    {
+        (string Path, string Locale)? found;
+        try
+        {
+            found = ItemNameCache.Find(flavorPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new ItemNamesReadResult(flavor, null, null, Truncate($"cache du jeu introuvable : {e.Message}"));
+        }
+
+        if (found is not { } cache) return null;
+        try
+        {
+            var snapshot = await reader.ReadAsync(cache.Path, cancellationToken).ConfigureAwait(false);
+            var file = FileOf(snapshot);
+            if (file.Hash == knownHash) return new ItemNamesReadResult(flavor, file.Hash, null, null);
+            var data = ItemNameCache.Parse(snapshot.Content);
+            return new ItemNamesReadResult(
+                flavor,
+                file.Hash,
+                data.Names.Count == 0 ? null : new ItemNamesPayload(flavor, cache.Locale, data.Build, file, data.Names),
+                null);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            return new ItemNamesReadResult(flavor, null, null, Truncate($"cache du jeu illisible, noms des objets non transmis : {e.Message}"));
+        }
+    }
+
+    /// <summary>Clients distincts des comptes trouvés, dans l'ordre de découverte.</summary>
+    public static IReadOnlyList<(string Flavor, string FlavorPath)> Flavors(IEnumerable<AccountSource> sources) =>
+        sources.Select(source => (source.Flavor, source.FlavorPath)).DistinctBy(entry => entry.Flavor, StringComparer.OrdinalIgnoreCase).ToList();
+
     private static SourceFilePayload FileOf(FileSnapshot snapshot) =>
         new(Convert.ToHexStringLower(SHA256.HashData(snapshot.Content)), snapshot.ModifiedAt, snapshot.Content.LongLength);
 
     private static string Truncate(string message) => message.Length > 300 ? message[..300] : message;
 
-    public static SyncPayload Build(MachinePayload machine, IEnumerable<AccountPayload> accounts, string agentVersion, DateTimeOffset now) =>
-        new(SyncPayload.CurrentSchemaVersion, agentVersion, now, machine, accounts.ToList());
+    public static SyncPayload Build(
+        MachinePayload machine, IEnumerable<AccountPayload> accounts, string agentVersion, DateTimeOffset now, IReadOnlyList<ItemNamesPayload>? itemNames = null) =>
+        new(SyncPayload.CurrentSchemaVersion, agentVersion, now, machine, accounts.ToList()) { ItemNames = itemNames is { Count: > 0 } ? itemNames : null };
 }

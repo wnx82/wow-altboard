@@ -105,6 +105,33 @@ public class AgentAppTests
         Assert.Contains("3 nouveaux snapshots.", output);
         Assert.Contains("3 personnages inchangés.", output);
         Assert.Contains("Synchronisation terminée.", output);
+        Assert.False(root.TryGetProperty("itemNames", out _));
+    }
+
+    [Fact]
+    public async Task Sync_sends_the_item_names_of_the_game_cache_and_warns_when_it_is_unreadable()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var cache = DbCacheFile.Write(h.Flavor, DbCacheFile.Build(70862, DbCacheFile.Name(720, "Masque de bandit")));
+        var server = new FakeServer(HttpStatusCode.OK, SuccessBody);
+
+        Assert.Equal(AgentApp.ExitOk, await h.Run(server, "sync"));
+
+        using (var json = JsonDocument.Parse(server.Calls[0].Body))
+        {
+            var names = Assert.Single(json.RootElement.GetProperty("itemNames").EnumerateArray());
+            Assert.Equal("frFR", names.GetProperty("locale").GetString());
+            Assert.Equal("""[{"id":720,"name":"Masque de bandit"}]""", names.GetProperty("names").GetRawText());
+        }
+
+        Assert.Contains("Noms des objets du cache du jeu (_classic_beta_) : 1 objet", h.Out.ToString());
+
+        // Cache illisible : avertissement, la synchronisation part quand même, sans les noms.
+        File.WriteAllText(cache, "pas un cache");
+        Assert.Equal(AgentApp.ExitOk, await h.Run(server, "sync"));
+        Assert.False(JsonDocument.Parse(server.Calls[1].Body).RootElement.TryGetProperty("itemNames", out _));
+        Assert.Contains("avertissement : cache du jeu illisible, noms des objets non transmis", h.Out.ToString());
     }
 
     [Fact]

@@ -2,9 +2,11 @@
 
 ## Ce qui n'est jamais collecté
 
-L'agent ne lit que deux fichiers par compte : `SavedVariables\AltBoard.lua` et, s'il existe,
-`SavedVariables\AllemanoLedger.lua` (temps de jeu et sessions : dates, durée, expérience ; l'or de
-l'addon et son détail ne sont pas lus).
+L'agent ne lit, par compte, que les fichiers de quatre addons sous `SavedVariables` :
+`AltBoard.lua` et, s'ils existent, `AllemanoLedger.lua` (temps de jeu, sessions, finances par jour),
+`Auctionator.lua` (prix) et `NaowhForever.lua` (recettes). Depuis 0.7.0, il lit aussi, par client,
+`Cache\ADB\<langue>\DBCache.bin`, dont il ne garde que les noms d'objets, et la seule ligne
+`textLocale` de `WTF\Config.wtf`. Tout en lecture seule.
 Il ne lit ni identifiants Battle.net, ni mot de passe, ni jeton de session du jeu, et n'envoie
 aucun chemin de fichier.
 

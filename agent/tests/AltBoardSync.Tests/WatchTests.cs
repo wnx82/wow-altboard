@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using AltBoardSync.Core.App;
 using AltBoardSync.Core.IO;
 
@@ -312,6 +313,51 @@ public class WatchTests
         h.Control.RequestSync();
 
         await Eventually(() => server.Calls == 2, "l'envoi demandé");
+    }
+
+    /// <summary>Faux serveur qui garde le corps de chaque requête et répond 200.</summary>
+    private sealed class RecordingServer : HttpMessageHandler
+    {
+        public ConcurrentQueue<string> Bodies { get; } = new();
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Bodies.Enqueue(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(SuccessBody, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
+    public async Task Item_names_of_the_game_cache_are_sent_again_only_when_the_cache_changes()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var cache = DbCacheFile.Write(h.Flavor, DbCacheFile.Build(70862, DbCacheFile.Name(720, "Masque de bandit")));
+        var server = new RecordingServer();
+        h.Start(server);
+        await Eventually(() => server.Bodies.Count == 1, "l'envoi du démarrage");
+
+        h.Control.RequestSync();
+        await Eventually(() => server.Bodies.Count == 2, "l'envoi demandé");
+
+        // Un cache modifié seul ne déclenche rien : il part avec la synchronisation suivante.
+        File.WriteAllBytes(cache, DbCacheFile.Build(70862, DbCacheFile.Name(720, "Masque de bandit"), DbCacheFile.Name(721, "Lame de bandit")));
+        await Quiet();
+        Assert.Equal(2, server.Bodies.Count);
+        h.Control.RequestSync();
+        await Eventually(() => server.Bodies.Count == 3, "l'envoi demandé après la modification du cache");
+
+        var bodies = server.Bodies.Select(body => JsonDocument.Parse(body).RootElement).ToArray();
+        var first = Assert.Single(bodies[0].GetProperty("itemNames").EnumerateArray());
+        Assert.Equal("_classic_beta_", first.GetProperty("flavor").GetString());
+        Assert.Equal("frFR", first.GetProperty("locale").GetString());
+        Assert.Equal(70862, first.GetProperty("build").GetInt32());
+        Assert.Equal("""[{"id":720,"name":"Masque de bandit"}]""", first.GetProperty("names").GetRawText());
+        Assert.False(bodies[1].TryGetProperty("itemNames", out _));
+        Assert.Equal(2, bodies[2].GetProperty("itemNames")[0].GetProperty("names").GetArrayLength());
+
+        Assert.Contains("noms des objets du cache du jeu (_classic_beta_, frFR, build 70862) : 1 envoyés", h.Log);
+        Assert.Contains("\"itemNameHashes\"", File.ReadAllText(Path.Combine(h.Home, "state.json")));
     }
 
     [Fact]

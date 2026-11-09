@@ -12,7 +12,18 @@ import { processSync } from "@/lib/sync/process";
 import type { SyncPayload } from "@/lib/sync/schema";
 import { buildActivity } from "./activity";
 import { buildLevelProgress } from "./levels";
-import { getCharacterDetail, getOverview, listAccounts, listCharacters, listLevelSnapshots, listMachines, listRecentRuns, listRecentSnapshots } from "./queries";
+import {
+  getCharacterDetail,
+  getOverview,
+  hasLedgerDays,
+  listAccounts,
+  listCharacters,
+  listLedgerDays,
+  listLevelSnapshots,
+  listMachines,
+  listRecentRuns,
+  listRecentSnapshots,
+} from "./queries";
 
 const BASE: SyncPayload = JSON.parse(
   readFileSync(path.resolve(import.meta.dirname, "../../../../tests/fixtures/payloads/two-accounts.json"), "utf8"),
@@ -248,6 +259,30 @@ describe("lecture du tableau de bord", () => {
     );
 
     assert.deepEqual((await listLevelSnapshots(database.db, null)).map((row) => row.level), [10, 15, 20, 5]);
+  });
+
+  test("les finances lisent les journées de la période, avec le personnage et son compte, en une requête", async () => {
+    assert.equal(await hasLedgerDays(database.db), false);
+    const payload = structuredClone(BASE);
+    payload.accounts[0].characters[0].finances = [
+      { day: "2026-09-30", income: { quest: 100 }, expense: {}, transferIn: 0, transferOut: 0 },
+      { day: "2026-10-04", income: { ah: 900 }, expense: { repair: 50 }, transferIn: 0, transferOut: 0, lootValue: 12, playedSeconds: 3600 },
+    ];
+    await sync(payload);
+    const [character] = await database.db.select({ id: t.characters.id, name: t.characters.name }).from(t.characters).where(eq(t.characters.guid, payload.accounts[0].characters[0].guid));
+
+    queries = 0;
+    const { rows, characters } = await listLedgerDays(database.db, "2026-10-01");
+
+    assert.equal(queries, 1);
+    assert.deepEqual(
+      rows.map((row) => [row.characterId, row.day, row.income, row.expense, row.lootValue, row.playedSeconds]),
+      [[character.id, "2026-10-04", { ah: 900 }, { repair: 50 }, 12, 3600]],
+    );
+    const known = characters.get(character.id)!;
+    assert.deepEqual([known.id, known.name, known.account], [character.id, character.name, "Compte 11…#1"]);
+    assert.equal((await listLedgerDays(database.db, null)).rows.length, 2);
+    assert.equal(await hasLedgerDays(database.db), true);
   });
 });
 

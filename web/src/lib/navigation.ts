@@ -1,4 +1,4 @@
-// Navigation principale : dix-sept pages en trois groupes, pour que l'en-tête tienne sur une ligne
+// Navigation principale : dix-huit pages en trois groupes, pour que l'en-tête tienne sur une ligne
 // à toutes les largeurs. Chaque groupe s'ouvre en liste déroulante ; sur téléphone, un seul bouton
 // ouvre les trois groupes à la fois.
 
@@ -28,6 +28,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/market", label: "Marché" },
       { href: "/crafting", label: "Craft" },
       { href: "/farming", label: "Farm" },
+      { href: "/finances", label: "Finances" },
       { href: "/audit", label: "Audit" },
     ],
   },
