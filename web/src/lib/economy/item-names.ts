@@ -17,6 +17,8 @@ export const catalogUrl = (build: string) => `https://wago.tools/db2/ItemSparse/
 /** Le fichier de la version 1.60.1 pèse 5,5 Mo : au-delà de cette taille, la réponse est refusée. */
 export const MAX_CATALOG_BYTES = 40 * 1024 * 1024;
 const TIMEOUT_MS = 60_000;
+/** Le fichier a mis près de deux minutes à arriver sur le serveur de production (novembre 2026). */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 const BATCH = 1_000;
 const BUILD_PATTERN = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,7}$/;
 const MAX_NAME_LENGTH = 200;
@@ -108,9 +110,9 @@ function networkError(error: unknown): string {
   return `wago.tools injoignable${cause ? ` (${cause})` : ""}.`;
 }
 
-async function get(fetchImpl: Fetch, url: string): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
+async function get(fetchImpl: Fetch, url: string, timeoutMs = TIMEOUT_MS): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
   try {
-    const response = await fetchImpl(url, { headers: { "user-agent": "wow-altboard" }, signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "error" });
+    const response = await fetchImpl(url, { headers: { "user-agent": "wow-altboard" }, signal: AbortSignal.timeout(timeoutMs), redirect: "error" });
     if (!response.ok) return { ok: false, error: `wago.tools a répondu ${response.status}.` };
     return { ok: true, response };
   } catch (error) {
@@ -133,18 +135,24 @@ export async function latestBuild(fetchImpl: Fetch = fetch): Promise<Parsed<stri
   return { ok: true, value: version };
 }
 
-export type ImportResult = { ok: true; build: string; count: number; removed: number } | { ok: false; error: string };
+export type ImportResult = { ok: true; build: string; count: number; removed: number; unchanged?: true } | { ok: false; error: string };
 
 /**
  * Importe les noms de la dernière version : un nom « wago » est remplacé, un nom « client » jamais.
  * Les noms « wago » d'une version précédente absents de la nouvelle sont supprimés. Tout ou rien.
+ * Avec onlyIfNewer, rien n'est téléchargé quand cette version est déjà importée (`unchanged`).
  */
-export async function importItemNames(db: Database, options: { now: Date; fetch?: Fetch }): Promise<ImportResult> {
+export async function importItemNames(db: Database, options: { now: Date; fetch?: Fetch; onlyIfNewer?: boolean }): Promise<ImportResult> {
   const fetchImpl = options.fetch ?? fetch;
   const build = await latestBuild(fetchImpl);
   if (!build.ok) return build;
 
-  const download = await get(fetchImpl, catalogUrl(build.value));
+  if (options.onlyIfNewer) {
+    const current = (await catalogSummary(db)).wago;
+    if (current.count > 0 && current.build === build.value) return { ok: true, build: build.value, count: current.count, removed: 0, unchanged: true };
+  }
+
+  const download = await get(fetchImpl, catalogUrl(build.value), DOWNLOAD_TIMEOUT_MS);
   if (!download.ok) return download;
   let text: string | null;
   try {

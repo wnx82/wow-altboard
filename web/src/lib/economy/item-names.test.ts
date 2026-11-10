@@ -9,6 +9,7 @@ import { createAgentToken } from "@/lib/agent-tokens";
 import { processSync } from "@/lib/sync/process";
 import type { SyncPayload } from "@/lib/sync/schema";
 import { BUILD_URL, catalogSummary, catalogUrl, fillCatalogNames, importItemNames, loadItemNames, MAX_CATALOG_BYTES, parseCsv, parseItemSparse } from "./item-names";
+import { runItemNamesImport } from "./item-names-runtime";
 import { itemLabel, itemQuality, loadEconomy, type ItemName } from "./load";
 
 const BASE: SyncPayload = JSON.parse(
@@ -141,6 +142,43 @@ describe("import des noms depuis wago.tools", () => {
       assert.deepEqual(await importItemNames(database.db, { now: NOW, fetch: wago.fetchImpl }), { ok: false, error });
     }
     assert.equal((await catalogSummary(database.db)).wago.count, 0);
+  });
+
+  test("contrôle automatique : rien n'est téléchargé tant que la version importée est la dernière", async () => {
+    const first = fakeWago();
+    assert.deepEqual(await importItemNames(database.db, { now: NOW, fetch: first.fetchImpl, onlyIfNewer: true }), { ok: true, build: "1.60.1.70862", count: 4, removed: 0 });
+    assert.equal(first.calls.length, 2);
+
+    const same = fakeWago();
+    assert.deepEqual(await importItemNames(database.db, { now: LATER, fetch: same.fetchImpl, onlyIfNewer: true }), {
+      ok: true,
+      build: "1.60.1.70862",
+      count: 4,
+      removed: 0,
+      unchanged: true,
+    });
+    assert.deepEqual(same.calls, [BUILD_URL]);
+    assert.deepEqual((await catalogSummary(database.db)).wago.updatedAt, NOW);
+
+    const newer = fakeWago({ build: "1.60.2.71000" });
+    const result = await importItemNames(database.db, { now: LATER, fetch: newer.fetchImpl, onlyIfNewer: true });
+    assert.deepEqual(result, { ok: true, build: "1.60.2.71000", count: 4, removed: 0 });
+  });
+
+  test("deux demandes simultanées partagent le même import", async () => {
+    const wago = fakeWago();
+    const [manual, daily] = await Promise.all([
+      runItemNamesImport(database.db, { trigger: "manual", onlyIfNewer: false, fetch: wago.fetchImpl }),
+      runItemNamesImport(database.db, { trigger: "daily", onlyIfNewer: true, fetch: wago.fetchImpl }),
+    ]);
+    assert.deepEqual(manual, { ok: true, build: "1.60.1.70862", count: 4, removed: 0 });
+    assert.equal(daily, manual);
+    assert.equal(wago.calls.length, 2);
+
+    // Import terminé : la demande suivante en lance un nouveau.
+    const next = await runItemNamesImport(database.db, { trigger: "daily", onlyIfNewer: true, fetch: wago.fetchImpl });
+    assert.equal(next.ok && next.unchanged, true);
+    assert.equal(wago.calls.length, 3);
   });
 
   test("une réponse plus grosse que la limite est abandonnée en cours de lecture", async () => {

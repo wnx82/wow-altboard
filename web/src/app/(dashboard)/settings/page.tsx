@@ -156,7 +156,8 @@ export default async function SettingsPage() {
             <div className="mt-5 border-t border-line pt-4">
               <ItemNamesImportForm action={importItemNamesAction} imported={catalog.wago.count > 0} />
               <p className="mt-2 text-xs text-faint">
-                À refaire après une mise à jour du jeu qui ajoute des objets. Le serveur télécharge environ 6 Mo depuis wago.tools.
+                Automatique : le serveur vérifie la version du jeu à son démarrage puis chaque jour, et importe la table à chaque nouvelle
+                version. Le bouton force un import immédiat ; le serveur télécharge environ 6 Mo depuis wago.tools.
               </p>
             </div>
           </div>

@@ -10,7 +10,7 @@ import { deleteAlert, saveItemAlerts } from "./alerts";
 import { askAssistant, assistantConfig, MAX_QUESTION_LENGTH } from "./assistant";
 import { writeDailyAudit } from "./daily-audit";
 import { loadFacts } from "./facts-service";
-import { importItemNames } from "./item-names";
+import { runItemNamesImport } from "./item-names-runtime";
 import { parseMoneyInput } from "./money-input";
 import { cancelFarmSession, endFarmSession, MAX_LABEL_LENGTH, startFarmSession } from "./sessions";
 
@@ -162,15 +162,21 @@ export type ItemNamesState = { error?: string; message?: string };
 const ITEM_NAMES_LIMIT = { max: 3, windowMs: 15 * 60_000 };
 const itemNamesLimiter = new RateLimiter();
 
+/**
+ * Attente maximale de la réponse : au-delà, le proxy Cloudflare coupe la requête (100 s). L'import
+ * continue alors sur le serveur et ses noms apparaissent à la fin du téléchargement.
+ */
+const ITEM_NAMES_WAIT_MS = 45_000;
+
 /** Importe les noms des objets du jeu depuis wago.tools (version la plus récente du client). */
 export async function importItemNamesAction(): Promise<ItemNamesState> {
   const session = await requireSession();
   if (!itemNamesLimiter.consume(`item-names:${session.userId}`, ITEM_NAMES_LIMIT)) return { error: "Trop d'imports. Réessayez dans quelques minutes." };
-  const started = Date.now();
-  const result = await importItemNames(getDatabase(), { now: new Date() });
-  console.log(
-    JSON.stringify({ event: "item_names.import", userId: session.userId, ok: result.ok, ms: Date.now() - started, ...(result.ok ? { build: result.build, count: result.count, removed: result.removed } : { error: result.error }) }),
-  );
+  const running = runItemNamesImport(getDatabase(), { trigger: "manual", onlyIfNewer: false, userId: session.userId });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const result = await Promise.race([running, new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), ITEM_NAMES_WAIT_MS)))]);
+  clearTimeout(timer);
+  if (result === null) return { message: "Import en cours : wago.tools est lent aujourd'hui. Les noms apparaîtront d'ici quelques minutes." };
   if (!result.ok) return { error: result.error };
   revalidatePath("/", "layout");
   const removed = result.removed > 0 ? `, ${result.removed} retiré${result.removed > 1 ? "s" : ""}` : "";

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache, Suspense } from "react";
-import { Confidence, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
+import { Confidence, ItemName, MarketSelector, MarketSource, OwnedStock, Reasons } from "@/components/economy";
 import { AssistantForm, AssistantRetryButton, DailyAuditForm } from "@/components/economy-forms";
 import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -10,7 +10,7 @@ import { askAssistantAction, writeDailyAuditAction } from "@/lib/economy/actions
 import { assistantConfig, MAX_QUESTION_LENGTH, probeAssistant, type AssistantConfig } from "@/lib/economy/assistant";
 import { listDailyAudits, type DailyAudit } from "@/lib/economy/daily-audit";
 import { todayInBrussels } from "@/lib/economy/days";
-import { loadEconomy } from "@/lib/economy/load";
+import { loadEconomy, type Holding } from "@/lib/economy/load";
 import { KIND_LABELS, type Opportunity, type OpportunityKind } from "@/lib/economy/opportunities";
 import { ensureOpportunityRun } from "@/lib/economy/runs";
 import { formatDay, formatPercent, marketParam, marketQuery } from "@/lib/economy/view";
@@ -93,7 +93,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
       ) : (
         <ol className="mt-4 space-y-3">
           {list.map((opportunity, index) => (
-            <OpportunityCard key={`${opportunity.kind}-${opportunity.itemKey}-${opportunity.spellId}-${index}`} opportunity={opportunity} rank={run.opportunities.indexOf(opportunity) + 1} names={context.names} query={itemQuery} fallbackDay={run.dataThrough} />
+            <OpportunityCard key={`${opportunity.kind}-${opportunity.itemKey}-${opportunity.spellId}-${index}`} opportunity={opportunity} rank={run.opportunities.indexOf(opportunity) + 1} names={context.names} holdings={context.holdings} query={itemQuery} fallbackDay={run.dataThrough} />
           ))}
         </ol>
       )}
@@ -268,12 +268,14 @@ function OpportunityCard({
   opportunity,
   rank,
   names,
+  holdings,
   query,
   fallbackDay,
 }: {
   opportunity: Opportunity;
   rank: number;
   names: Parameters<typeof ItemName>[0]["names"];
+  holdings: ReadonlyMap<string, Holding[]>;
   query: string;
   fallbackDay: string | null;
 }) {
@@ -290,6 +292,12 @@ function OpportunityCard({
             </span>
             {opportunity.itemKey && <ItemName itemKey={opportunity.itemKey} names={names} query={query} />}
           </p>
+          {/* Vendre ou garder ne vaut que pour un stock : combien, et sur quels personnages. */}
+          {(opportunity.kind === "SELL" || opportunity.kind === "KEEP") && opportunity.itemKey && (
+            <div className="mt-1.5">
+              <OwnedStock holdings={holdings.get(opportunity.itemKey) ?? []} />
+            </div>
+          )}
           <div className="mt-2">
             <Reasons codes={opportunity.reasonCodes} />
           </div>

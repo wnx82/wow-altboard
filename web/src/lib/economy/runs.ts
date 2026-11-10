@@ -3,7 +3,7 @@ import type { Database } from "@/db/client";
 import { canonicalJson } from "@/lib/hash";
 import * as t from "@/db/schema";
 import { loadItemNames } from "./item-names";
-import type { EconomyContext } from "./load";
+import { loadHoldings, type EconomyContext } from "./load";
 import { buildOpportunities, DEFAULT_PARAMETERS, ENGINE_VERSION, type Opportunity, type OpportunityKind } from "./opportunities";
 
 // Conservation des calculs d'opportunités. Un calcul n'est refait que si sa base a changé : un
@@ -119,12 +119,14 @@ export async function listRuns(db: Database, marketId: number, limit = 20) {
     .limit(limit);
 }
 
-/** Dernier calcul conservé, tous marchés confondus, et ses premières opportunités de gain. Rien n'est recalculé. */
+/** Dernier calcul conservé, tous marchés confondus, ses premières opportunités de gain et leurs détenteurs. Rien n'est recalculé. */
 export async function latestOpportunities(db: Database, limit = 3) {
   const [last] = await db.select({ id: t.opportunityRuns.id }).from(t.opportunityRuns).orderBy(desc(t.opportunityRuns.id)).limit(1);
   if (!last) return null;
   const run = (await readRun(db, last.id))!;
   const top = run.opportunities.filter((o) => o.kind !== "DONT_CRAFT").slice(0, limit);
   const keys = top.flatMap((o) => (o.itemKey ? [o.itemKey] : []));
-  return { run, top, names: await loadItemNames(db, keys) };
+  // Stocks actuels, pas ceux du calcul : un objet vendu depuis ne doit plus paraître détenu.
+  const [names, holdings] = await Promise.all([loadItemNames(db, keys), loadHoldings(db, keys)]);
+  return { run, top, names, holdings };
 }

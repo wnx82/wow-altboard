@@ -16,6 +16,7 @@ import { DECISION_LABELS } from "@/lib/economy/craft";
 import { craftHistory, findPeriod, PERIODS, withinPeriod } from "@/lib/economy/history";
 import { itemLabel, itemQuality, loadEconomy, loadItemsHistory } from "@/lib/economy/load";
 import { formatMoneyInput, MONEY_INPUT_HINT } from "@/lib/economy/money-input";
+import { holdingPlace } from "@/lib/economy/stock-view";
 import { formatChange, formatCopperShort, formatDay, formatPercent, formatShortDay, ITEM_KEY_PATTERN, itemHref, marketParam, marketQuery } from "@/lib/economy/view";
 import { classKey, formatInteger, QUALITY_LABELS } from "@/lib/wow/format";
 
@@ -206,7 +207,9 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
                   <Link href={`/characters/${holding.characterId}`} prefetch={false} className="font-semibold class-text hover:underline">
                     {holding.characterName}
                   </Link>
-                  <span className="tabular-nums">{formatInteger(holding.quantity)}</span>
+                  <span className="tabular-nums">
+                    {formatInteger(holding.quantity)} <span className="text-xs text-faint">({holdingPlace(holding, formatInteger)})</span>
+                  </span>
                 </li>
               ))}
             </ul>

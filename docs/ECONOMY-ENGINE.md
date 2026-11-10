@@ -152,8 +152,11 @@ tableau) et dans le bloc **À surveiller** de l'accueil. Aucune notification.
 
 L'addon ne nomme que les objets vus dans un inventaire (table `items`). Les autres prennent le nom
 de la table `ItemSparse` du jeu, que wago.tools publie pour chaque version du client WoW Forever
-(produit `wowf`, en `frFR`). **Paramètres → Noms des objets** lance l'import : dernière version
-(`/api/builds/wowf/latest`), puis son fichier CSV (5,5 Mo et 19 324 objets pour 1.60.1.70862). Le
+(produit `wowf`, en `frFR`). Depuis le site 0.13.0, le serveur lance l'import seul
+(`item-names-runtime.ts`, démarré par `instrumentation.ts`) : une minute après son démarrage, puis
+chaque jour, il lit la dernière version (`/api/builds/wowf/latest`) et ne télécharge son fichier CSV
+(5,5 Mo et 19 324 objets pour 1.60.1.70862) que si cette version n'est pas déjà importée. Un seul
+import tourne à la fois ; **Paramètres → Noms des objets** en force un. Le
 nom de l'addon reste prioritaire ; une clé `g:1234:60` prend le nom de `1234`, une mascotte
 (`p:…`) ou une clé à suffixe de l'addon (`1234:567`) n'en reçoit pas. Les noms servent au Marché,
 au Craft, au Farm, aux Opportunités, aux faits de l'assistant et aux libellés des objectifs.
@@ -170,6 +173,7 @@ seul nomme 59 % des objets d'Auctionator ; avec le cache, 98,5 %.
 - Granularité journalière : pas de prix « 24 h » ni d'heure de scan, pas de nombre d'enchères.
 - Un scan partiel fait un jour à peu d'objets : la page Audit le signale (moins de la moitié des
   objets habituels).
-- Noms d'objets jamais possédés : ceux de wago.tools, à réimporter après une mise à jour du jeu.
-  La table publiée peut écrire un nom autrement que le jeu (« Etoffe de lin » sans accent).
+- Noms d'objets jamais possédés : ceux de wago.tools, réimportés chaque jour quand une nouvelle
+  version du jeu est publiée. La table publiée peut écrire un nom autrement que le jeu (« Etoffe de
+  lin » sans accent).
 - Le moteur ne connaît que les recettes relevées par NaowhForever.

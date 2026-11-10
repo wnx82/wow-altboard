@@ -23,7 +23,8 @@ export type MarketSummary = {
 
 export type ItemName = { name: string | null; quality: number | null };
 
-export type Holding = { characterId: number; characterName: string; characterClass: string | null; quantity: number };
+/** Quantité d'un objet chez un personnage : total, dont sacs et banque. */
+export type Holding = { characterId: number; characterName: string; characterClass: string | null; quantity: number; bags: number; bank: number };
 
 export type KnownRecipe = Recipe & { characters: { id: number; name: string; class: string | null }[] };
 
@@ -102,6 +103,42 @@ export function historyStart(settings: { marketHistoryFrom: Date | null; charact
   return from ? todayInBrussels(from) : null;
 }
 
+/**
+ * Détenteurs de chaque objet (sacs et banques relevés), le plus gros stock d'abord. Sans liste :
+ * tous les objets possédés.
+ */
+export async function loadHoldings(db: Database, itemKeys?: readonly string[]): Promise<Map<string, Holding[]>> {
+  const holdings = new Map<string, Holding[]>();
+  if (itemKeys?.length === 0) return holdings;
+  const rows = await db
+    .select({
+      itemKey: t.characterItems.itemKey,
+      location: t.characterItems.location,
+      characterId: t.characters.id,
+      characterName: t.characters.name,
+      characterClass: t.characters.class,
+      quantity: sql<number>`sum(${t.characterItems.quantity})::int`,
+    })
+    .from(t.characterItems)
+    .innerJoin(t.characters, eq(t.characters.id, t.characterItems.characterId))
+    .where(itemKeys ? inArray(t.characterItems.itemKey, [...new Set(itemKeys)]) : undefined)
+    .groupBy(t.characterItems.itemKey, t.characterItems.location, t.characters.id);
+  for (const row of rows) {
+    const list = holdings.get(row.itemKey) ?? [];
+    let holding = list.find((entry) => entry.characterId === row.characterId);
+    if (!holding) {
+      holding = { characterId: row.characterId, characterName: row.characterName, characterClass: row.characterClass, quantity: 0, bags: 0, bank: 0 };
+      list.push(holding);
+    }
+    holding.quantity += row.quantity;
+    if (row.location === "bank") holding.bank += row.quantity;
+    else holding.bags += row.quantity;
+    holdings.set(row.itemKey, list);
+  }
+  for (const list of holdings.values()) list.sort((a, b) => b.quantity - a.quantity || a.characterName.localeCompare(b.characterName));
+  return holdings;
+}
+
 /** Contexte complet, ou null tant qu'aucun prix n'a été reçu. */
 export async function loadEconomy(db: Database, options: { marketId?: number; now: Date }): Promise<EconomyContext | null> {
   const markets = await listMarkets(db);
@@ -115,7 +152,7 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
   const windowStart = addDays(today, -WINDOW_DAYS);
   const from = historyFrom && historyFrom > windowStart ? historyFrom : windowStart;
 
-  const [dayRows, latestRows, vendorRows, itemRows, holdingRows, recipeRows, reagentRows, knownRows, lastImportRows, lastRun, professionRows, newestImport] = await Promise.all([
+  const [dayRows, latestRows, vendorRows, itemRows, holdings, recipeRows, reagentRows, knownRows, lastImportRows, lastRun, professionRows, newestImport] = await Promise.all([
     db
       .select({ itemKey: t.marketItemDays.itemKey, day: t.marketItemDays.day, low: t.marketItemDays.lowCopper, high: t.marketItemDays.highCopper, available: t.marketItemDays.available })
       .from(t.marketItemDays)
@@ -126,17 +163,7 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
       .where(eq(t.marketItemLatest.marketId, market.id)),
     db.select({ itemKey: t.vendorPrices.itemKey, price: t.vendorPrices.priceCopper }).from(t.vendorPrices),
     db.select({ itemKey: t.items.itemKey, name: t.items.name, quality: t.items.quality }).from(t.items),
-    db
-      .select({
-        itemKey: t.characterItems.itemKey,
-        characterId: t.characters.id,
-        characterName: t.characters.name,
-        characterClass: t.characters.class,
-        quantity: sql<number>`sum(${t.characterItems.quantity})::int`,
-      })
-      .from(t.characterItems)
-      .innerJoin(t.characters, eq(t.characters.id, t.characterItems.characterId))
-      .groupBy(t.characterItems.itemKey, t.characters.id),
+    loadHoldings(db),
     db.select().from(t.recipes),
     db.select().from(t.recipeReagents).orderBy(asc(t.recipeReagents.spellId), asc(t.recipeReagents.itemId)),
     db
@@ -171,15 +198,7 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
 
   const vendor = new Map(vendorRows.map((row) => [row.itemKey, row.price]));
   const names = new Map(itemRows.map((row) => [row.itemKey, { name: row.name, quality: row.quality }]));
-  const stock = new Map<string, number>();
-  const holdings = new Map<string, Holding[]>();
-  for (const row of holdingRows) {
-    stock.set(row.itemKey, (stock.get(row.itemKey) ?? 0) + row.quantity);
-    const list = holdings.get(row.itemKey) ?? [];
-    list.push({ characterId: row.characterId, characterName: row.characterName, characterClass: row.characterClass, quantity: row.quantity });
-    holdings.set(row.itemKey, list);
-  }
-  for (const list of holdings.values()) list.sort((a, b) => b.quantity - a.quantity || a.characterName.localeCompare(b.characterName));
+  const stock = new Map([...holdings].map(([itemKey, list]) => [itemKey, list.reduce((total, holding) => total + holding.quantity, 0)]));
 
   const reagentsBySpell = new Map<number, { itemId: number; quantity: number }[]>();
   for (const row of reagentRows) {

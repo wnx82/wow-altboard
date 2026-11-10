@@ -263,7 +263,7 @@ export function DeleteAlertButton({ action, alertId, label }: { action: DeleteAl
 
 type ItemNamesAction = (previous: ItemNamesState, formData: FormData) => Promise<ItemNamesState>;
 
-/** Import des noms des objets depuis wago.tools : quelques secondes, plusieurs mégaoctets. */
+/** Import des noms des objets depuis wago.tools : jusqu'à une minute, plusieurs mégaoctets. */
 export function ItemNamesImportForm({ action, imported }: { action: ItemNamesAction; imported: boolean }) {
   const [state, formAction, pending] = useActionState(action, {});
   return (
@@ -272,7 +272,7 @@ export function ItemNamesImportForm({ action, imported }: { action: ItemNamesAct
         {pending ? "Import en cours…" : imported ? "Mettre à jour depuis wago.tools" : "Importer depuis wago.tools"}
       </button>
       <span className="text-sm" role="status">
-        {pending && <span className="text-muted">Téléchargement de la table des objets, quelques secondes.</span>}
+        {pending && <span className="text-muted">Téléchargement de la table des objets, jusqu&apos;à une minute.</span>}
         {!pending && state.error && <span className="text-danger">{state.error}</span>}
         {!pending && state.message && <span className="text-ok">{state.message}</span>}
       </span>

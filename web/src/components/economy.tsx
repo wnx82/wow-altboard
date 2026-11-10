@@ -1,9 +1,10 @@
 import Link from "next/link";
-import type { ItemName, MarketSummary } from "@/lib/economy/load";
+import type { Holding, ItemName, MarketSummary } from "@/lib/economy/load";
 import { itemLabel, itemQuality } from "@/lib/economy/load";
 import { REASON_LABELS } from "@/lib/economy/opportunities";
+import { holdingPlace } from "@/lib/economy/stock-view";
 import { confidenceTone, formatChange, itemHref } from "@/lib/economy/view";
-import { formatDateTime } from "@/lib/wow/format";
+import { classKey, formatDateTime, formatInteger } from "@/lib/wow/format";
 
 // Éléments partagés des pages de l'économie. Composants serveur : aucun état côté navigateur.
 
@@ -34,6 +35,44 @@ export function ItemName({ itemKey, names, query = "" }: { itemKey: string; name
     <Link href={itemHref(itemKey, query)} prefetch={false} className="font-semibold hover:underline" data-quality={quality ?? undefined}>
       <span className={quality === null ? undefined : "quality-text"}>{itemLabel(names, itemKey)}</span>
     </Link>
+  );
+}
+
+/** Détenteurs d'un objet : personnage (couleur de classe, lien), quantité et emplacement. */
+export function Holders({ holdings, limit = 3 }: { holdings: readonly Holding[]; limit?: number }) {
+  const shown = holdings.slice(0, limit);
+  const rest = holdings.length - shown.length;
+  return (
+    <span>
+      {shown.map((holding, index) => (
+        <span key={holding.characterId} data-class={classKey(holding.characterClass)}>
+          {index > 0 && " · "}
+          <Link href={`/characters/${holding.characterId}`} prefetch={false} className="class-text font-semibold hover:underline">
+            {holding.characterName}
+          </Link>{" "}
+          <span className="tabular-nums">{formatInteger(holding.quantity)}</span>{" "}
+          <span className="text-faint">({holdingPlace(holding, formatInteger)})</span>
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="text-faint">
+          {" "}
+          · {rest} autre{rest > 1 ? "s" : ""}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Ce que vous détenez d'un objet à vendre ou à garder : quantité totale et détenteurs, au dernier relevé. */
+export function OwnedStock({ holdings }: { holdings: readonly Holding[] }) {
+  const total = holdings.reduce((sum, holding) => sum + holding.quantity, 0);
+  // Des span, pas un paragraphe : le composant se place aussi dans une ligne de texte.
+  if (total === 0) return <span className="block text-xs text-warn">Plus aucun en stock au dernier relevé : vendu ou utilisé depuis le calcul.</span>;
+  return (
+    <span className="block text-xs text-muted">
+      Vous en avez <span className="font-semibold tabular-nums text-text">{formatInteger(total)}</span> : <Holders holdings={holdings} />
+    </span>
   );
 }
 

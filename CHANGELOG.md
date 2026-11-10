@@ -4,6 +4,28 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.13.0 — 2026-11-10
+
+### Ajouté
+
+- **Noms des objets à jour sans intervention** : le serveur vérifie la dernière version du jeu chez
+  wago.tools une minute après son démarrage, puis chaque jour, et importe la table des objets à
+  chaque nouvelle version. Plus de « Objet 6264 » sur Craft, Marché ou Opportunités tant que
+  wago.tools répond. Le bouton de la page Paramètres force toujours un import.
+- **Craft, colonne « Vos composants »** : pour chaque recette, l'état des stocks (tout en stock et
+  combien de fois, à compléter chez un marchand, en partie, rien), puis chaque composant avec la
+  quantité détenue face à la quantité demandée et ses détenteurs (personnage, sacs ou banque).
+  Nouveau filtre « Faisables avec vos stocks », combinable avec la décision.
+- **Opportunités « Vendre » et « Garder »** : la quantité détenue et ses détenteurs, au dernier
+  relevé, sur la page Opportunités comme à l'accueil ; un objet vendu depuis le calcul est signalé.
+- Fiche d'un objet du marché : emplacement du stock de chaque personnage (sacs, banque).
+
+### Corrigé
+
+- Import des noms : le téléchargement de la table (5,5 Mo) dispose de 5 minutes au lieu d'une ;
+  il a pris près de deux minutes sur le serveur de production. Le bouton n'attend plus que
+  45 secondes, sous la limite du proxy Cloudflare : au-delà, l'import continue sur le serveur.
+
 ## Site 0.12.0 — 2026-11-10
 
 ### Ajouté

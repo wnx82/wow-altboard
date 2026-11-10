@@ -11,7 +11,7 @@ import type { SyncPayload } from "@/lib/sync/schema";
 import { listImports, markPartialDays } from "./audit";
 import { sortCrafts, summarizeProfessions } from "./craft-view";
 import { loadFacts } from "./facts-service";
-import { itemLabel, loadCoverage, loadEconomy, loadItemHistory, loadItemsHistory } from "./load";
+import { itemLabel, loadCoverage, loadEconomy, loadHoldings, loadItemHistory, loadItemsHistory } from "./load";
 import { buildMarketView, PAGE_SIZE } from "./market-view";
 import { ensureOpportunityRun, latestOpportunities, readRun } from "./runs";
 
@@ -54,6 +54,34 @@ describe("chargement du moteur", () => {
     assert.equal(item.lastDay, "2026-11-06");
     // Chaque décision est justifiée par au moins une raison.
     assert.ok(context.crafts.every((c) => c.reasons.length > 0));
+  });
+
+  test("détenteurs d'un objet : sacs et banque par personnage, plus gros stock d'abord", async () => {
+    const [first, second] = await database.db.select({ id: t.characters.id, name: t.characters.name }).from(t.characters).orderBy(t.characters.id).limit(2);
+    assert.ok(first && second, "la fixture compte au moins deux personnages");
+    await database.db.insert(t.characterItems).values([
+      { characterId: second.id, location: "bags", itemKey: "99001", quantity: 2 },
+      { characterId: second.id, location: "bank", itemKey: "99001", quantity: 4 },
+      { characterId: first.id, location: "bank", itemKey: "99001", quantity: 1 },
+      { characterId: first.id, location: "bags", itemKey: "99002", quantity: 3 },
+    ]);
+
+    const holdings = await loadHoldings(database.db, ["99001", "99001"]);
+    assert.deepEqual([...holdings.keys()], ["99001"]);
+    assert.deepEqual(
+      holdings.get("99001")!.map(({ characterId, quantity, bags, bank }) => ({ characterId, quantity, bags, bank })),
+      [
+        { characterId: second.id, quantity: 6, bags: 2, bank: 4 },
+        { characterId: first.id, quantity: 1, bags: 0, bank: 1 },
+      ],
+    );
+    assert.equal((await loadHoldings(database.db, [])).size, 0);
+
+    // Le moteur lit les mêmes détenteurs, et le stock en est la somme.
+    const context = (await loadEconomy(database.db, { now: NOW }))!;
+    assert.deepEqual(context.holdings.get("99001"), holdings.get("99001"));
+    assert.equal(context.stock.get("99001"), 7);
+    assert.equal(context.stock.get("99002"), 3);
   });
 
   test("le début de l'historique suit la date limite des personnages", async () => {

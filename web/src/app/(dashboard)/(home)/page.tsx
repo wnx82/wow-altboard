@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChampionPodium } from "@/components/champion-podium";
 import { CharacterBrowser } from "@/components/character-browser";
-import { Confidence, ItemName } from "@/components/economy";
+import { Confidence, ItemName, OwnedStock } from "@/components/economy";
 import { ServerStatusChips, ServerStatusTiles } from "@/components/server-status";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { Money, StatTile } from "@/components/ui";
@@ -180,6 +180,11 @@ export default async function CharactersPage() {
                     <span className="min-w-0">
                       <span className="badge mr-2">{KIND_LABELS[opportunity.kind]}</span>
                       {opportunity.itemKey && <ItemName itemKey={opportunity.itemKey} names={opportunities.names} />}
+                      {(opportunity.kind === "SELL" || opportunity.kind === "KEEP") && opportunity.itemKey && (
+                        <span className="mt-1 block">
+                          <OwnedStock holdings={opportunities.holdings.get(opportunity.itemKey) ?? []} />
+                        </span>
+                      )}
                     </span>
                     <span className="flex flex-none items-center gap-2">
                       <Money copper={opportunity.valueCopper} />
