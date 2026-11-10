@@ -61,7 +61,18 @@ public class WatchTests
             }
         }
 
-        public string Log => File.ReadAllText(Path.Combine(Home, "logs", "altboardsync.log"));
+        // L'agent peut être en train d'ajouter une ligne : la lecture partage l'écriture, comme celle
+        // du journal des synchronisations, sans quoi elle échoue par intermittence (fichier occupé).
+        public string Log
+        {
+            get
+            {
+                using var stream = new FileStream(
+                    Path.Combine(Home, "logs", "altboardsync.log"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+        }
 
         /// <summary>Du plus ancien au plus récent.</summary>
         public IReadOnlyList<JournalEntry> Journal => [.. new SyncJournal(Home, () => DateTimeOffset.UtcNow).ReadLatest().Reverse()];
