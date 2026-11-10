@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { EmptyState, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { formatDuration } from "@/lib/dashboard/level-times";
@@ -33,12 +33,10 @@ export default async function PlaytimePage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Temps de jeu</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Temps de jeu">
         D&apos;après l&apos;addon Allemano Ledger : le dernier <code className="text-text">/played</code> connu de chaque personnage, et les
         sessions de jeu des {PLAYTIME_WEEKS} dernières semaines. Chaque PC ne connaît que les sessions jouées chez lui.
-      </p>
+      </PageHeader>
 
       {measured === 0 && sessions.length === 0 ? (
         <div className="mt-6">

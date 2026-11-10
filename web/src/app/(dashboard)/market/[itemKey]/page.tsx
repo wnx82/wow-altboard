@@ -7,7 +7,7 @@ import { Change, Confidence, ItemName, Reasons } from "@/components/economy";
 import { PriceAlertForm } from "@/components/economy-forms";
 import { PriceChart } from "@/components/price-chart";
 import { TrendChart } from "@/components/trend-chart";
-import { Money, SectionTitle, StatTile } from "@/components/ui";
+import { Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { saveAlertsAction } from "@/lib/economy/actions";
@@ -74,16 +74,22 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
 
   return (
     <>
-      <p className="eyebrow text-gold">
-        <Link href={`/market${itemQuery}`} prefetch={false} className="hover:underline">
-          Marché
-        </Link>{" "}
-        · {context.market.label}
-      </p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl" data-quality={quality ?? undefined}>
-        <span className={quality === null ? undefined : "quality-text"}>{name}</span>
-      </h1>
-      <p className="mt-2 text-sm text-muted">
+      <PageHeader
+        section="economy"
+        eyebrow={
+          <>
+            <Link href={`/market${itemQuery}`} prefetch={false}>
+              Marché
+            </Link>{" "}
+            · {context.market.label}
+          </>
+        }
+        title={
+          <span data-quality={quality ?? undefined}>
+            <span className={quality === null ? undefined : "quality-text"}>{name}</span>
+          </span>
+        }
+      >
         Objet {key}
         {quality !== null && ` · ${QUALITY_LABELS[quality] ?? ""}`}
         {vendor !== null && (
@@ -93,7 +99,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
           </>
         )}
         {stats?.lastDay && <> · dernier relevé le {formatDay(stats.lastDay)}</>}
-      </p>
+      </PageHeader>
 
       {stats ? (
         <section aria-label="Statistiques" className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

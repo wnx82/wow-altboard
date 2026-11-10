@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cache, Suspense } from "react";
 import { Confidence, ItemName, MarketSelector, MarketSource, OwnedStock, Reasons } from "@/components/economy";
 import { AssistantForm, AssistantRetryButton, DailyAuditForm } from "@/components/economy-forms";
-import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { askAssistantAction, writeDailyAuditAction } from "@/lib/economy/actions";
@@ -56,11 +56,10 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
 
   return (
     <>
-      <Header />
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <Header>
         Classement de toutes les décisions du moteur : gains attendus pondérés par la confiance, crafts à éviter en fin de liste. Chaque ligne
         garde les valeurs qui l&apos;ont produite. <MarketSource lastImport={context.lastImport} lastDay={formatDay(context.lastImport?.lastDay ?? null)} />
-      </p>
+      </Header>
       <MarketSelector path="/opportunities" market={context.market} markets={context.markets} />
 
       {/* En tête de page : l'analyse se lance d'ici, et son texte s'affiche aussitôt dessous. */}
@@ -215,12 +214,11 @@ async function DailyAuditButton({ config, marketId, rewrite }: { config: Assista
   return <DailyAuditForm action={writeDailyAuditAction} marketId={marketId} rewrite={rewrite} />;
 }
 
-function Header() {
+function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <>
-      <p className="eyebrow text-gold">Économie</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Opportunités</h1>
-    </>
+    <PageHeader section="economy" title="Opportunités">
+      {children}
+    </PageHeader>
   );
 }
 

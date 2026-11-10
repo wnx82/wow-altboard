@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Confidence, Holders, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
-import { EmptyState, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, Money, PageHeader, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { DECISION_LABELS, type CraftDecision } from "@/lib/economy/craft";
@@ -70,12 +70,11 @@ export default async function CraftingPage({ searchParams }: PageProps<"/craftin
 
   return (
     <>
-      <Header />
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <Header>
         Rentabilité des recettes connues de vos personnages, au prix du marché. Un composant déjà possédé est compté à ce qu&apos;il rapporterait
         vendu : il n&apos;est jamais gratuit. Commission de l&apos;hôtel des ventes : {formatPercent(context.auctionCut)}.{" "}
         <MarketSource lastImport={context.lastImport} lastDay={formatDay(context.lastImport?.lastDay ?? null)} />
-      </p>
+      </Header>
       <MarketSelector path="/crafting" market={context.market} markets={context.markets} />
 
       <section aria-label="Décisions" className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -269,11 +268,10 @@ export default async function CraftingPage({ searchParams }: PageProps<"/craftin
   );
 }
 
-function Header() {
+function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <>
-      <p className="eyebrow text-gold">Économie</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Craft</h1>
-    </>
+    <PageHeader section="economy" title="Craft">
+      {children}
+    </PageHeader>
   );
 }

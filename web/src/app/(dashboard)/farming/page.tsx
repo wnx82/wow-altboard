@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Confidence, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
 import { FarmSessionControls, FarmStartForm } from "@/components/economy-forms";
-import { Money, SectionTitle, StatTile } from "@/components/ui";
+import { Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { formatDuration } from "@/lib/dashboard/level-times";
@@ -33,12 +33,10 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
 
   return (
     <>
-      <p className="eyebrow text-gold">Économie</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Farm</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="economy" title="Farm">
         Deux mesures distinctes. Le signal de marché dit quelles ressources sont chères et peu offertes aujourd&apos;hui : ce n&apos;est pas un
         rendement. Le po/h ne vient que de vos sessions, entre deux relevés réels de vos sacs et de votre banque.
-      </p>
+      </PageHeader>
       {context && <MarketSelector path="/farming" market={context.market} markets={context.markets} />}
 
       <section aria-label="Vue générale" className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">

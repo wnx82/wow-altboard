@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EconomySettingsForm, ItemNamesImportForm } from "@/components/economy-forms";
 import { ResetCharactersForm, StatusSettingsForm } from "@/components/settings-forms";
-import { SectionTitle } from "@/components/ui";
+import { PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { todayInBrussels } from "@/lib/economy/days";
@@ -25,11 +25,9 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">Réglages du site</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Paramètres</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="admin" title="Paramètres">
         Ces réglages s&apos;appliquent aussitôt, sans redéployer le serveur. Ils sont enregistrés dans la base de données.
-      </p>
+      </PageHeader>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section aria-label="Serveurs surveillés">

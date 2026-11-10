@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState, SectionTitle } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { templateMatrices, type MatrixCell, type TemplateMatrix } from "@/lib/goals/matrix";
@@ -14,12 +14,10 @@ export default async function GoalsPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Objectifs</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Objectifs">
         Chaque modèle d&apos;objectifs en tableau : ses objectifs en colonnes, les personnages qui l&apos;ont appliqué en lignes. Un modèle
         s&apos;enregistre et s&apos;applique depuis la section Objectifs de la fiche d&apos;un personnage.
-      </p>
+      </PageHeader>
 
       {matrices.length === 0 ? (
         <div className="mt-6">

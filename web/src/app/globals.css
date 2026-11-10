@@ -166,10 +166,122 @@ body {
     opacity: 0.2;
   }
 
-  /* En-tête de l'accueil : un halo doré discret derrière le titre. */
+  /* En-tête de page : un halo doré discret derrière le titre, un filet doré qui s'efface dessous. */
   .page-hero {
     position: relative;
     isolation: isolate;
+    padding-bottom: 1.5rem;
+  }
+  .page-hero::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgb(227 189 106 / 0.5), rgb(227 189 106 / 0.12) 35%, transparent 80%);
+    pointer-events: none;
+  }
+  /* Emblème de la rubrique du menu, en médaillon doré. */
+  .page-sigil {
+    flex: none;
+    place-items: center;
+    width: 3.4rem;
+    height: 3.4rem;
+    border: 1px solid rgb(227 189 106 / 0.38);
+    border-radius: 1rem;
+    color: var(--gold);
+    background:
+      radial-gradient(circle at 30% 18%, rgb(227 189 106 / 0.3), rgb(227 189 106 / 0.05) 62%),
+      rgb(14 19 32 / 0.85);
+    box-shadow:
+      0 0 0 4px rgb(227 189 106 / 0.05),
+      0 1px 0 rgb(255 255 255 / 0.12) inset,
+      0 12px 30px -14px rgb(227 189 106 / 0.55);
+  }
+  .page-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .page-eyebrow::before {
+    content: "";
+    width: 0.42rem;
+    height: 0.42rem;
+    transform: rotate(45deg);
+    background: linear-gradient(135deg, #f5d58d, var(--gold-deep));
+    box-shadow: 0 0 10px rgb(227 189 106 / 0.6);
+  }
+  .page-eyebrow a:hover { text-decoration: underline; }
+  .page-sigil[data-size="lg"] { width: 4.75rem; height: 4.75rem; border-radius: 1.4rem; }
+
+  /* Fiche d'un personnage : grande icône de classe en fond, sans le soulèvement des cartes. */
+  .character-hero .champion-backdrop { top: -3rem; right: -2rem; width: 17rem; height: 17rem; opacity: 0.12; }
+  .character-hero:hover,
+  .character-hero:focus-within { transform: none; }
+
+  /* Page de connexion : halo doré derrière le blason. */
+  .login-stage {
+    background: radial-gradient(34rem 22rem at 50% 28%, rgb(227 189 106 / 0.12), transparent 70%);
+  }
+
+  /* Chiffre clé : liseré doré en tête, halo dans le coin. */
+  .stat-tile {
+    position: relative;
+    overflow: hidden;
+    transition: border-color 160ms ease;
+  }
+  .stat-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, rgb(227 189 106 / 0.7), rgb(227 189 106 / 0.1) 55%, transparent);
+  }
+  .stat-tile::after {
+    content: "";
+    position: absolute;
+    top: -3.5rem;
+    right: -3.5rem;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgb(227 189 106 / 0.1), transparent);
+    pointer-events: none;
+  }
+  .stat-tile:hover { border-color: rgb(227 189 106 / 0.3); }
+  .stat-tile[data-tone="ok"] .stat-value { color: var(--ok); }
+  .stat-tile[data-tone="warn"] .stat-value { color: var(--warn); }
+  .stat-tile[data-tone="danger"] .stat-value { color: var(--danger); }
+
+  /* Filet doré d'un titre de section : il occupe la place entre le titre et sa précision. */
+  .section-rule {
+    flex: 1 1 2rem;
+    min-width: 2rem;
+    height: 1px;
+    background: linear-gradient(90deg, rgb(227 189 106 / 0.4), rgb(227 189 106 / 0.06) 70%, transparent);
+  }
+
+  /* État vide : sceau doré au centre, bordure en pointillés. */
+  .empty-state {
+    border-style: dashed;
+    border-color: rgb(227 189 106 / 0.22);
+    background:
+      radial-gradient(28rem 12rem at 50% 0%, rgb(227 189 106 / 0.07), transparent 70%),
+      linear-gradient(180deg, rgb(24 32 52 / 0.6), rgb(14 19 32 / 0.6));
+  }
+  .empty-sigil {
+    display: inline-grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border: 1px solid rgb(227 189 106 / 0.35);
+    border-radius: 999px;
+    color: var(--gold);
+    background: radial-gradient(circle at 35% 25%, rgb(227 189 106 / 0.22), rgb(227 189 106 / 0.04) 65%);
   }
   .page-hero::before {
     content: "";
@@ -563,7 +675,11 @@ body {
     padding: 0.7rem 0.9rem;
     border-bottom: 1px solid var(--line);
     white-space: nowrap;
+    background: rgb(255 255 255 / 0.025);
   }
+  .data-table thead th:first-child { border-top-left-radius: var(--radius-card); }
+  .data-table thead th:last-child { border-top-right-radius: var(--radius-card); }
+  .data-table tbody tr:nth-child(even) { background: rgb(255 255 255 / 0.012); }
   .data-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid rgb(255 255 255 / 0.05); vertical-align: middle; }
   /* En-tête de ligne (scope="row") : une cellule ordinaire pour l'œil, un en-tête pour les lecteurs d'écran. */
   .data-table tbody th {
@@ -575,6 +691,7 @@ body {
     border-bottom: 1px solid rgb(255 255 255 / 0.05);
     vertical-align: middle;
     white-space: normal;
+    background: none;
   }
   .data-table tbody tr:last-child :is(td, th) { border-bottom: 0; }
   .data-table tbody tr { transition: background 120ms ease; }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LevelGainsChart, LevelProgressChart } from "@/components/level-charts";
-import { EmptyState, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { buildLevelProgress } from "@/lib/dashboard/levels";
@@ -37,12 +37,10 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Niveaux</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Niveaux">
         L&apos;évolution des niveaux de tous les personnages, lue dans les relevés envoyés par l&apos;agent. Un niveau gagné porte l&apos;heure du
         relevé qui le montre, pas celle où il s&apos;est produit en jeu.
-      </p>
+      </PageHeader>
 
       <nav aria-label="Période" className="mt-5 flex flex-wrap gap-2">
         {PERIODS.map((entry) => (

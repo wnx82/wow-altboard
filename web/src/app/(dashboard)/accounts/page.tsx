@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AccountReference } from "@/components/account-reference";
 import { DeleteAccountForm, RenameForm } from "@/components/admin-forms";
-import { EmptyState, Money, StarIcon } from "@/components/ui";
+import { EmptyState, Money, PageHeader, StarIcon } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { deleteAccountAction, renameAccountAction, setAccountFeaturedAction } from "@/lib/dashboard/actions";
@@ -17,12 +17,10 @@ export default async function AccountsPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Comptes</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="admin" title="Comptes">
         Un compte correspond à un dossier <code className="text-text">WTF\Account</code> : sa référence (identifiant Battle.net et numéro de
         licence WoW) est envoyée par l&apos;agent 0.6.0 et vérifiée contre l&apos;empreinte du compte. Donnez-lui aussi le nom qui vous parle.
-      </p>
+      </PageHeader>
 
       {accounts.length === 0 ? (
         <div className="mt-6">

@@ -7,8 +7,9 @@ import { InventoryList } from "@/components/inventory-list";
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
-import { ClassAvatar, FactionBadge, Meter, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
+import { ClassAvatar, FactionBadge, GameIcon, Meter, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
+import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
 import { buildHistory } from "@/lib/dashboard/history";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
@@ -137,16 +138,20 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       ]
     : [];
 
+  const classIcon = classIconUrl(character.class);
+
   return (
     <div data-class={classKey(character.class)}>
-      <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Tous les personnages
+      <Link href="/" className="page-eyebrow hover:underline">
+        Tous les personnages
       </Link>
 
-      <header className="panel character-card mt-4 flex flex-wrap items-center gap-5 p-6" data-class={classKey(character.class)}>
+      <header className="panel character-card character-hero isolate mt-4 flex flex-wrap items-center gap-5 p-6 sm:p-7" data-class={classKey(character.class)}>
+        {/* Grande icône de la classe, floue, en fond : la même signature que le podium de l'accueil. */}
+        {classIcon && <GameIcon src={classIcon} size={56} className="champion-backdrop" />}
         <ClassAvatar name={character.name} classToken={character.class} size="lg" level={character.level} />
         <div className="min-w-0 flex-1">
-          <h1 className="display break-words text-3xl font-bold leading-tight class-text sm:text-4xl">{character.name}</h1>
+          <h1 className="display break-words text-3xl font-bold leading-tight class-text sm:text-[2.6rem]">{character.name}</h1>
           <p className="mt-1 text-lg">
             {classLabel(character.class)}
             {character.level !== null && <span className="text-muted"> — Niveau {character.level}</span>}

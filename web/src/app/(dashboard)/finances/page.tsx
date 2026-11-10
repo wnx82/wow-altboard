@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ColumnChart } from "@/components/column-chart";
-import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import {
@@ -43,12 +43,10 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
 
   const header = (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Finances</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="economy" title="Finances">
         D&apos;après l&apos;addon Allemano Ledger : l&apos;or gagné et dépensé chaque jour, par source et par personnage. Les transferts entre vos
         personnages ne sont ni des revenus ni des dépenses. Chaque PC ne compte que les sessions jouées chez lui.
-      </p>
+      </PageHeader>
     </>
   );
 

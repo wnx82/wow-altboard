@@ -135,30 +135,111 @@ export function FactionBadge({ faction }: { faction: string | null }) {
   );
 }
 
-export function StatTile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
+/** Chiffre clé : libellé, valeur, précision. Un liseré doré en tête ; tone colore la valeur. */
+export function StatTile({ label, value, hint, tone }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "ok" | "warn" | "danger" }) {
   return (
-    <div className="panel px-4 py-4 sm:px-5">
+    <div className="panel stat-tile px-4 py-4 sm:px-5" data-tone={tone}>
       <div className="eyebrow">{label}</div>
-      <div className="mt-1.5 text-xl font-semibold tabular-nums leading-tight sm:text-2xl">{value}</div>
-      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
+      <div className="stat-value mt-2 text-xl font-semibold tabular-nums leading-tight sm:text-[1.6rem]">{value}</div>
+      {hint && <div className="mt-1.5 text-xs text-muted">{hint}</div>}
     </div>
   );
 }
 
+/** Titre de section : le titre, un filet doré qui s'efface, puis la précision à droite. */
 export function SectionTitle({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
       <h2 className="display text-lg font-bold text-gold">{children}</h2>
+      <span className="section-rule" aria-hidden="true" />
       {aside && <div className="text-xs text-muted">{aside}</div>}
     </div>
   );
 }
 
+/** Rien à montrer : un sceau, le titre, puis ce qu'il faut faire pour que des données arrivent. */
 export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="panel px-6 py-10 text-center">
-      <p className="display text-lg font-bold text-gold">{title}</p>
-      {children && <div className="mx-auto mt-2 max-w-xl text-sm text-muted">{children}</div>}
+    <div className="panel empty-state px-6 py-12 text-center">
+      <span className="empty-sigil" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12Z" />
+          <path d="M12 7.5 16.5 12 12 16.5 7.5 12Z" />
+        </svg>
+      </span>
+      <p className="display mt-4 text-lg font-bold text-gold">{title}</p>
+      {children && <div className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted">{children}</div>}
     </div>
+  );
+}
+
+export type PageSection = "characters" | "economy" | "admin";
+
+const SECTION_LABELS: Record<PageSection, string> = { characters: "Personnages", economy: "Économie", admin: "Gestion" };
+
+/** Emblème d'une rubrique du menu : casque, pièces, engrenage. Décoratif. */
+function SectionIcon({ section }: { section: PageSection }) {
+  const paths: Record<PageSection, React.ReactNode> = {
+    characters: (
+      <>
+        <path d="M12 3c-4 0-7 3-7 7.5V15l2 2h2.5l1-3h3l1 3H17l2-2v-4.5C19 6 16 3 12 3Z" />
+        <path d="M9 10h6" />
+        <path d="M12 3v4" />
+      </>
+    ),
+    economy: (
+      <>
+        <ellipse cx="9" cy="7" rx="5.5" ry="2.5" />
+        <path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7" />
+        <path d="M9.5 15.4v1.1c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4c0-1.4-2.5-2.5-5.5-2.5" />
+      </>
+    ),
+    admin: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5" />
+      </>
+    ),
+  };
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[section]}
+    </svg>
+  );
+}
+
+/**
+ * En-tête de page : emblème de la rubrique, rubrique, titre et présentation, actions à droite. Un
+ * halo doré derrière le titre, un filet doré dessous. eyebrow remplace le nom de la rubrique.
+ */
+export function PageHeader({
+  section,
+  title,
+  eyebrow,
+  actions,
+  children,
+}: {
+  section: PageSection;
+  title: React.ReactNode;
+  eyebrow?: React.ReactNode;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <header className="page-hero mb-2">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="page-sigil hidden sm:grid" aria-hidden="true">
+            <SectionIcon section={section} />
+          </span>
+          <div className="min-w-0">
+            <p className="page-eyebrow">{eyebrow ?? SECTION_LABELS[section]}</p>
+            <h1 className="display mt-1 break-words text-3xl font-bold leading-tight sm:text-[2.4rem]">{title}</h1>
+          </div>
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {children && <div className="mt-4 max-w-3xl text-sm leading-relaxed text-muted">{children}</div>}
+    </header>
   );
 }

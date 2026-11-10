@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState, SectionTitle } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { buildActivity } from "@/lib/dashboard/activity";
@@ -20,12 +20,10 @@ export default async function ActivityPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Activité</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Activité">
         Ce qui a changé sur les {ACTIVITY_DAYS} derniers jours, tous personnages confondus : niveaux, or, métiers, réputations, guilde. Un
         changement porte l&apos;heure du relevé qui le montre, pas celle où il s&apos;est produit en jeu.
-      </p>
+      </PageHeader>
 
       {days.length === 0 ? (
         <div className="mt-6">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { MAX_MATCHES, parseItemQuery, searchItemOwners, type Holding } from "@/lib/dashboard/item-search";
@@ -20,12 +20,10 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Objets</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Objets">
         Qui possède un objet, et combien : sacs, banque et équipement de tous les personnages, tels que relevés à leur dernière
         synchronisation.
-      </p>
+      </PageHeader>
 
       <form className="mt-6 flex max-w-xl flex-wrap gap-2" role="search" action="">
         <input

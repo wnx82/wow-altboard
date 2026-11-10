@@ -20,6 +20,15 @@ tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://
   relevé, sur la page Opportunités comme à l'accueil ; un objet vendu depuis le calcul est signalé.
 - Fiche d'un objet du marché : emplacement du stock de chaque personnage (sacs, banque).
 
+### Modifié
+
+- **Design de toutes les pages** : un en-tête commun (`PageHeader`) avec l'emblème de la rubrique
+  du menu (Personnages, Économie, Gestion), le titre agrandi, la présentation dessous, un halo et
+  un filet dorés. Chiffres clés avec liseré doré, titres de section prolongés d'un filet, états
+  vides avec un sceau, en-têtes de tableau teintés et lignes alternées.
+- Fiche d'un personnage : grande icône de la classe en fond de l'en-tête, comme sur le podium.
+- Page de connexion : blason, titre et halo doré au-dessus du formulaire.
+
 ### Corrigé
 
 - Import des noms : le téléchargement de la table (5,5 Mo) dispose de 5 minutes au lieu d'une ;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ColumnChart } from "@/components/column-chart";
 import { MarketSelector } from "@/components/economy";
-import { EmptyState, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { listImports, listRecipeSources, markPartialDays, PARTIAL_SCAN_RATIO } from "@/lib/economy/audit";
@@ -51,10 +51,9 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
 
   return (
     <>
-      <Header />
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <Header>
         D&apos;où viennent les chiffres du moteur, sur quels jours ils reposent, et selon quelles règles une valeur est jugée fiable.
-      </p>
+      </Header>
       <MarketSelector path="/audit" market={context.market} markets={context.markets} />
 
       <section aria-label="Vue générale" className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -224,12 +223,11 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   );
 }
 
-function Header() {
+function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <>
-      <p className="eyebrow text-gold">Économie</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Audit</h1>
-    </>
+    <PageHeader section="economy" title="Audit">
+      {children}
+    </PageHeader>
   );
 }
 

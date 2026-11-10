@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Change, Confidence, ItemName, MarketSelector, MarketSource } from "@/components/economy";
 import { DeleteAlertButton } from "@/components/economy-forms";
 import { Sparkline } from "@/components/sparkline";
-import { EmptyState, Money, SectionTitle, StatTile } from "@/components/ui";
+import { EmptyState, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { deleteAlertAction } from "@/lib/economy/actions";
@@ -55,11 +55,10 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
 
   return (
     <>
-      <Header />
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <Header>
         <MarketSource lastImport={context.lastImport} lastDay={formatDay(context.lastImport?.lastDay ?? null)} />{" "}
         {context.historyFrom && <>Prix pris en compte depuis le {formatDay(context.historyFrom)}.</>}
-      </p>
+      </Header>
       <MarketSelector path="/market" market={context.market} markets={context.markets} />
 
       <section aria-label="Vue générale" className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -201,12 +200,11 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
   );
 }
 
-function Header() {
+function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <>
-      <p className="eyebrow text-gold">Économie</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Marché</h1>
-    </>
+    <PageHeader section="economy" title="Marché">
+      {children}
+    </PageHeader>
   );
 }
 

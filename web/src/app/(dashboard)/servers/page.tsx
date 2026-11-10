@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ServerStatusTable, ServiceHistoryPanel, StatusLegend, TransitionsTable } from "@/components/server-status";
 import { StatusRefresh } from "@/components/status-refresh";
-import { SectionTitle } from "@/components/ui";
+import { PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { refreshServerStatusAction } from "@/lib/status/actions";
@@ -45,13 +45,11 @@ export default async function ServersPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft Forever</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">WoW Forever — État des serveurs {config.label}</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="admin" title={<>WoW Forever — État des serveurs {config.label}</>}>
         Ce serveur ouvre une connexion TCP vers chaque adresse configurée, {formatEvery(intervalSeconds)}, mesure le temps de
         réponse et referme. Une connexion acceptée prouve qu&apos;un service écoute, pas que le jeu fonctionne : file d&apos;attente,
         royaume plein ou liste de personnages absente ne se voient pas d&apos;ici.
-      </p>
+      </PageHeader>
 
       {config.errors.length > 0 && (
         <ul role="alert" className="panel mt-6 list-disc space-y-1 p-5 pl-9 text-sm text-warn">

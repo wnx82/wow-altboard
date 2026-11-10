@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState, Meter, ProfessionIcon, SectionTitle } from "@/components/ui";
+import { EmptyState, Meter, PageHeader, ProfessionIcon, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { compareProfessions, PRIMARY_SLOTS, type ProfessionRow } from "@/lib/dashboard/professions";
@@ -19,11 +19,9 @@ export default async function ProfessionsPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Métiers</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Métiers">
         Qui exerce quoi, et à quel rang : pour chaque métier, les personnages du plus avancé au moins avancé, tous comptes confondus.
-      </p>
+      </PageHeader>
 
       {primary.length === 0 && secondary.length === 0 ? (
         <div className="mt-6">

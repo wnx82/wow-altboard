@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import { RenameForm, TokenForm } from "@/components/admin-forms";
-import { EmptyState, SectionTitle } from "@/components/ui";
+import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { agentDirectory, archiveAgent, findAgent, formatAgentSize } from "@/lib/agent-download";
 import { requireSession } from "@/lib/auth/session";
@@ -41,12 +41,10 @@ export default async function MachinesPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">Synchronisation</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Machines</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="admin" title="Machines">
         Chaque PC exécute l&apos;agent <code className="text-text">AltBoardSync</code>. Tant qu&apos;il tourne, il envoie les données à chaque
         écriture du jeu ; arrêté, rien n&apos;est envoyé.
-      </p>
+      </PageHeader>
 
       {agent && archive && (
         <section className="panel mt-6 flex flex-wrap items-center justify-between gap-4 p-5" aria-label="Télécharger l'agent">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyState, Meter, SectionTitle } from "@/components/ui";
+import { EmptyState, Meter, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { listReputationRows, type ReputationCharacter } from "@/lib/dashboard/queries";
@@ -17,12 +17,10 @@ export default async function ReputationsPage() {
 
   return (
     <>
-      <p className="eyebrow text-gold">World of Warcraft</p>
-      <h1 className="display mt-1 text-3xl font-bold sm:text-4xl">Réputations</h1>
-      <p className="mt-2 max-w-3xl text-sm text-muted">
+      <PageHeader section="characters" title="Réputations">
         Où en est chaque personnage auprès de chaque faction, tous comptes confondus : du plus avancé au moins avancé, d&apos;après le palier
         puis l&apos;avancement dans ce palier.
-      </p>
+      </PageHeader>
 
       {groups.length === 0 ? (
         <div className="mt-6">
