@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { AccountReference } from "@/components/account-reference";
 import { DeleteAccountForm, RenameForm } from "@/components/admin-forms";
-import { EmptyState, Money } from "@/components/ui";
+import { EmptyState, Money, StarIcon } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { deleteAccountAction, renameAccountAction } from "@/lib/dashboard/actions";
+import { deleteAccountAction, renameAccountAction, setAccountFeaturedAction } from "@/lib/dashboard/actions";
 import { listAccounts } from "@/lib/dashboard/queries";
 import { formatDateTime, formatRelative } from "@/lib/wow/format";
 
@@ -31,9 +31,13 @@ export default async function AccountsPage() {
       ) : (
         <ul className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {accounts.map((account) => (
-            <li key={account.id} className="panel p-5">
+            <li key={account.id} className="panel p-5" data-featured={account.featured || undefined}>
               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                <h2 className="display text-xl font-bold text-gold">{account.label}</h2>
+                <h2 className="display flex min-w-0 items-center gap-2 text-xl font-bold text-gold">
+                  {account.featured && <StarIcon size={18} className="flex-none" />}
+                  <span className="min-w-0 break-words">{account.label}</span>
+                  {account.featured && <span className="sr-only"> (mis en avant)</span>}
+                </h2>
                 <AccountReference folderName={account.folderName} folderHint={account.folderHint} />
               </div>
 
@@ -74,6 +78,18 @@ export default async function AccountsPage() {
               </div>
 
               <div className="mt-4 space-y-3 border-t border-line pt-4">
+                {/* Bouton bascule : son état (aria-pressed) dit si le compte est en avant à l'accueil. */}
+                <form action={setAccountFeaturedAction} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <input type="hidden" name="id" value={account.id} />
+                  <input type="hidden" name="featured" value={account.featured ? "0" : "1"} />
+                  <button className="button" type="submit" aria-pressed={account.featured}>
+                    <StarIcon filled={account.featured} size={15} />
+                    Mettre en avant à l&apos;accueil
+                  </button>
+                  <span className="text-xs text-muted">
+                    {account.featured ? "Ses personnages passent en premier, sous une bannière." : "Ses personnages passeraient en premier à l'accueil."}
+                  </span>
+                </form>
                 <RenameForm
                   id={account.id}
                   name={account.displayName}

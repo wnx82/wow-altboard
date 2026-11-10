@@ -166,6 +166,23 @@ export function ServiceHistoryPanel({ history }: { history: ServiceHistory }) {
  * frise y est décorative : la disponibilité écrite en dessous en dit l'essentiel, le détail heure
  * par heure reste sur la page.
  */
+/** État des serveurs en pastilles, pour l'en-tête de l'accueil : chacune mène à la page Serveurs. */
+export function ServerStatusChips({ services }: { services: ServiceSummary[] }) {
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {services.map((service) => (
+        <li key={service.service}>
+          <Link href="/servers" className="badge server-chip" data-tone={STATUS_TONES[service.status]} data-status={service.status} title={service.detail}>
+            <span className="status-dot" aria-hidden="true" />
+            <span className="text-text">{service.label}</span>
+            {STATUS_LABELS[service.status]}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ServerStatusTiles({ services, now }: { services: ServiceSummary[]; now: Date }) {
   return (
     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">

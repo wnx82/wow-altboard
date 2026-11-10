@@ -99,6 +99,23 @@ describe("lecture du tableau de bord", () => {
     assert.equal(mage.sourceLastSeenAt, new Date(1791118113_000).toISOString());
   });
 
+  test("un compte mis en avant le reste après une synchronisation", async () => {
+    await sync(BASE);
+    const [first] = await listAccounts(database.db);
+    assert.equal(first.featured, false);
+    assert.ok((await listCharacters(database.db)).every((character) => !character.account.featured));
+
+    await database.db.update(t.wowAccounts).set({ featured: true }).where(eq(t.wowAccounts.id, first.id));
+    await sync(BASE);
+
+    const accounts = await listAccounts(database.db);
+    assert.deepEqual(
+      accounts.map((account) => account.featured),
+      accounts.map((account) => account.id === first.id),
+    );
+    for (const character of await listCharacters(database.db)) assert.equal(character.account.featured, character.account.id === first.id);
+  });
+
   test("le nombre de requêtes ne dépend pas du nombre de personnages", async () => {
     const measure = async (count: number) => {
       await database.reset();

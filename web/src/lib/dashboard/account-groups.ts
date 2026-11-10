@@ -12,8 +12,8 @@ export type AccountGroup<T extends Grouped> = {
 };
 
 /**
- * Un bloc par compte, rangés par libellé. L'ordre reçu est conservé à l'intérieur de chaque bloc :
- * le tri choisi dans la page s'y applique donc tel quel.
+ * Un bloc par compte : les comptes mis en avant d'abord, puis rangés par libellé. L'ordre reçu est
+ * conservé à l'intérieur de chaque bloc : le tri choisi dans la page s'y applique donc tel quel.
  */
 export function groupByAccount<T extends Grouped>(characters: T[], compareLabels: (a: string, b: string) => number): AccountGroup<T>[] {
   const byAccount = new Map<number, AccountGroup<T>>();
@@ -27,5 +27,10 @@ export function groupByAccount<T extends Grouped>(characters: T[], compareLabels
     if (character.moneyCopper !== null) group.totalCopper = (group.totalCopper ?? 0) + character.moneyCopper;
     if (character.level !== null) group.topLevel = Math.max(group.topLevel ?? character.level, character.level);
   }
-  return [...byAccount.values()].sort((a, b) => compareLabels(a.account.label, b.account.label) || a.account.id - b.account.id);
+  return [...byAccount.values()].sort(
+    (a, b) =>
+      Number(b.account.featured) - Number(a.account.featured) ||
+      compareLabels(a.account.label, b.account.label) ||
+      a.account.id - b.account.id,
+  );
 }

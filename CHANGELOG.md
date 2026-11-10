@@ -4,6 +4,28 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.12.0 — 2026-11-10
+
+### Ajouté
+
+- **Comptes mis en avant** : bouton bascule « Mettre en avant à l'accueil » sur la page Comptes.
+  Sur l'accueil, les comptes mis en avant passent en premier, sous une bannière dorée ; les autres
+  suivent sous l'intertitre « Autres comptes ». Le choix survit aux synchronisations.
+- **Podium** en tête de l'accueil : les trois personnages les plus hauts (niveau, puis expérience
+  gagnée dans le niveau, puis niveau d'objet), la première place au centre. Un personnage masqué
+  dans l'addon n'y monte pas. Sa médaille le suit dans les cartes et le tableau.
+- Migration `0012_account_featured` : colonne `wow_accounts.featured` (ajout seul, `false` par
+  défaut).
+
+### Modifié
+
+- **Accueil redessiné** : nouvel en-tête (nombre de personnages et de comptes, comptes en avant,
+  dernière synchronisation, état des serveurs en pastilles), personnages remontés juste après les
+  chiffres clés et « À surveiller ». La courbe de l'or, les meilleures opportunités et les frises
+  de 24 heures des serveurs passent en bas de page.
+- Cartes des personnages : guilde sous le nom, dernière zone connue en pied de carte, médaille
+  du podium. En-têtes de compte avec leurs chiffres en pastilles.
+
 ## Agent 0.7.1 — 2026-11-09
 
 ### Corrigé

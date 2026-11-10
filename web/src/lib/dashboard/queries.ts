@@ -11,6 +11,8 @@ import type { LevelRow } from "./levels";
 // Chaque page lit ses données en un nombre fixe de requêtes, indépendant du nombre de personnages.
 
 export type Named = { id: number; label: string };
+/** Compte d'un personnage ; `featured` : mis en avant à l'accueil. */
+export type AccountRef = Named & { featured: boolean };
 
 export const accountLabel = (account: { displayName: string | null; folderHint: string | null }) =>
   account.displayName ?? `Compte ${account.folderHint ?? "inconnu"}`;
@@ -33,7 +35,7 @@ export type CharacterListItem = {
   moneyCopper: number | null;
   itemLevel: number | null;
   hidden: boolean;
-  account: Named;
+  account: AccountRef;
   machines: Named[];
   professions: { skillLine: number; name: string; rank: number | null; maxRank: number | null; isPrimary: boolean }[];
   /** Objectifs atteints (datés) sur le total ; total 0 sans objectif. */
@@ -63,6 +65,7 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
       accountId: t.wowAccounts.id,
       accountDisplayName: t.wowAccounts.displayName,
       accountFolderHint: t.wowAccounts.folderHint,
+      accountFeatured: t.wowAccounts.featured,
       sourceLastSeenAt: t.characters.sourceLastSeenAt,
       lastSyncAt: t.characters.lastSyncAt,
     })
@@ -127,7 +130,11 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
     moneyCopper: row.moneyCopper,
     itemLevel: row.itemLevel,
     hidden: row.hidden,
-    account: { id: row.accountId, label: accountLabel({ displayName: row.accountDisplayName, folderHint: row.accountFolderHint }) },
+    account: {
+      id: row.accountId,
+      label: accountLabel({ displayName: row.accountDisplayName, folderHint: row.accountFolderHint }),
+      featured: row.accountFeatured,
+    },
     machines: (machinesBy.get(row.id) ?? []).map((machine) => ({ id: machine.id, label: machineLabel(machine) })),
     professions: (professionsBy.get(row.id) ?? []).map(({ skillLine, name, rank, maxRank, isPrimary }) => ({ skillLine, name, rank, maxRank, isPrimary })),
     goals: goalsBy.get(row.id) ?? { done: 0, total: 0 },
@@ -343,6 +350,7 @@ export async function listAccounts(db: Database) {
         displayName: t.wowAccounts.displayName,
         folderHint: t.wowAccounts.folderHint,
         folderName: t.wowAccounts.folderName,
+        featured: t.wowAccounts.featured,
         lastSyncAt: t.wowAccounts.lastSyncAt,
         characters: sql<number>`count(${t.characters.id})::int`,
         maxLevel: sql<number | null>`max(${t.characters.level})::int`,

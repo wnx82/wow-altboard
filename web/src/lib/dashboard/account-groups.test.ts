@@ -4,9 +4,9 @@ import { groupByAccount } from "./account-groups";
 
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
-const character = (name: string, accountId: number, accountLabel: string, level: number | null, moneyCopper: number | null) => ({
+const character = (name: string, accountId: number, accountLabel: string, level: number | null, moneyCopper: number | null, featured = false) => ({
   name,
-  account: { id: accountId, label: accountLabel },
+  account: { id: accountId, label: accountLabel, featured },
   level,
   moneyCopper,
 });
@@ -59,5 +59,22 @@ test("deux comptes de même libellé restent deux blocs", () => {
   assert.deepEqual(
     groups.map((group) => group.account.id),
     [3, 7],
+  );
+});
+
+test("les comptes mis en avant passent devant, rangés entre eux par libellé", () => {
+  const groups = groupByAccount(
+    [
+      character("A", 1, "Alpha", 1, 1),
+      character("B", 2, "Zèbre", 30, 1, true),
+      character("C", 3, "Bêta", 1, 1),
+      character("D", 4, "Yack", 30, 1, true),
+    ],
+    collator.compare,
+  );
+
+  assert.deepEqual(
+    groups.map((group) => group.account.label),
+    ["Yack", "Zèbre", "Alpha", "Bêta"],
   );
 });

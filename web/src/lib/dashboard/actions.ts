@@ -31,6 +31,20 @@ export async function renameAccountAction(_previous: ActionState, formData: Form
   return { saved: true };
 }
 
+/** Met un compte en avant à l'accueil, ou l'en retire. */
+export async function setAccountFeaturedAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const parsed = z
+    .object({ id, featured: z.enum(["0", "1"]) })
+    .safeParse({ id: formData.get("id"), featured: formData.get("featured") });
+  if (!parsed.success) return;
+  await getDatabase()
+    .update(wowAccounts)
+    .set({ featured: parsed.data.featured === "1", updatedAt: new Date() })
+    .where(eq(wowAccounts.id, parsed.data.id));
+  revalidatePath("/", "layout");
+}
+
 /** Renomme une machine. Un nom vide rétablit le nom d'hôte. */
 export async function renameMachineAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   await requireSession();

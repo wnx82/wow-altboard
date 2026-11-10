@@ -5,7 +5,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { groupByAccount } from "@/lib/dashboard/account-groups";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
 import { classKey, classLabel, formatDateTime, formatItemLevel, formatRelative, progressPercent } from "@/lib/wow/format";
-import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, SectionTitle } from "./ui";
+import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal, StarIcon } from "./ui";
 
 type SortKey = "name" | "level" | "itemLevel" | "money" | "activity" | "progress";
 type View = "cards" | "table";
@@ -110,7 +110,12 @@ function sortValue(character: CharacterListItem, key: SortKey): number | string 
   }
 }
 
-export function CharacterBrowser({ characters, now }: { characters: CharacterListItem[]; now: string }) {
+/** Place sur le podium de l'accueil, par identifiant de personnage. */
+type Ranks = Record<number, number>;
+
+const rankTitle = (rank: number) => (rank === 1 ? "Le plus haut niveau" : `${rank}e plus haut niveau`);
+
+export function CharacterBrowser({ characters, now, ranks = {} }: { characters: CharacterListItem[]; now: string; ranks?: Ranks }) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({ key: "level", descending: true });
@@ -315,49 +320,61 @@ export function CharacterBrowser({ characters, now }: { characters: CharacterLis
         <EmptyState title="Aucun personnage ne correspond">Modifiez la recherche ou les filtres.</EmptyState>
       ) : (
         <div className="space-y-8">
-          {groups.map(({ account, members, totalCopper, topLevel }) => {
+          {groups.map(({ account, members, totalCopper, topLevel }, index) => {
             const folded = collapsed.has(String(account.id));
+            // Les comptes mis en avant passent devant ; un intertitre sépare les autres.
+            const firstOther = !account.featured && index > 0 && groups[index - 1].account.featured;
             return (
               <section key={account.id} aria-label={account.label}>
-                <SectionTitle
-                  aside={
-                    <p className="flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1">
-                      <span>
-                        {members.length} personnage{members.length > 1 ? "s" : ""}
+                {firstOther && (
+                  <p className="divider-label mb-5" aria-hidden="true">
+                    Autres comptes
+                  </p>
+                )}
+                <div className="account-banner" data-featured={account.featured || undefined}>
+                  <h2 className="min-w-0">
+                    <button
+                      type="button"
+                      className="flex min-w-0 max-w-full items-center gap-2.5 text-left"
+                      aria-expanded={!folded}
+                      aria-controls={`account-${account.id}`}
+                      onClick={() => toggleAccount(account.id)}
+                    >
+                      <span aria-hidden="true" className="w-3 flex-none text-sm text-muted">
+                        {folded ? "▸" : "▾"}
                       </span>
-                      {topLevel !== null && <span>Niveau le plus haut {topLevel}</span>}
-                      {totalCopper !== null && (
-                        <span>
-                          Or total <Money copper={totalCopper} />
-                        </span>
-                      )}
-                    </p>
-                  }
-                >
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 text-left"
-                    aria-expanded={!folded}
-                    aria-controls={`account-${account.id}`}
-                    onClick={() => toggleAccount(account.id)}
-                  >
-                    <span aria-hidden="true" className="w-3 text-sm text-muted">
-                      {folded ? "▸" : "▾"}
-                    </span>
-                    {account.label}
-                  </button>
-                </SectionTitle>
+                      {account.featured && <StarIcon size={18} className="flex-none text-gold" />}
+                      <span className="account-name truncate">{account.label}</span>
+                      {account.featured && <span className="sr-only"> (compte mis en avant)</span>}
+                    </button>
+                  </h2>
+                  <ul className="flex flex-wrap items-center gap-1.5">
+                    <li className="stat-chip">
+                      <strong>{members.length}</strong> personnage{members.length > 1 ? "s" : ""}
+                    </li>
+                    {topLevel !== null && (
+                      <li className="stat-chip">
+                        Niveau max. <strong>{topLevel}</strong>
+                      </li>
+                    )}
+                    {totalCopper !== null && (
+                      <li className="stat-chip">
+                        Or <Money copper={totalCopper} />
+                      </li>
+                    )}
+                  </ul>
+                </div>
                 <div id={`account-${account.id}`} hidden={folded}>
                   {view === "cards" ? (
                     <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {members.map((character) => (
                         <li key={character.id}>
-                          <CharacterCard character={character} now={reference} />
+                          <CharacterCard character={character} now={reference} rank={ranks[character.id]} />
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <CharacterTable characters={members} now={reference} />
+                    <CharacterTable characters={members} now={reference} ranks={ranks} />
                   )}
                 </div>
               </section>
@@ -392,7 +409,7 @@ function FilterSelect({
   );
 }
 
-function CharacterCard({ character, now }: { character: CharacterListItem; now: Date }) {
+function CharacterCard({ character, now, rank }: { character: CharacterListItem; now: Date; rank?: number }) {
   const professions = [...character.professions].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)).slice(0, 2);
   const others = character.professions.length - professions.length;
 
@@ -411,8 +428,18 @@ function CharacterCard({ character, now }: { character: CharacterListItem; now: 
             {character.level !== null && <span className="text-muted"> — Niveau {character.level}</span>}
           </p>
           <p className="mt-0.5 truncate text-xs text-muted">{[character.race, character.realm].filter(Boolean).join(" • ")}</p>
+          {character.guild && <p className="mt-0.5 truncate text-xs text-ok/85">&lt;{character.guild}&gt;</p>}
         </div>
-        <FactionBadge faction={character.faction} />
+        <div className="flex flex-none flex-col items-end gap-2">
+          <FactionBadge faction={character.faction} />
+          {rank !== undefined && (
+            <span className="flex items-center gap-1.5 text-[0.7rem] font-semibold text-gold">
+              <RankMedal rank={rank} size="sm" />
+              <span className="sr-only">{rankTitle(rank)}</span>
+              <span aria-hidden="true">Podium</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {character.xpMax !== null && character.xp !== null && (
@@ -469,18 +496,22 @@ function CharacterCard({ character, now }: { character: CharacterListItem; now: 
         </ul>
       )}
 
-      <p
-        className="mt-4 border-t border-line pt-3 text-xs text-muted"
-        title={`Dernière donnée AltBoard connue : ${formatDateTime(character.sourceLastSeenAt)}`}
-      >
-        Vu en jeu {formatRelative(character.sourceLastSeenAt, now)}
+      <p className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
+        <span className="flex-none" title={`Dernière donnée AltBoard connue : ${formatDateTime(character.sourceLastSeenAt)}`}>
+          Vu en jeu {formatRelative(character.sourceLastSeenAt, now)}
+        </span>
+        {character.zone && (
+          <span className="min-w-0 truncate text-faint" title={`Dernière zone connue : ${character.zone}`}>
+            {character.zone}
+          </span>
+        )}
       </p>
       {character.hidden && <p className="mt-2 text-xs text-faint">Masqué dans l&apos;addon</p>}
     </article>
   );
 }
 
-function CharacterTable({ characters, now }: { characters: CharacterListItem[]; now: Date }) {
+function CharacterTable({ characters, now, ranks }: { characters: CharacterListItem[]; now: Date; ranks: Ranks }) {
   return (
     <div className="panel overflow-x-auto">
       <table className="data-table min-w-[1060px]">
@@ -515,6 +546,12 @@ function CharacterTable({ characters, now }: { characters: CharacterListItem[]; 
                   <span className="max-w-56 truncate" title={character.name}>
                     {character.name}
                   </span>
+                  {ranks[character.id] !== undefined && (
+                    <>
+                      <RankMedal rank={ranks[character.id]} size="sm" title={rankTitle(ranks[character.id])} />
+                      <span className="sr-only">{rankTitle(ranks[character.id])}</span>
+                    </>
+                  )}
                 </Link>
               </td>
               <td>

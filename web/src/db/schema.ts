@@ -62,6 +62,8 @@ export const wowAccounts = pgTable("wow_accounts", {
   // Nom complet du dossier (« 123456789#1 »), envoyé depuis l'agent 0.6.0 ; null avant.
   folderName: text("folder_name"),
   displayName: text("display_name"),
+  // Compte mis en avant à l'accueil : ses personnages passent en premier, sous une bannière.
+  featured: boolean("featured").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   lastSyncAt: ts("last_sync_at"),

@@ -62,6 +62,34 @@ export function ClassAvatar({
   );
 }
 
+/** Étoile d'un compte mis en avant ; creuse quand il ne l'est pas. Décorative. */
+export function StarIcon({ filled = true, size = 16, className }: { filled?: boolean; size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m12 2.8 2.83 5.74 6.33.92-4.58 4.46 1.08 6.3L12 17.25l-5.66 2.97 1.08-6.3-4.58-4.46 6.33-.92Z" />
+    </svg>
+  );
+}
+
+/** Médaille d'une place du podium (1 à 3). Décorative : le rang est toujours écrit ailleurs. */
+export function RankMedal({ rank, size = "md", title }: { rank: number; size?: "sm" | "md"; title?: string }) {
+  return (
+    <span className="rank-medal" data-rank={rank} data-size={size} title={title} aria-hidden="true">
+      {rank}
+    </span>
+  );
+}
+
 export function Money({ copper }: { copper: number | null }) {
   if (copper === null) return <span className="text-faint">—</span>;
   // Une perte (profit négatif) garde son signe : la valeur absolue est découpée en pièces.

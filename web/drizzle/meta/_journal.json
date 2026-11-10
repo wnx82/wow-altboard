@@ -85,6 +85,13 @@
       "when": 1794210950633,
       "tag": "0011_character_ledger_days",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794324793958,
+      "tag": "0012_account_featured",
+      "breakpoints": true
     }
   ]
 }
