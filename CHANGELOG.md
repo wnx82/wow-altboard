@@ -4,6 +4,19 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.15.0 — 2026-11-11
+
+### Ajouté
+
+- **Favoris depuis l'accueil** : une étoile à côté du nom de chaque compte, sur Mes personnages,
+  l'ajoute aux favoris ou l'en retire en un clic. L'étoile change tout de suite. Les personnages du
+  compte passent alors en premier, sous une bannière dorée, ou rejoignent les autres comptes.
+
+### Modifié
+
+- Les comptes « mis en avant » s'appellent désormais des **favoris**. Sur la page Comptes, le bouton
+  devient « Ajouter aux favoris » ou « Retirer des favoris ». Il réagit aussi dès le clic.
+
 ## Site 0.14.0 — 2026-11-11
 
 ### Modifié

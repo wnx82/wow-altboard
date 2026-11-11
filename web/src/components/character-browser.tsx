@@ -5,7 +5,8 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { groupByAccount } from "@/lib/dashboard/account-groups";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
 import { classKey, classLabel, formatDateTime, formatItemLevel, formatRelative, progressPercent } from "@/lib/wow/format";
-import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal, StarIcon } from "./ui";
+import { FavoriteToggle } from "./favorite-toggle";
+import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal } from "./ui";
 
 type SortKey = "name" | "level" | "itemLevel" | "money" | "activity" | "progress";
 type View = "cards" | "table";
@@ -322,7 +323,7 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
         <div className="space-y-8">
           {groups.map(({ account, members, totalCopper, topLevel }, index) => {
             const folded = collapsed.has(String(account.id));
-            // Les comptes mis en avant passent devant ; un intertitre sépare les autres.
+            // Les comptes favoris passent devant ; un intertitre sépare les autres.
             const firstOther = !account.featured && index > 0 && groups[index - 1].account.featured;
             return (
               <section key={account.id} aria-label={account.label}>
@@ -332,22 +333,24 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
                   </p>
                 )}
                 <div className="account-banner" data-featured={account.featured || undefined}>
-                  <h2 className="min-w-0">
-                    <button
-                      type="button"
-                      className="flex min-w-0 max-w-full items-center gap-2.5 text-left"
-                      aria-expanded={!folded}
-                      aria-controls={`account-${account.id}`}
-                      onClick={() => toggleAccount(account.id)}
-                    >
-                      <span aria-hidden="true" className="w-3 flex-none text-sm text-muted">
-                        {folded ? "▸" : "▾"}
-                      </span>
-                      {account.featured && <StarIcon size={18} className="flex-none text-gold" />}
-                      <span className="account-name truncate">{account.label}</span>
-                      {account.featured && <span className="sr-only"> (compte mis en avant)</span>}
-                    </button>
-                  </h2>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h2 className="min-w-0">
+                      <button
+                        type="button"
+                        className="flex min-w-0 max-w-full items-center gap-2.5 text-left"
+                        aria-expanded={!folded}
+                        aria-controls={`account-${account.id}`}
+                        onClick={() => toggleAccount(account.id)}
+                      >
+                        <span aria-hidden="true" className="w-3 flex-none text-sm text-muted">
+                          {folded ? "▸" : "▾"}
+                        </span>
+                        <span className="account-name truncate">{account.label}</span>
+                        {account.featured && <span className="sr-only"> (compte favori)</span>}
+                      </button>
+                    </h2>
+                    <FavoriteToggle accountId={account.id} accountLabel={account.label} favorite={account.featured} compact />
+                  </div>
                   <ul className="flex flex-wrap items-center gap-1.5">
                     <li className="stat-chip">
                       <strong>{members.length}</strong> personnage{members.length > 1 ? "s" : ""}

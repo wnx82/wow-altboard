@@ -477,6 +477,20 @@ body {
       0 20px 44px -30px rgb(227 189 106 / 0.6);
   }
   .account-banner[data-featured] .account-name { font-size: 1.3rem; color: #f3d48a; }
+
+  /* Étoile d'une bannière de compte : creuse et discrète hors favoris, dorée sinon. */
+  .favorite-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: var(--faint);
+    transition: color 150ms ease, background 150ms ease, transform 150ms ease;
+  }
+  .favorite-toggle:hover { color: var(--gold); background: rgb(227 189 106 / 0.12); }
+  .favorite-toggle:active { transform: scale(0.88); }
+  .favorite-toggle[aria-pressed="true"] { color: var(--gold); }
   .stat-chip {
     display: inline-flex;
     align-items: baseline;

@@ -31,7 +31,7 @@ export async function renameAccountAction(_previous: ActionState, formData: Form
   return { saved: true };
 }
 
-/** Met un compte en avant à l'accueil, ou l'en retire. */
+/** Ajoute un compte aux favoris (en avant à l'accueil), ou l'en retire. */
 export async function setAccountFeaturedAction(formData: FormData): Promise<void> {
   await requireSession();
   const parsed = z

@@ -95,7 +95,7 @@ export default async function CharactersPage() {
                 {featuredAccounts.size > 0 && (
                   <>
                     {" "}
-                    · en avant : <span className="text-gold">{[...featuredAccounts].join(" et ")}</span>
+                    · {featuredAccounts.size > 1 ? "favoris" : "favori"} : <span className="text-gold">{[...featuredAccounts].join(" et ")}</span>
                   </>
                 )}
               </p>
@@ -137,7 +137,7 @@ export default async function CharactersPage() {
 
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatTile label="Personnages" value={characters.length} />
-        <StatTile label="Comptes" value={overview.accounts} hint={featuredAccounts.size > 0 ? `${featuredAccounts.size} en avant` : undefined} />
+        <StatTile label="Comptes" value={overview.accounts} hint={featuredAccounts.size > 0 ? plural(featuredAccounts.size, "favori") : undefined} />
         <StatTile label="PC" value={overview.machines} />
         <StatTile
           label="Niveau moyen"

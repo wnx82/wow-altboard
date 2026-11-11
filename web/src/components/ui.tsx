@@ -62,7 +62,7 @@ export function ClassAvatar({
   );
 }
 
-/** Étoile d'un compte mis en avant ; creuse quand il ne l'est pas. Décorative. */
+/** Étoile d'un compte favori ; creuse quand il ne l'est pas. Décorative. */
 export function StarIcon({ filled = true, size = 16, className }: { filled?: boolean; size?: number; className?: string }) {
   return (
     <svg
