@@ -223,9 +223,10 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
   rendu (`web/src/components/character-browser.tsx:107`), le serveur rend toujours le défaut. Qui
   préfère le tableau voit les cartes, puis le basculement. Porter ces préférences dans un cookie lu
   au rendu.
-- [ ] **P2 · M** — Recherche, filtres et tri de l'accueil en état local
+- [x] **P2 · M** — Recherche, filtres et tri de l'accueil en état local
   (`character-browser.tsx:102`) : ouvrir une fiche puis revenir remet la liste à zéro. Les porter
-  dans les paramètres d'URL. Comportement déduit du code, à confirmer dans un navigateur.
+  dans les paramètres d'URL. Fait le 2026-11-11 (site 0.15.0, `web/src/lib/dashboard/browser-state.ts`) :
+  confirmé dans un navigateur, la liste revient intacte après une fiche.
 - [ ] **P3 · S** — Date limite de réinitialisation saisie dans le fuseau du navigateur
   (`web/src/components/settings-forms.tsx:103`), réaffichée en heure de Bruxelles
   (`web/src/app/(dashboard)/settings/page.tsx:87`) : décalée pour qui n'est pas dans ce fuseau.

@@ -1,14 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { groupByAccount } from "@/lib/dashboard/account-groups";
+import {
+  type Filters,
+  type GoalState,
+  naturalDescending,
+  NO_FILTERS,
+  readBrowserState,
+  type SortKey,
+  writeBrowserState,
+} from "@/lib/dashboard/browser-state";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
 import { classKey, classLabel, formatDateTime, formatItemLevel, formatRelative, progressPercent } from "@/lib/wow/format";
 import { FavoriteToggle } from "./favorite-toggle";
-import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal } from "./ui";
+import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal, StarIcon } from "./ui";
 
-type SortKey = "name" | "level" | "itemLevel" | "money" | "activity" | "progress";
 type View = "cards" | "table";
 
 const SORTS: { key: SortKey; label: string }[] = [
@@ -62,27 +71,13 @@ const viewPreference = browserPreference("altboard:view");
 const collapsedPreference = browserPreference("altboard:collapsed-accounts");
 const serverPreference = () => null;
 
-type Filters = {
-  account: string;
-  realm: string;
-  classToken: string;
-  race: string;
-  faction: string;
-  profession: string;
-  machine: string;
-  goals: string;
-  minLevel: string;
-  maxLevel: string;
-};
-const NO_FILTERS: Filters = { account: "", realm: "", classToken: "", race: "", faction: "", profession: "", machine: "", goals: "", minLevel: "", maxLevel: "" };
-
-const GOAL_FILTERS = [
+const GOAL_FILTERS: (readonly [GoalState, string])[] = [
   ["open", "Objectifs en cours"],
   ["done", "Objectifs tous atteints"],
   ["none", "Sans objectif"],
-] as const;
+];
 
-function goalState(goals: CharacterListItem["goals"]): (typeof GOAL_FILTERS)[number][0] {
+function goalState(goals: CharacterListItem["goals"]): GoalState {
   if (goals.total === 0) return "none";
   return goals.done < goals.total ? "open" : "done";
 }
@@ -117,9 +112,14 @@ type Ranks = Record<number, number>;
 const rankTitle = (rank: number) => (rank === 1 ? "Le plus haut niveau" : `${rank}e plus haut niveau`);
 
 export function CharacterBrowser({ characters, now, ranks = {} }: { characters: CharacterListItem[]; now: string; ranks?: Ranks }) {
-  const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-  const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({ key: "level", descending: true });
+  // Recherche, filtres, tri et favoris partent de l'adresse, puis y sont recopiés à chaque changement :
+  // ouvrir une fiche puis revenir retrouve la liste telle qu'on l'a laissée.
+  const searchParams = useSearchParams();
+  const [initial] = useState(() => readBrowserState(searchParams));
+  const [query, setQuery] = useState(initial.query);
+  const [filters, setFilters] = useState<Filters>(initial.filters);
+  const [sort, setSort] = useState(initial.sort);
+  const [favoritesOnly, setFavoritesOnly] = useState(initial.favoritesOnly);
   // Repliés à l'arrivée : la recherche suffit le plus souvent, et les personnages remontent d'autant.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const view: View = useSyncExternalStore(viewPreference.subscribe, viewPreference.read, serverPreference) === "table" ? "table" : "cards";
@@ -146,6 +146,7 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
     const maxLevel = filters.maxLevel === "" ? null : Number(filters.maxLevel);
 
     const matching = characters.filter((c) => {
+      if (favoritesOnly && !c.account.featured) return false;
       if (filters.account && String(c.account.id) !== filters.account) return false;
       if (filters.realm && c.realm !== filters.realm) return false;
       if (filters.classToken && c.class !== filters.classToken) return false;
@@ -169,7 +170,16 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
       const order = typeof left === "string" ? collator.compare(left, right as string) : left - (right as number);
       return (sort.descending ? -order : order) || collator.compare(a.name, b.name);
     });
-  }, [characters, filters, query, sort]);
+  }, [characters, favoritesOnly, filters, query, sort]);
+
+  // replaceState plutôt que pushState : un filtre ne crée pas d'étape dans l'historique. Next.js
+  // suit ces appels (useSearchParams) sans recharger la page.
+  useEffect(() => {
+    const search = writeBrowserState({ query, filters, sort, favoritesOnly }, window.location.search);
+    if (search !== window.location.search) window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+  }, [favoritesOnly, filters, query, sort]);
+
+  const hasFavorites = useMemo(() => characters.some((c) => c.account.featured), [characters]);
 
   // Le tri choisi s'applique à l'intérieur de chaque bloc.
   const groups = useMemo(() => groupByAccount(visible, collator.compare), [visible]);
@@ -180,7 +190,7 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
   };
 
   const activeFilters = Object.values(filters).filter(Boolean).length;
-  const filtered = query.trim() !== "" || activeFilters > 0;
+  const filtered = query.trim() !== "" || activeFilters > 0 || favoritesOnly;
   const setFilter = (key: keyof Filters) => (event: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) =>
     setFilters((current) => ({ ...current, [key]: event.target.value }));
 
@@ -221,13 +231,27 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
             Filtres{activeFilters > 0 && ` (${activeFilters})`}
             <span aria-hidden="true">{filtersOpen ? "▴" : "▾"}</span>
           </button>
+          {/* Affiché dès qu'un compte est favori, ou tant que le filtre agit (adresse partagée). Sur
+              téléphone l'étoile seule laisse sa place au tri ; le libellé reste lu par les lecteurs d'écran. */}
+          {(hasFavorites || favoritesOnly) && (
+            <button
+              type="button"
+              className="button"
+              aria-pressed={favoritesOnly}
+              title="N'afficher que les comptes favoris"
+              onClick={() => setFavoritesOnly((only) => !only)}
+            >
+              <StarIcon filled={favoritesOnly} size={15} />
+              <span className="sr-only sm:not-sr-only">Favoris</span>
+            </button>
+          )}
           {/* Sur téléphone le tri partage la rangée des filtres : son libellé visible cède la place. */}
-          <label className="flex min-w-0 flex-1 items-center gap-2 text-xs text-muted sm:flex-none">
+          <label className="flex min-w-32 flex-1 items-center gap-2 text-xs text-muted sm:flex-none">
             <span className="sr-only whitespace-nowrap sm:not-sr-only">Trier par</span>
             <select
               className="field min-w-0 flex-1 sm:w-auto sm:flex-none"
               value={sort.key}
-              onChange={(event) => setSort({ key: event.target.value as SortKey, descending: event.target.value !== "name" })}
+              onChange={(event) => setSort({ key: event.target.value as SortKey, descending: naturalDescending(event.target.value as SortKey) })}
             >
               {SORTS.map((option) => (
                 <option key={option.key} value={option.key}>
@@ -309,6 +333,7 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
               onClick={() => {
                 setQuery("");
                 setFilters(NO_FILTERS);
+                setFavoritesOnly(false);
               }}
             >
               Tout afficher

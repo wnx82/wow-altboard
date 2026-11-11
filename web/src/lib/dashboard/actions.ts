@@ -8,7 +8,9 @@ import { machines, wowAccounts } from "@/db/schema";
 import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
 import { confirmPassword } from "@/lib/auth/confirm-password";
 import { requireSession } from "@/lib/auth/session";
+import { describeError } from "@/lib/errors";
 import { deleteAccount } from "./delete-account";
+import { setAccountFavorite } from "./favorite-account";
 
 // Chaque action vérifie la session elle-même : une Server Action est un point d'entrée HTTP à part
 // entière, joignable sans passer par la page qui l'affiche.
@@ -31,18 +33,26 @@ export async function renameAccountAction(_previous: ActionState, formData: Form
   return { saved: true };
 }
 
-/** Ajoute un compte aux favoris (en avant à l'accueil), ou l'en retire. */
-export async function setAccountFeaturedAction(formData: FormData): Promise<void> {
+/**
+ * Ajoute un compte aux favoris (en avant à l'accueil), ou l'en retire. Un échec revient en message :
+ * l'étoile, déjà basculée à l'écran, reprend son état et la page reste en place.
+ */
+export async function setAccountFeaturedAction(formData: FormData): Promise<ActionState> {
   await requireSession();
   const parsed = z
     .object({ id, featured: z.enum(["0", "1"]) })
     .safeParse({ id: formData.get("id"), featured: formData.get("featured") });
-  if (!parsed.success) return;
-  await getDatabase()
-    .update(wowAccounts)
-    .set({ featured: parsed.data.featured === "1", updatedAt: new Date() })
-    .where(eq(wowAccounts.id, parsed.data.id));
+  if (!parsed.success) return { error: "Demande invalide." };
+
+  let found: boolean;
+  try {
+    found = await setAccountFavorite(getDatabase(), parsed.data.id, parsed.data.featured === "1");
+  } catch (error) {
+    console.error(JSON.stringify({ event: "account.favorite.failed", accountId: parsed.data.id, error: describeError(error) }));
+    return { error: "Échec de l'enregistrement. Réessayez." };
+  }
   revalidatePath("/", "layout");
+  return found ? { saved: true } : { error: "Ce compte n'existe plus." };
 }
 
 /** Renomme une machine. Un nom vide rétablit le nom d'hôte. */

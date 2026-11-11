@@ -11,11 +11,23 @@ tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://
 - **Favoris depuis l'accueil** : une étoile à côté du nom de chaque compte, sur Mes personnages,
   l'ajoute aux favoris ou l'en retire en un clic. L'étoile change tout de suite. Les personnages du
   compte passent alors en premier, sous une bannière dorée, ou rejoignent les autres comptes.
+- **Filtre « Favoris »** dans la barre de l'accueil : seuls les personnages des comptes favoris
+  restent affichés. Le bouton apparaît dès qu'un compte est favori. Sur téléphone, il se réduit à
+  l'étoile.
+- **La liste de l'accueil garde son état** : la recherche, les filtres, le tri et le filtre
+  « Favoris » sont recopiés dans l'adresse (`?q=…&tri=nom&favoris=1`). Ouvrir une fiche puis
+  revenir retrouve la liste telle qu'on l'a laissée, et le lien se partage ou se met en signet.
 
 ### Modifié
 
 - Les comptes « mis en avant » s'appellent désormais des **favoris**. Sur la page Comptes, le bouton
   devient « Ajouter aux favoris » ou « Retirer des favoris ». Il réagit aussi dès le clic.
+
+### Corrigé
+
+- Un favori qui ne s'enregistre pas le dit. Si le serveur est injoignable, si la base échoue ou si
+  le compte a été supprimé entre-temps, l'étoile reprend son état et un court message s'affiche à
+  côté. Avant, l'erreur restait muette ou remplaçait toute la page.
 
 ## Site 0.14.0 — 2026-11-11
 
