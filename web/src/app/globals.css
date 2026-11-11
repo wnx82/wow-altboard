@@ -22,6 +22,10 @@
   --ok: #5fd39a;
   --warn: #f0b354;
   --danger: #f0625f;
+  /* Revenus et dépenses : paire chaud/froid validée sur la surface sombre (luminosité, contraste,
+     séparation en vision daltonienne). Le rouge reste réservé aux alertes. */
+  --income: #b38d3a;
+  --expense: #5b84e8;
   --radius-card: 1.1rem;
 
   --class: #8b93a7;
@@ -256,6 +260,61 @@ body {
   .stat-tile[data-tone="ok"] .stat-value { color: var(--ok); }
   .stat-tile[data-tone="warn"] .stat-value { color: var(--warn); }
   .stat-tile[data-tone="danger"] .stat-value { color: var(--danger); }
+
+  /* Choix exclusif (période…) : pastilles groupées, la sélection en or. */
+  .segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.03);
+  }
+  .segmented > a {
+    padding: 0.35rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: background-color 120ms, color 120ms;
+  }
+  .segmented > a:hover { color: var(--text); background: rgb(255 255 255 / 0.06); }
+  .segmented > a:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .segmented > a[aria-current="true"] { color: #1a1306; font-weight: 600; background: linear-gradient(180deg, #f0cf85, #d2a24b); }
+
+  /* Bilan de la période : chiffre phare, halo vert ou rouge selon son signe. */
+  .finance-hero {
+    position: relative;
+    overflow: hidden;
+  }
+  .finance-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, rgb(227 189 106 / 0.8), rgb(227 189 106 / 0.1) 60%, transparent);
+  }
+  .finance-hero::after {
+    content: "";
+    position: absolute;
+    top: -6rem;
+    right: -5rem;
+    width: 18rem;
+    height: 18rem;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgb(95 211 154 / 0.12), transparent);
+    pointer-events: none;
+  }
+  .finance-hero[data-tone="danger"]::after { background: radial-gradient(closest-side, rgb(240 98 95 / 0.12), transparent); }
+  .hero-figure { font-size: clamp(2.25rem, 6vw, 3.25rem); font-weight: 650; line-height: 1.05; letter-spacing: -0.01em; }
+  .hero-figure .tabular-nums { font-variant-numeric: proportional-nums; }
+
+  /* Écart avec la période précédente : flèche et signe, la couleur dit si c'est une bonne nouvelle. */
+  .delta { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem; font-size: 0.8rem; color: var(--muted); }
+  .delta[data-tone="ok"] .delta-value { color: var(--ok); }
+  .delta[data-tone="danger"] .delta-value { color: var(--danger); }
+  .delta-value { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 
   /* Filet doré d'un titre de section : il occupe la place entre le titre et sa précision. */
   .section-rule {
@@ -525,6 +584,7 @@ body {
   .badge[data-tone="ok"] { color: var(--ok); border-color: rgb(95 211 154 / 0.35); background: rgb(95 211 154 / 0.1); }
   .badge[data-tone="warn"] { color: var(--warn); border-color: rgb(240 179 84 / 0.35); background: rgb(240 179 84 / 0.1); }
   .badge[data-tone="danger"] { color: var(--danger); border-color: rgb(240 98 95 / 0.35); background: rgb(240 98 95 / 0.1); }
+  .badge[data-tone="gold"] { color: var(--gold); border-color: rgb(227 189 106 / 0.35); background: rgb(227 189 106 / 0.1); }
 
   /* Référence complète d'un compte (« 123456789#1 ») : badge doré, chiffres à chasse fixe. */
   .account-ref {
@@ -596,6 +656,8 @@ body {
   .meter::-webkit-progress-value { background: linear-gradient(90deg, color-mix(in srgb, var(--class) 70%, white 0%), var(--class)); border-radius: 999px; }
   .meter::-moz-progress-bar { background: var(--class); border-radius: 999px; }
   .meter[data-tone="gold"] { --class: var(--gold); }
+  .meter[data-tone="income"] { --class: var(--income); }
+  .meter[data-tone="expense"] { --class: var(--expense); }
 
   .coin-gold { color: #f0cf7a; }
   .coin-silver { color: #c9d2e3; }
@@ -721,6 +783,17 @@ body {
   .trend-tooltip rect { fill: #0a0f1b; stroke: var(--line-strong); }
   .trend-tooltip-value { fill: var(--text); font-size: 12.5px; font-weight: 600; }
   .trend-tooltip-date { fill: var(--muted); font-size: 11px; }
+  /* Revenus et dépenses : colonnes de part et d'autre de l'axe, bilan en repère cerclé. */
+  .flow-income { fill: var(--income); }
+  .flow-expense { fill: var(--expense); }
+  .flow-income[data-active] { fill: color-mix(in srgb, var(--income) 75%, white); }
+  .flow-expense[data-active] { fill: color-mix(in srgb, var(--expense) 75%, white); }
+  .flow-net { fill: var(--text); stroke: #131b2c; stroke-width: 2; pointer-events: none; }
+  .legend-key { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .legend-swatch { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 3px; background: var(--muted); }
+  .legend-swatch[data-key="income"] { background: var(--income); }
+  .legend-swatch[data-key="expense"] { background: var(--expense); }
+  .legend-swatch[data-key="net"] { width: 0.6rem; height: 0.6rem; border-radius: 999px; background: var(--text); box-shadow: 0 0 0 2px #131b2c; }
   /* Prix d'un objet : bande plus bas / plus haut du jour, dans la teinte de la série. */
   .price-band { fill: var(--series); fill-opacity: 0.18; stroke: none; }
   .sparkline { display: block; overflow: visible; }

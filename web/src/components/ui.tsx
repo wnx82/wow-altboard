@@ -120,7 +120,7 @@ export function Money({ copper }: { copper: number | null }) {
 }
 
 /** Barre de progression. Rien n'est affiché quand la progression n'est pas calculable. */
-export function Meter({ value, max, label, tone }: { value: number | null; max: number | null; label: string; tone?: "gold" }) {
+export function Meter({ value, max, label, tone }: { value: number | null; max: number | null; label: string; tone?: "gold" | "income" | "expense" }) {
   const percent = progressPercent(value, max);
   if (percent === null) return null;
   return <progress className="meter" value={percent} max={100} aria-label={`${label} : ${percent} %`} data-tone={tone} />;

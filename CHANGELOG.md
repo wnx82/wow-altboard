@@ -4,6 +4,25 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.14.0 — 2026-11-11
+
+### Modifié
+
+- **Page Finances repensée** :
+  - Le bilan de la période est mis en vedette, comparé à la période précédente de même longueur :
+    écart en or et en pourcentage, flèche, en vert ou en rouge selon que la nouvelle est bonne.
+    Les revenus et les dépenses ont chacun leur écart. Une jauge montre la part des revenus
+    repartie en dépenses.
+  - Nouveau graphique avec les revenus au-dessus de l'axe et les dépenses en dessous. Le bilan de
+    chaque jour (ou mois) y apparaît en repère. Les couleurs or et bleu ont été vérifiées pour la
+    vision des couleurs.
+  - Trois chiffres marquants : le meilleur jour, le jour le plus coûteux et le personnage le plus
+    rentable.
+  - Les sources de revenus et de dépenses sont classées en barres, avec montant et part.
+  - Le tableau des personnages montre l'icône de classe et la part de chacun dans les revenus.
+  - Le meilleur jour est signalé dans le détail. La période se choisit dans l'en-tête.
+  - Chiffres clés : bilan moyen par jour joué.
+
 ## Site 0.13.0 — 2026-11-10
 
 ### Ajouté

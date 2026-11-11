@@ -51,6 +51,26 @@ export function periodStart(period: FinancePeriod, today: string): string | null
   return period.days === null ? null : addDays(today, -(period.days - 1));
 }
 
+/**
+ * Premier jour de la période précédente, de même longueur, qui finit la veille de periodStart ;
+ * null pour tout l'historique, qui n'a pas de période précédente.
+ */
+export function previousPeriodStart(period: FinancePeriod, today: string): string | null {
+  return period.days === null ? null : addDays(today, -(2 * period.days - 1));
+}
+
+export type Change = {
+  /** Écart avec la période précédente, en pièces de cuivre. */
+  diff: number;
+  /** Écart relatif ; null quand la valeur précédente n'est pas positive (pourcentage sans sens). */
+  ratio: number | null;
+};
+
+/** Écart d'une valeur avec celle de la période précédente. */
+export function change(current: number, previous: number): Change {
+  return { diff: current - previous, ratio: previous > 0 ? (current - previous) / previous : null };
+}
+
 export type LedgerDayRow = {
   characterId: number;
   machineId: number;
@@ -174,6 +194,17 @@ export function buckets(rows: readonly LedgerDayRow[], grouping: "day" | "month"
     bucket.days = daysSeen.get(bucket.key)?.size ?? 0;
   }
   return [...result.values()];
+}
+
+/**
+ * Jour (ou mois) au meilleur bilan, et celui aux plus fortes dépenses. Seules les périodes jouées
+ * comptent ; null quand il n'y en a pas, ou quand rien n'a été dépensé.
+ */
+export function highlights(series: readonly FinanceBucket[]): { best: FinanceBucket | null; costliest: FinanceBucket | null } {
+  const played = series.filter((bucket) => bucket.days > 0);
+  const best = played.reduce<FinanceBucket | null>((top, bucket) => (top === null || bucket.net > top.net ? bucket : top), null);
+  const costliest = played.reduce<FinanceBucket | null>((top, bucket) => (bucket.expense > (top?.expense ?? 0) ? bucket : top), null);
+  return { best, costliest };
 }
 
 /** Premier jour du mois suivant. */

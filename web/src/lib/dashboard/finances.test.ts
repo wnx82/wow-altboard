@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { buckets, byCharacter, distinctDays, financePeriod, goldPerHour, periodStart, summarize, type LedgerDayRow } from "./finances";
+import {
+  buckets,
+  byCharacter,
+  change,
+  distinctDays,
+  financePeriod,
+  goldPerHour,
+  highlights,
+  periodStart,
+  previousPeriodStart,
+  summarize,
+  type LedgerDayRow,
+} from "./finances";
 
 const day = (date: string, extra: Partial<LedgerDayRow> = {}): LedgerDayRow => ({
   characterId: 1,
@@ -100,5 +112,41 @@ describe("finances", () => {
         ["2026-02", 0, 0],
       ],
     );
+  });
+
+  test("période précédente : même longueur, jusqu'à la veille de la période", () => {
+    assert.equal(previousPeriodStart(financePeriod("7"), "2026-11-09"), "2026-10-27");
+    assert.equal(periodStart(financePeriod("30"), "2026-11-09"), "2026-10-11");
+    assert.equal(previousPeriodStart(financePeriod("30"), "2026-11-09"), "2026-09-11");
+    assert.equal(previousPeriodStart(financePeriod("all"), "2026-11-09"), null);
+  });
+
+  test("écart avec la période précédente : pourcentage seulement sur une base positive", () => {
+    assert.deepEqual(change(1500, 1000), { diff: 500, ratio: 0.5 });
+    assert.deepEqual(change(-200, 1000), { diff: -1200, ratio: -1.2 });
+    assert.deepEqual(change(300, 0), { diff: 300, ratio: null });
+    assert.deepEqual(change(300, -100), { diff: 400, ratio: null });
+  });
+
+  test("faits marquants : meilleur bilan et plus fortes dépenses parmi les jours joués", () => {
+    const series = buckets(
+      [
+        day("2026-11-01", { income: { quest: 500 }, expense: { repair: 100 } }),
+        day("2026-11-02", { income: { ah: 900 }, expense: { repair: 50 } }),
+        day("2026-11-04", { income: { loot: 10 }, expense: { training: 700 } }),
+      ],
+      "day",
+      "2026-11-01",
+      "2026-11-05",
+    );
+    const { best, costliest } = highlights(series);
+    assert.equal(best?.key, "2026-11-02");
+    assert.equal(costliest?.key, "2026-11-04");
+
+    // Un seul jour joué, sans revenu ni dépense : il reste le meilleur ; rien dépensé, aucun « plus coûteux ».
+    const quiet = highlights(buckets([day("2026-11-03")], "day", "2026-11-01", "2026-11-05"));
+    assert.equal(quiet.best?.key, "2026-11-03");
+    assert.equal(quiet.costliest, null);
+    assert.deepEqual(highlights(buckets([], "day", "2026-11-01", "2026-11-02")), { best: null, costliest: null });
   });
 });
