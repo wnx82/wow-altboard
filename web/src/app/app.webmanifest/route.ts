@@ -1,12 +1,22 @@
-// Manifeste du site installable (écran d'accueil du téléphone). Servi par une route plutôt que par
-// la convention app/manifest.ts : le site est derrière Cloudflare Access, et la balise générée par
-// Next.js ne demande pas le manifeste avec les cookies. La balise est posée dans app/layout.tsx.
+// Manifeste du site installable (écran d'accueil du téléphone ; sur Android, Chrome en fait une
+// application à part entière, proposée par components/app-install.tsx). Servi par une route plutôt
+// que par la convention app/manifest.ts : le site est derrière Cloudflare Access, et la balise
+// générée par Next.js ne demande pas le manifeste avec les cookies. La balise est posée dans
+// app/layout.tsx.
 
 export const dynamic = "force-static";
 
 export function GET(): Response {
   const base = process.env.WOW_BASE_PATH ?? "";
+  // Appui long sur l'icône de l'application : accès direct à ces pages.
+  const shortcut = (name: string, path: string) => ({
+    name,
+    url: `${base}${path}`,
+    icons: [{ src: `${base}/icons/icon-192.png`, sizes: "192x192", type: "image/png" }],
+  });
   const manifest = {
+    // Identité stable de l'application installée, même si start_url change un jour.
+    id: `${base}/`,
     name: "WoW AltBoard",
     short_name: "AltBoard",
     description: "Tous mes personnages World of Warcraft, synchronisés depuis l'addon AltBoard.",
@@ -20,6 +30,12 @@ export function GET(): Response {
       { src: `${base}/icons/icon-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: `${base}/icons/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
       { src: `${base}/icons/maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+    shortcuts: [
+      shortcut("Objectifs", "/goals"),
+      shortcut("Opportunités", "/opportunities"),
+      shortcut("Finances", "/finances"),
+      shortcut("Serveurs", "/servers"),
     ],
   };
   return new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/manifest+json; charset=utf-8" } });

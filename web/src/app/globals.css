@@ -491,6 +491,36 @@ body {
   .favorite-toggle:hover { color: var(--gold); background: rgb(227 189 106 / 0.12); }
   .favorite-toggle:active { transform: scale(0.88); }
   .favorite-toggle[aria-pressed="true"] { color: var(--gold); }
+
+  /* Bandeau « Installer AltBoard », en bas de l'écran du téléphone. */
+  .install-banner {
+    position: fixed;
+    z-index: 30;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    margin-inline: auto;
+    max-width: 30rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--gold) 42%, transparent);
+    border-radius: var(--radius-card);
+    background: rgb(15 21 34 / 0.96);
+    backdrop-filter: blur(16px);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.07) inset,
+      0 24px 48px -16px rgb(0 0 0 / 0.85),
+      0 18px 40px -28px rgb(227 189 106 / 0.6);
+    animation: install-rise 300ms ease-out;
+  }
+  @keyframes install-rise {
+    from { opacity: 0; transform: translateY(1rem); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .install-banner { animation: none; }
+  }
   .stat-chip {
     display: inline-flex;
     align-items: baseline;

@@ -7,8 +7,9 @@ import { sessionCookieName } from "@/lib/auth/cookie";
 //    filtre, que les requêtes de préchargement ne traversent pas (voir matcher) : la session est
 //    réellement vérifiée en base par chaque page, par requireSession().
 
-// Manifeste et icônes du site installable : le système les lit parfois sans la session du site.
-const PUBLIC_PATHS = new Set(["/login", "/robots.txt", "/app.webmanifest"]);
+// Manifeste, icônes et service worker du site installable : le système les lit parfois sans la
+// session du site (mise à jour du service worker, par exemple). Fichiers fixes, sans donnée.
+const PUBLIC_PATHS = new Set(["/login", "/robots.txt", "/app.webmanifest", "/sw.js"]);
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -31,6 +32,9 @@ export function proxy(request: NextRequest) {
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",
+    // Sans cette directive, celle des scripts s'appliquerait au service worker, et 'strict-dynamic'
+    // y ignore 'self' : son inscription serait refusée.
+    "worker-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

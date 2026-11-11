@@ -59,6 +59,7 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | `src/lib/settings` | Page **Paramètres** : réglages en base, validation des saisies, réinitialisation des personnages |
 | `src/lib/economy` | Import des prix et des recettes, moteur économique déterministe (prix, craft, farm, opportunités), faits structurés, assistant facultatif ([ECONOMY-ENGINE](ECONOMY-ENGINE.md)) |
 | `src/app` | Pages et routes, manifeste du site installable (`app.webmanifest`) ; `src/proxy.ts` pose la CSP et filtre les requêtes sans session |
+| `public/sw.js` | Service worker du site installable : rien en cache, page « Hors ligne » sans réseau. Inscrit, avec le bandeau qui propose l'installation sur téléphone, par `src/components/app-install.tsx` |
 | `scripts` | Outils lancés à la main, dont `generate-icons.ts` qui redessine les icônes du site installable |
 | `src/instrumentation.ts` | Lance le moniteur d'état au démarrage du serveur |
 

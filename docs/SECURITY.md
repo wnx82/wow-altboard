@@ -48,7 +48,7 @@ hors limites, le serveur revalide tout.
 
 | Mesure | Détail |
 |---|---|
-| Accès | toutes les pages exigent une session ; seuls `/login`, `/api/sync` et `/api/health` répondent sans, ainsi que le manifeste du site installable (`/app.webmanifest`) et ses icônes (`/icons/*`, `/apple-icon.png`), fichiers fixes sans donnée. L'agent (`/api/agent`, `/api/agent/zip`) n'est servi qu'avec une session |
+| Accès | toutes les pages exigent une session ; seuls `/login`, `/api/sync` et `/api/health` répondent sans, ainsi que le manifeste du site installable (`/app.webmanifest`), ses icônes (`/icons/*`, `/apple-icon.png`) et son service worker (`/sw.js`, qui ne met rien en cache), fichiers fixes sans donnée. L'agent (`/api/agent`, `/api/agent/zip`) n'est servi qu'avec une session |
 | Double vérification | `src/proxy.ts` (présence du cookie) puis chaque page, action et route (session lue en base) ; le layout ne protège pas ses pages, un test refuse une page sans contrôle |
 | Mot de passe | scrypt (N=32768, r=8, p=1), sel aléatoire, comparaison à temps constant, 12 caractères minimum |
 | Session | identifiant aléatoire de 256 bits ; seule son empreinte est en base ; 30 jours ; supprimée à la déconnexion |
@@ -68,8 +68,8 @@ hors limites, le serveur revalide tout.
 
 ```text
 default-src 'self'; script-src 'self' 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…';
-img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none';
-base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self';
+object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
 Les pages n'utilisent aucun style en ligne : couleurs de classe et de qualité passent par des

@@ -17,11 +17,25 @@ tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://
 - **La liste de l'accueil garde son état** : la recherche, les filtres, le tri et le filtre
   « Favoris » sont recopiés dans l'adresse (`?q=…&tri=nom&favoris=1`). Ouvrir une fiche puis
   revenir retrouve la liste telle qu'on l'a laissée, et le lien se partage ou se met en signet.
+- **Application Android proposée** : sur téléphone, un bandeau « Installer AltBoard » apparaît en
+  bas de l'écran dès que Chrome permet l'installation. Installée, l'application a son icône,
+  s'ouvre en plein écran et figure parmi les applications du téléphone. « Plus tard » tait le
+  bandeau trente jours. Rien n'est proposé sur ordinateur.
+- Raccourcis de l'application (appui long sur l'icône) : Objectifs, Opportunités, Finances,
+  Serveurs.
+- **Page « Hors ligne »** : sans réseau, l'application affiche une page à ses couleurs avec un
+  bouton « Réessayer », au lieu de l'erreur du navigateur. Un service worker minimal la sert ; il
+  ne met rien en cache, les données restent toujours fraîches.
 
 ### Modifié
 
 - Les comptes « mis en avant » s'appellent désormais des **favoris**. Sur la page Comptes, le bouton
   devient « Ajouter aux favoris » ou « Retirer des favoris ». Il réagit aussi dès le clic.
+
+### Sécurité
+
+- CSP : `worker-src 'self'` ajouté. Sans lui, `'strict-dynamic'` aurait refusé le service worker.
+  `/sw.js` répond sans session, comme le manifeste : fichier fixe, sans donnée.
 
 ### Corrigé
 
