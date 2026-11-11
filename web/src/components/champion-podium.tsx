@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
+import { CHAMPION_ART } from "@/lib/wow/art";
 import { classKey, classLabel, formatItemLevel, progressPercent } from "@/lib/wow/format";
 import { classIconUrl } from "@/lib/wow/icons";
+import { ArtBackdrop } from "./art-backdrop";
 import { ClassAvatar, FactionBadge, GameIcon, Meter, Money, RankMedal, StarIcon } from "./ui";
 
 const RANK_LABELS = ["Le plus haut niveau", "Deuxième", "Troisième"];
@@ -37,6 +39,7 @@ function ChampionCard({ character, rank }: { character: CharacterListItem; rank:
   const percent = progressPercent(character.xp, character.xpMax);
   return (
     <article className="champion" data-class={classKey(character.class)} data-rank={rank}>
+      <ArtBackdrop art={CHAMPION_ART[rank - 1] ?? CHAMPION_ART[0]} className="champion-art" sizes="(min-width: 1024px) 34vw, 100vw" />
       {/* Grande icône floue en fond : la classe se lit d'un coup d'œil, sans style en ligne. */}
       {icon && <GameIcon src={icon} size={56} className="champion-backdrop" />}
 

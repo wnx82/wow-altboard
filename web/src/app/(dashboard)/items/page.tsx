@@ -20,7 +20,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
 
   return (
     <>
-      <PageHeader section="characters" title="Objets">
+      <PageHeader art="throne" section="characters" title="Objets">
         Qui possède un objet, et combien : sacs, banque et équipement de tous les personnages, tels que relevés à leur dernière
         synchronisation.
       </PageHeader>

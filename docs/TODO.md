@@ -201,9 +201,9 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
 - [ ] **P3 · S** — Sondes : la liste des plages non publiques est incomplète en IPv6 (adresses
   compatibles IPv4, 6to4, Teredo) et pour deux plages IPv4 réservées
   (`web/src/lib/status/guard.ts:23`). N'autoriser en IPv6 que `2000::/3`, moins les exceptions.
-- [ ] **P3 · S** — Cache de l'optimiseur d'images sans plafond (`web/next.config.ts:26`), sur un
-  `tmpfs` sans taille compté dans les 512 Mo du conteneur. Fixer `maximumDiskCacheSize` et la
-  taille du `tmpfs`. Effet non mesuré.
+- [ ] **P3 · S** — Cache de l'optimiseur d'images sur un `tmpfs` sans taille, compté dans les
+  512 Mo du conteneur. `maximumDiskCacheSize` est fixé à 64 Mo depuis le site 0.16.0 (illustrations
+  des bandeaux) ; reste à fixer la taille du `tmpfs`. Effet non mesuré.
 - [ ] **P3 · S** — Hachage des mots de passe : scrypt avec N = 2^15, r = 8, p = 1
   (`web/src/lib/auth/password.ts:5`), sous la recommandation OWASP (p = 3 à ce N). Monter le
   paramètre et recalculer le hachage à la connexion suivante.

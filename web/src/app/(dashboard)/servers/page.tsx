@@ -45,7 +45,7 @@ export default async function ServersPage() {
 
   return (
     <>
-      <PageHeader section="admin" title={<>WoW Forever — État des serveurs {config.label}</>}>
+      <PageHeader art="terraces" section="admin" title={<>WoW Forever — État des serveurs {config.label}</>}>
         Ce serveur ouvre une connexion TCP vers chaque adresse configurée, {formatEvery(intervalSeconds)}, mesure le temps de
         réponse et referme. Une connexion acceptée prouve qu&apos;un service écoute, pas que le jeu fonctionne : file d&apos;attente,
         royaume plein ou liste de personnages absente ne se voient pas d&apos;ici.

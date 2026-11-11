@@ -18,7 +18,7 @@ export default async function AccountsPage() {
 
   return (
     <>
-      <PageHeader section="admin" title="Comptes">
+      <PageHeader art="deepForest" section="admin" title="Comptes">
         Un compte correspond à un dossier <code className="text-text">WTF\Account</code> : sa référence (identifiant Battle.net et numéro de
         licence WoW) est envoyée par l&apos;agent 0.6.0 et vérifiée contre l&apos;empreinte du compte. Donnez-lui aussi le nom qui vous parle.
       </PageHeader>

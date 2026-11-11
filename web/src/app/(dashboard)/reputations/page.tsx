@@ -17,7 +17,7 @@ export default async function ReputationsPage() {
 
   return (
     <>
-      <PageHeader section="characters" title="Réputations">
+      <PageHeader art="cliffCity" section="characters" title="Réputations">
         Où en est chaque personnage auprès de chaque faction, tous comptes confondus : du plus avancé au moins avancé, d&apos;après le palier
         puis l&apos;avancement dans ce palier.
       </PageHeader>

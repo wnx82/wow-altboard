@@ -33,7 +33,7 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
 
   return (
     <>
-      <PageHeader section="economy" title="Farm">
+      <PageHeader art="jungle" section="economy" title="Farm">
         Deux mesures distinctes. Le signal de marché dit quelles ressources sont chères et peu offertes aujourd&apos;hui : ce n&apos;est pas un
         rendement. Le po/h ne vient que de vos sessions, entre deux relevés réels de vos sacs et de votre banque.
       </PageHeader>

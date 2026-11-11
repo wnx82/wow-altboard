@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { ArtBackdrop } from "@/components/art-backdrop";
 import { getSession } from "@/lib/auth/session";
+import { LOGIN_ART } from "@/lib/wow/art";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Connexion" };
@@ -11,6 +13,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
   return (
     <main className="login-stage grid min-h-dvh place-items-center px-4 py-10">
+      <ArtBackdrop art={LOGIN_ART} className="login-art" sizes="100vw" eager />
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           {/* Blason : écu et épée, l'emblème du site. Décoratif. */}

@@ -75,6 +75,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
   return (
     <>
       <PageHeader
+        art="harbor"
         section="economy"
         eyebrow={
           <>

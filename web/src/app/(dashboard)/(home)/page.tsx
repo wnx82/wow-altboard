@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArtBackdrop } from "@/components/art-backdrop";
 import { ChampionPodium } from "@/components/champion-podium";
 import { CharacterBrowser } from "@/components/character-browser";
 import { Confidence, ItemName, OwnedStock } from "@/components/economy";
@@ -84,7 +85,8 @@ export default async function CharactersPage() {
 
   return (
     <>
-      <header className="page-hero mb-8">
+      <header className="page-hero mb-8" data-art="" data-size="lg">
+        <ArtBackdrop art="heroesCliff" className="hero-art" sizes="(min-width: 1500px) 1500px, 100vw" eager />
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
             <p className="eyebrow text-gold">World of Warcraft</p>

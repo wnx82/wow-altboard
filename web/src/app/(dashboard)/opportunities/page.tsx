@@ -216,7 +216,7 @@ async function DailyAuditButton({ config, marketId, rewrite }: { config: Assista
 
 function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <PageHeader section="economy" title="Opportunités">
+    <PageHeader art="dusk" section="economy" title="Opportunités">
       {children}
     </PageHeader>
   );

@@ -24,10 +24,17 @@ const nextConfig: NextConfig = {
   compress: false,
   reactStrictMode: true,
   images: {
-    // Seules les icônes du CDN officiel de Blizzard passent par l'optimiseur.
-    remotePatterns: [new URL("https://render.worldofwarcraft.com/eu/icons/56/**")],
-    // Une icône ne change jamais : cache d'un mois.
+    // Seules les images des CDN officiels de Blizzard passent par l'optimiseur : icônes du jeu
+    // (lib/wow/icons.ts) et illustrations de WoW Forever (lib/wow/art.ts).
+    remotePatterns: [new URL("https://render.worldofwarcraft.com/eu/icons/56/**"), new URL("https://bnetcmsus-a.akamaihd.net/cms/**")],
+    // Une icône ou une illustration publiée ne change jamais : cache d'un mois.
     minimumCacheTTL: 2_678_400,
+    // Largeurs servies aux illustrations plein écran. Au-delà de 1920, une image assombrie en fond
+    // ne gagnerait rien de visible : pas de variante 2048 ni 3840 à produire et à garder.
+    deviceSizes: [640, 828, 1200, 1920],
+    // Le cache vit dans un tmpfs compté dans la mémoire du conteneur (512 Mo, voir
+    // deploy/proxmox/compose.yaml) : plafonné, les images les moins vues en sortent les premières.
+    maximumDiskCacheSize: 64_000_000,
   },
   async headers() {
     return [

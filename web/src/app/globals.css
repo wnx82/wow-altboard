@@ -222,15 +222,116 @@ body {
   .page-eyebrow a:hover { text-decoration: underline; }
   .page-sigil[data-size="lg"] { width: 4.75rem; height: 4.75rem; border-radius: 1.4rem; }
 
+  /* Illustrations de WoW Forever (lib/wow/art.ts) : en fond, sous un voile sombre posé par le
+     parent. Sans image (chargement, CDN injoignable), le décor sombre du parent reste. */
+  .hero-art,
+  .login-art,
+  .champion-art,
+  .account-art {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 45%;
+    pointer-events: none;
+    user-select: none;
+  }
+  img[data-focus="top"] { object-position: 50% 15%; }
+  img[data-focus="bottom"] { object-position: 50% 78%; }
+  img[data-focus="right"] { object-position: 82% 50%; }
+  /* Après les filtres propres à chaque emplacement : la correction de l'image l'emporte. */
+  img[data-tone="dark"] { filter: saturate(1.2) brightness(1.35) contrast(1.06); }
+  img[data-tone="bright"] { filter: saturate(1.05) brightness(0.78); }
+
+  /* En-tête de page illustré : le texte à gauche, sur la partie la plus sombre ; l'illustration
+     s'éclaircit vers la droite. Sur téléphone, le texte occupe toute la largeur : voile uniforme. */
+  .page-hero[data-art] {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 12.5rem;
+    padding: 2.5rem 1.15rem 1.4rem;
+    border: 1px solid rgb(227 189 106 / 0.26);
+    border-radius: var(--radius-card);
+    background:
+      radial-gradient(70% 140% at 88% 0%, rgb(227 189 106 / 0.12), transparent 70%),
+      rgb(10 14 24);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.07) inset,
+      0 34px 64px -38px rgb(0 0 0 / 0.95),
+      0 26px 56px -44px rgb(227 189 106 / 0.5);
+  }
+  /* Remplace le halo doré des en-têtes sans illustration (voir plus bas), dont il reprend la taille. */
+  .page-hero[data-art]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: auto;
+    height: auto;
+    background:
+      linear-gradient(0deg, rgb(7 10 18 / 0.96) 8%, rgb(7 10 18 / 0.6) 55%, rgb(7 10 18 / 0.3)),
+      radial-gradient(120% 90% at 0% 100%, rgb(7 10 18 / 0.5), transparent 70%);
+    pointer-events: none;
+  }
+  .page-hero[data-art]::after { background: linear-gradient(90deg, rgb(227 189 106 / 0.75), rgb(227 189 106 / 0.2) 45%, transparent 85%); }
+  .page-hero[data-art] h1 { text-shadow: 0 2px 22px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.6); }
+  .page-hero[data-art] p { text-shadow: 0 1px 10px rgb(0 0 0 / 0.9); }
+  .page-hero[data-art] .page-sigil { backdrop-filter: blur(6px); }
+  @media (min-width: 640px) {
+    .page-hero[data-art] { min-height: 14.5rem; padding: 3rem 2rem 1.75rem; }
+    .page-hero[data-art]::before {
+      /* En bas, les actions de droite (boutons, date de synchronisation) restent sur fond sombre. */
+      background:
+        linear-gradient(90deg, rgb(7 10 18 / 0.94) 0%, rgb(7 10 18 / 0.74) 30%, rgb(7 10 18 / 0.08) 66%, rgb(7 10 18 / 0.2) 100%),
+        linear-gradient(0deg, rgb(7 10 18 / 0.9) 0%, rgb(7 10 18 / 0.5) 24%, transparent 55%);
+    }
+  }
+  /* Accueil : plus haut, la peinture en vedette. */
+  .page-hero[data-art][data-size="lg"] { min-height: 16rem; }
+  @media (min-width: 640px) {
+    .page-hero[data-art][data-size="lg"] { min-height: 20rem; padding-top: 4rem; }
+  }
+  .hero-art {
+    filter: saturate(1.1) contrast(1.04) brightness(0.92);
+    animation: art-reveal 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  @keyframes art-reveal {
+    from { opacity: 0; transform: scale(1.06); }
+  }
+
   /* Fiche d'un personnage : grande icône de classe en fond, sans le soulèvement des cartes. */
   .character-hero .champion-backdrop { top: -3rem; right: -2rem; width: 17rem; height: 17rem; opacity: 0.12; }
   .character-hero:hover,
   .character-hero:focus-within { transform: none; }
 
-  /* Page de connexion : halo doré derrière le blason. */
+  /* Page de connexion : la peinture de WoW Forever en plein écran, assombrie sur les bords, un
+     halo doré derrière le blason et le formulaire en verre dépoli. */
   .login-stage {
-    background: radial-gradient(34rem 22rem at 50% 28%, rgb(227 189 106 / 0.12), transparent 70%);
+    position: relative;
+    isolation: isolate;
   }
+  .login-art {
+    position: fixed;
+    filter: saturate(1.08);
+    animation: art-reveal 2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .login-stage::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(34rem 22rem at 50% 28%, rgb(227 189 106 / 0.14), transparent 70%),
+      radial-gradient(120% 90% at 50% 45%, rgb(7 10 18 / 0.45), rgb(7 10 18 / 0.9) 75%),
+      linear-gradient(0deg, rgb(7 10 18 / 0.85), transparent 45%);
+    pointer-events: none;
+  }
+  .login-stage h1 { text-shadow: 0 2px 24px rgb(0 0 0 / 0.8); }
+  .login-stage .panel { background: linear-gradient(180deg, rgb(20 27 45 / 0.82), rgb(10 14 24 / 0.86)); }
 
   /* Chiffre clé : liseré doré en tête, halo dans le coin. */
   .stat-tile {
@@ -405,6 +506,19 @@ body {
     mask-image: radial-gradient(closest-side, #000 35%, transparent);
     pointer-events: none;
   }
+  /* Illustration en haut de la carte, fondue vers le bas : les chiffres restent sur fond sombre. */
+  .champion-art {
+    opacity: 0.36;
+    filter: saturate(1.1);
+    mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.75) 0%, #000 25%, rgb(0 0 0 / 0.6) 50%, transparent 82%);
+    transition: transform 600ms ease, opacity 300ms ease;
+  }
+  .champion[data-rank="1"] .champion-art { opacity: 0.48; }
+  .champion:hover .champion-art,
+  .champion:focus-within .champion-art { opacity: 0.58; transform: scale(1.04); }
+  .champion .eyebrow,
+  .champion p { text-shadow: 0 1px 8px rgb(0 0 0 / 0.85); }
+  .champion .eyebrow { color: color-mix(in srgb, var(--text) 80%, transparent); }
   .champion-name { font-size: 1.25rem; }
   .champion[data-rank="1"] .champion-name { font-size: 1.5rem; }
   /* Niveau en grand chiffre gravé, dégradé d'or. */
@@ -477,6 +591,45 @@ body {
       0 20px 44px -30px rgb(227 189 106 / 0.6);
   }
   .account-banner[data-featured] .account-name { font-size: 1.3rem; color: #f3d48a; }
+  /* Bannière illustrée : un paysage par compte, sombre côté nom, visible à droite. */
+  .account-banner[data-art] {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    min-height: 5.5rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: rgb(12 17 29);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 20px 44px -32px rgb(0 0 0 / 0.9);
+  }
+  .account-banner[data-art]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: rgb(7 10 18 / 0.72);
+    pointer-events: none;
+  }
+  .account-banner[data-featured][data-art] { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+  .account-banner[data-featured][data-art]::before {
+    background:
+      linear-gradient(100deg, rgb(227 189 106 / 0.2), transparent 50%),
+      rgb(7 10 18 / 0.68);
+  }
+  .account-banner[data-art] .account-name { text-shadow: 0 1px 12px rgb(0 0 0 / 0.8); }
+  .account-art { filter: saturate(1.1); }
+  @media (min-width: 640px) {
+    .account-banner[data-art] { min-height: 7rem; padding: 1.25rem 1.5rem; }
+    .account-banner[data-art]::before {
+      background: linear-gradient(90deg, rgb(7 10 18 / 0.94) 0%, rgb(7 10 18 / 0.78) 35%, rgb(7 10 18 / 0.28) 75%, rgb(7 10 18 / 0.45));
+    }
+    .account-banner[data-featured][data-art]::before {
+      background:
+        linear-gradient(100deg, rgb(227 189 106 / 0.2), transparent 50%),
+        linear-gradient(90deg, rgb(7 10 18 / 0.92) 0%, rgb(7 10 18 / 0.74) 35%, rgb(7 10 18 / 0.24) 75%, rgb(7 10 18 / 0.42));
+    }
+  }
 
   /* Étoile d'une bannière de compte : creuse et discrète hors favoris, dorée sinon. */
   .favorite-toggle {
@@ -519,7 +672,10 @@ body {
     from { opacity: 0; transform: translateY(1rem); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .install-banner { animation: none; }
+    .install-banner,
+    .hero-art,
+    .login-art { animation: none; }
+    .champion-art { transition: none; }
   }
   .stat-chip {
     display: inline-flex;

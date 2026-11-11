@@ -62,7 +62,7 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
   if (!known) {
     return (
       <>
-        <PageHeader section="economy" title="Finances">
+        <PageHeader art="galleons" section="economy" title="Finances">
           {intro}
         </PageHeader>
         <div className="mt-6">
@@ -90,7 +90,7 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
     </nav>
   );
   const header = (
-    <PageHeader section="economy" title="Finances" actions={periodNav}>
+    <PageHeader art="galleons" section="economy" title="Finances" actions={periodNav}>
       {intro}
     </PageHeader>
   );

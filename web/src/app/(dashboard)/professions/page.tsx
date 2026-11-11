@@ -19,7 +19,7 @@ export default async function ProfessionsPage() {
 
   return (
     <>
-      <PageHeader section="characters" title="Métiers">
+      <PageHeader art="camp" section="characters" title="Métiers">
         Qui exerce quoi, et à quel rang : pour chaque métier, les personnages du plus avancé au moins avancé, tous comptes confondus.
       </PageHeader>
 

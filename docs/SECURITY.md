@@ -78,9 +78,12 @@ attributs `data-*`, les jauges par l'élément `<progress>`, les graphiques par 
 Icônes de classe et de métier : elles viennent du CDN de Blizzard (`render.worldofwarcraft.com`),
 mais c'est **le serveur** qui les récupère, par l'optimiseur d'images de Next.js (`/_next/image`).
 Le navigateur ne contacte que ce site : la CSP reste à `img-src 'self'` et Blizzard ne voit ni
-l'adresse ni la navigation des visiteurs. L'optimiseur n'accepte qu'un hôte et un chemin
-(`remotePatterns` : `/eu/icons/56/**`) : il ne peut pas servir de relais vers une autre adresse.
-Les images ne sont pas copiées dans le dépôt ; le cache est en mémoire (`tmpfs`), perdu au redémarrage.
+l'adresse ni la navigation des visiteurs. L'optimiseur n'accepte que deux chemins, sur deux hôtes de
+Blizzard (`remotePatterns` : `render.worldofwarcraft.com/eu/icons/56/**` pour les icônes,
+`bnetcmsus-a.akamaihd.net/cms/**` pour les illustrations de WoW Forever des bandeaux, voir
+`src/lib/wow/art.ts`) : il ne peut pas servir de relais vers une autre adresse. Les images ne sont
+pas copiées dans le dépôt ; le cache est en mémoire (`tmpfs`), plafonné à 64 Mo
+(`maximumDiskCacheSize`) et perdu au redémarrage.
 
 Aussi : `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
 `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`,

@@ -4,6 +4,28 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.16.0 — 2026-11-11
+
+### Ajouté
+
+- **Bandeaux illustrés WoW Forever.** Les illustrations officielles de World of Warcraft: Forever
+  habillent le site : trois peintures et dix-sept paysages du jeu, tirés des annonces de Blizzard.
+  - **Page de connexion** : la grande peinture de l'annonce en plein écran, derrière le formulaire
+    en verre dépoli.
+  - **En-tête de chaque page** : une illustration propre à la page, par exemple des galions au
+    couchant pour Finances, un port pour Marché, une forge pour Artisanat. Elle est assombrie du
+    côté du titre et apparaît en fondu.
+  - **Accueil** : la peinture des héros en grand bandeau, une illustration sur chaque carte du
+    podium et un paysage par compte sur les bannières des comptes.
+- Les illustrations ne sont pas copiées dans le dépôt. Le serveur les lit sur le CDN de Blizzard,
+  les réduit à la taille de l'écran (WebP) et les garde en cache, comme les icônes. Le navigateur
+  ne contacte que ce site. Sans elles (CDN injoignable), les bandeaux gardent leur décor sombre.
+
+### Modifié
+
+- Cache de l'optimiseur d'images plafonné à 64 Mo. Les variantes d'images s'arrêtent à 1920 pixels
+  de large.
+
 ## Site 0.15.1 — 2026-11-11
 
 ### Corrigé

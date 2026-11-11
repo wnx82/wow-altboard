@@ -270,7 +270,7 @@ export default async function CraftingPage({ searchParams }: PageProps<"/craftin
 
 function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <PageHeader section="economy" title="Craft">
+    <PageHeader art="forge" section="economy" title="Craft">
       {children}
     </PageHeader>
   );

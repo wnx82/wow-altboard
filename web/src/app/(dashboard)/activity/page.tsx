@@ -20,7 +20,7 @@ export default async function ActivityPage() {
 
   return (
     <>
-      <PageHeader section="characters" title="Activité">
+      <PageHeader art="mistwood" section="characters" title="Activité">
         Ce qui a changé sur les {ACTIVITY_DAYS} derniers jours, tous personnages confondus : niveaux, or, métiers, réputations, guilde. Un
         changement porte l&apos;heure du relevé qui le montre, pas celle où il s&apos;est produit en jeu.
       </PageHeader>

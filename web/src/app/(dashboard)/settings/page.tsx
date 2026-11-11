@@ -25,7 +25,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader section="admin" title="Paramètres">
+      <PageHeader art="twilightGrove" section="admin" title="Paramètres">
         Ces réglages s&apos;appliquent aussitôt, sans redéployer le serveur. Ils sont enregistrés dans la base de données.
       </PageHeader>
 

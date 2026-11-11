@@ -1,6 +1,8 @@
 import { getImageProps } from "next/image";
+import type { ArtKey } from "@/lib/wow/art";
 import { classKey, formatMoney, progressPercent, splitMoney } from "@/lib/wow/format";
 import { classIconUrl, professionIconUrl } from "@/lib/wow/icons";
+import { ArtBackdrop } from "./art-backdrop";
 
 // Briques d'affichage sans état, utilisables côté serveur comme côté client.
 
@@ -211,22 +213,26 @@ function SectionIcon({ section }: { section: PageSection }) {
 /**
  * En-tête de page : emblème de la rubrique, rubrique, titre et présentation, actions à droite. Un
  * halo doré derrière le titre, un filet doré dessous. eyebrow remplace le nom de la rubrique.
+ * art : illustration de WoW Forever en fond, assombrie du côté du texte.
  */
 export function PageHeader({
   section,
   title,
   eyebrow,
   actions,
+  art,
   children,
 }: {
   section: PageSection;
   title: React.ReactNode;
   eyebrow?: React.ReactNode;
   actions?: React.ReactNode;
+  art?: ArtKey;
   children?: React.ReactNode;
 }) {
   return (
-    <header className="page-hero mb-2">
+    <header className="page-hero mb-2" data-art={art ? "" : undefined}>
+      {art && <ArtBackdrop art={art} className="hero-art" sizes="(min-width: 1500px) 1500px, 100vw" eager />}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
         <div className="flex min-w-0 items-center gap-4">
           <span className="page-sigil hidden sm:grid" aria-hidden="true">

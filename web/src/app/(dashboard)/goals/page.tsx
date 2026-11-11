@@ -14,7 +14,7 @@ export default async function GoalsPage() {
 
   return (
     <>
-      <PageHeader section="characters" title="Objectifs">
+      <PageHeader art="lakeTower" section="characters" title="Objectifs">
         Chaque modèle d&apos;objectifs en tableau : ses objectifs en colonnes, les personnages qui l&apos;ont appliqué en lignes. Un modèle
         s&apos;enregistre et s&apos;applique depuis la section Objectifs de la fiche d&apos;un personnage.
       </PageHeader>

@@ -14,7 +14,9 @@ import {
   writeBrowserState,
 } from "@/lib/dashboard/browser-state";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
+import { accountArt } from "@/lib/wow/art";
 import { classKey, classLabel, formatDateTime, formatItemLevel, formatRelative, progressPercent } from "@/lib/wow/format";
+import { ArtBackdrop } from "./art-backdrop";
 import { FavoriteToggle } from "./favorite-toggle";
 import { ClassAvatar, EmptyState, FactionBadge, Meter, Money, ProfessionIcon, RankMedal, StarIcon } from "./ui";
 
@@ -357,7 +359,8 @@ export function CharacterBrowser({ characters, now, ranks = {} }: { characters: 
                     Autres comptes
                   </p>
                 )}
-                <div className="account-banner" data-featured={account.featured || undefined}>
+                <div className="account-banner" data-featured={account.featured || undefined} data-art="">
+                  <ArtBackdrop art={accountArt(account.id)} className="account-art" sizes="(min-width: 1500px) 1500px, 100vw" />
                   <div className="flex min-w-0 items-center gap-1.5">
                     <h2 className="min-w-0">
                       <button

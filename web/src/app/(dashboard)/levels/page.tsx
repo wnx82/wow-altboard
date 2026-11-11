@@ -37,7 +37,7 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
 
   return (
     <>
-      <PageHeader section="characters" title="Niveaux">
+      <PageHeader art="road" section="characters" title="Niveaux">
         L&apos;évolution des niveaux de tous les personnages, lue dans les relevés envoyés par l&apos;agent. Un niveau gagné porte l&apos;heure du
         relevé qui le montre, pas celle où il s&apos;est produit en jeu.
       </PageHeader>

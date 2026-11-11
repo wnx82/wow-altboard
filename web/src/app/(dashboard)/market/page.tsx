@@ -202,7 +202,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
 
 function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <PageHeader section="economy" title="Marché">
+    <PageHeader art="harbor" section="economy" title="Marché">
       {children}
     </PageHeader>
   );

@@ -33,7 +33,7 @@ export default async function PlaytimePage() {
 
   return (
     <>
-      <PageHeader section="characters" title="Temps de jeu">
+      <PageHeader art="glade" section="characters" title="Temps de jeu">
         D&apos;après l&apos;addon Allemano Ledger : le dernier <code className="text-text">/played</code> connu de chaque personnage, et les
         sessions de jeu des {PLAYTIME_WEEKS} dernières semaines. Chaque PC ne connaît que les sessions jouées chez lui.
       </PageHeader>

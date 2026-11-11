@@ -225,7 +225,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
 
 function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <PageHeader section="economy" title="Audit">
+    <PageHeader art="ossuary" section="economy" title="Audit">
       {children}
     </PageHeader>
   );

@@ -41,7 +41,7 @@ export default async function MachinesPage() {
 
   return (
     <>
-      <PageHeader section="admin" title="Machines">
+      <PageHeader art="grotto" section="admin" title="Machines">
         Chaque PC exécute l&apos;agent <code className="text-text">AltBoardSync</code>. Tant qu&apos;il tourne, il envoie les données à chaque
         écriture du jeu ; arrêté, rien n&apos;est envoyé.
       </PageHeader>
