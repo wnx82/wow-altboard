@@ -47,7 +47,10 @@ export function proxy(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
-  response.headers.set("Cache-Control", "private, no-store");
+  // no-transform : Cloudflare ne réécrit plus la page. Son « Email Address Obfuscation » remplaçait
+  // les adresses e-mail (noms des comptes) par « [email protected] » dans le HTML : React ne
+  // retrouvait plus le texte rendu par le serveur et refaisait toute la page (erreur 418).
+  response.headers.set("Cache-Control", "private, no-store, no-transform");
   return response;
 }
 

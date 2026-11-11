@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { AppInstall } from "@/components/app-install";
 import { MainNav } from "@/components/main-nav";
 import { logoutAction } from "@/lib/auth/actions";
 import { requireSession } from "@/lib/auth/session";
@@ -59,7 +58,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
         n&apos;est pas du temps réel. World of Warcraft et ses icônes sont la propriété de Blizzard Entertainment.
         {versions.length > 0 && <p className="mt-2 tabular-nums">{versions.join(" · ")}</p>}
       </footer>
-      <AppInstall basePath={process.env.WOW_BASE_PATH ?? ""} />
     </div>
   );
 }

@@ -4,6 +4,21 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.15.1 — 2026-11-11
+
+### Corrigé
+
+- **Bandeau d'installation absent sur téléphone.** Chrome ne propose l'installation qu'après trente
+  secondes de visite et un appui, et d'autres navigateurs jamais. Sans cette proposition, le bandeau
+  indique désormais le chemin au bout de huit secondes : menu ⋮ puis « Installer l'application »
+  (sur iPhone : Partager puis « Sur l'écran d'accueil »). « Compris » le tait trente jours. Si
+  Chrome propose l'installation ensuite, le bandeau passe au bouton « Installer ». Il est aussi
+  présent sur la page de connexion, et ne revient plus une fois l'application installée.
+- **Pages refaites entièrement à chaque chargement.** Cloudflare remplaçait les adresses e-mail
+  (noms des comptes) du HTML par « [email protected] ». React ne retrouvait plus le texte du serveur
+  (erreur 418) et reconstruisait toute la page dans le navigateur. Les pages portent maintenant
+  `Cache-Control: no-transform`, que Cloudflare respecte.
+
 ## Site 0.15.0 — 2026-11-11
 
 ### Ajouté

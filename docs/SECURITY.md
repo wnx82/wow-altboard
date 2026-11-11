@@ -84,7 +84,8 @@ Les images ne sont pas copiées dans le dépôt ; le cache est en mémoire (`tmp
 
 Aussi : `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`,
 `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`,
-`Strict-Transport-Security`, `Cache-Control: private, no-store` sur les pages. Pas de CORS : l'API
+`Strict-Transport-Security`, `Cache-Control: private, no-store, no-transform` sur les pages
+(`no-transform` : Cloudflare ne réécrit pas le HTML, voir `src/proxy.ts`). Pas de CORS : l'API
 n'est pas appelée depuis un navigateur tiers.
 
 ## Import des noms des objets

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter } from "next/font/google";
+import { AppInstall } from "@/components/app-install";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
@@ -22,7 +23,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Avec les cookies : sans eux, Cloudflare Access renverrait sa page de connexion au lieu du manifeste. */}
         <link rel="manifest" href={`${process.env.WOW_BASE_PATH ?? ""}/app.webmanifest`} crossOrigin="use-credentials" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Ici et non dans le tableau de bord : Chrome peut proposer l'installation dès la page de connexion. */}
+        <AppInstall basePath={process.env.WOW_BASE_PATH ?? ""} />
+      </body>
     </html>
   );
 }
