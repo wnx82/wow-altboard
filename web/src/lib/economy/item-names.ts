@@ -82,7 +82,7 @@ export function parseItemSparse(text: string): Parsed<CatalogEntry[]> {
 }
 
 /** Corps d'une réponse, lu par morceaux : arrêté dès qu'il dépasse max octets. */
-async function readLimited(response: Response, max: number): Promise<string | null> {
+export async function readLimited(response: Response, max: number): Promise<string | null> {
   if (!response.body) return "";
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -100,17 +100,17 @@ async function readLimited(response: Response, max: number): Promise<string | nu
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
-type Fetch = typeof globalThis.fetch;
+export type Fetch = typeof globalThis.fetch;
 
 /** Message lisible d'un échec réseau : délai dépassé, adresse introuvable, connexion refusée. */
-function networkError(error: unknown): string {
+export function networkError(error: unknown): string {
   const cause = (error as { cause?: { code?: string } })?.cause?.code;
   const name = (error as { name?: string })?.name;
   if (name === "TimeoutError" || name === "AbortError") return "wago.tools ne répond pas (délai dépassé).";
   return `wago.tools injoignable${cause ? ` (${cause})` : ""}.`;
 }
 
-async function get(fetchImpl: Fetch, url: string, timeoutMs = TIMEOUT_MS): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
+export async function wagoGet(fetchImpl: Fetch, url: string, timeoutMs = TIMEOUT_MS): Promise<{ ok: true; response: Response } | { ok: false; error: string }> {
   try {
     const response = await fetchImpl(url, { headers: { "user-agent": "wow-altboard" }, signal: AbortSignal.timeout(timeoutMs), redirect: "error" });
     if (!response.ok) return { ok: false, error: `wago.tools a répondu ${response.status}.` };
@@ -122,7 +122,7 @@ async function get(fetchImpl: Fetch, url: string, timeoutMs = TIMEOUT_MS): Promi
 
 /** Version la plus récente du client publiée par wago.tools. */
 export async function latestBuild(fetchImpl: Fetch = fetch): Promise<Parsed<string>> {
-  const result = await get(fetchImpl, BUILD_URL);
+  const result = await wagoGet(fetchImpl, BUILD_URL);
   if (!result.ok) return result;
   const body = (await readLimited(result.response, 64 * 1024).catch(() => null)) ?? "";
   let version: unknown;
@@ -152,7 +152,7 @@ export async function importItemNames(db: Database, options: { now: Date; fetch?
     if (current.count > 0 && current.build === build.value) return { ok: true, build: build.value, count: current.count, removed: 0, unchanged: true };
   }
 
-  const download = await get(fetchImpl, catalogUrl(build.value), DOWNLOAD_TIMEOUT_MS);
+  const download = await wagoGet(fetchImpl, catalogUrl(build.value), DOWNLOAD_TIMEOUT_MS);
   if (!download.ok) return download;
   let text: string | null;
   try {

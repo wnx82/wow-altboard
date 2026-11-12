@@ -49,6 +49,17 @@ export function classIconUrl(token: string | null): string | null {
   return url(token ? CLASS_ICONS[token] : undefined);
 }
 
+/** Icône d'un objet sans icône connue, comme en jeu. */
+export const UNKNOWN_ITEM_ICON = "inv_misc_questionmark";
+
+/**
+ * Adresse de l'icône d'un objet d'après son nom de fichier (table icon_files). Les icônes propres à
+ * WoW Forever manquent au CDN de Blizzard : l'affichage se replie alors sur UNKNOWN_ITEM_ICON.
+ */
+export function itemIconUrl(name: string | null): string {
+  return url(name !== null && /^[a-z0-9_-]{1,100}$/.test(name) ? name : UNKNOWN_ITEM_ICON)!;
+}
+
 /** Adresse de l'icône de métier, ou null pour une ligne de compétence inconnue. */
 export function professionIconUrl(skillLine: number | null): string | null {
   return url(skillLine === null ? undefined : PROFESSION_ICONS[skillLine]);

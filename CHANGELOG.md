@@ -4,6 +4,31 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.19.0 — 2026-11-12
+
+### Modifié
+
+- **Page Inventaires à la manière du jeu.**
+  - **Recherche en vedette** : grand champ en tête de page, touche `/` pour s'y placer, croix pour
+    l'effacer. Sur téléphone, les filtres se replient derrière un bouton « Filtres ».
+  - **Tous les objets** : une grille de cases comme les sacs du jeu, avec l'icône de l'objet, un
+    liseré à la couleur de sa qualité (à partir de « peu commun ») et la quantité au coin.
+  - **Bulle d'objet** au survol, au clavier ou au toucher : nom à la couleur de la qualité, total,
+    puis chaque détenteur (personnage et endroit, ou guilde et onglet) avec sa quantité et
+    l'échéance d'un courrier ou d'une vente. Un clic la garde ouverte ; Échap ou un clic ailleurs
+    la referme.
+  - **Sac par sac** : une fenêtre par personnage (portrait, niveau, royaume) puis par banque de
+    guilde, chaque endroit ou onglet en grille de cases. Choisir un personnage ouvre cette vue.
+  - Le tri (quantité, nom, qualité) range aussi les cases de chaque endroit.
+
+### Ajouté
+
+- **Icônes des objets** : le contrôle quotidien de wago.tools importe aussi la table
+  `ManifestInterfaceData` du jeu, qui relie l'identifiant d'icône relevé par l'addon à son nom. Les
+  images viennent du CDN de Blizzard ; une icône propre à WoW Forever, absente de ce CDN, devient le
+  point d'interrogation du jeu.
+- Migration `0014_icon_files` : table `icon_files` (ajout seul).
+
 ## Site 0.18.0 — 2026-11-12
 
 ### Ajouté

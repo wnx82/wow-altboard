@@ -11,7 +11,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (48 tables, 14 migrations, 2026-11-12) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (49 tables, 15 migrations, 2026-11-12) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -105,6 +105,7 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_fa
 | `economy_audits` | `(market_id, day)` | Audit du jour rédigé par l'assistant : jour (Europe/Brussels), calcul dont viennent ses faits (`run_id`, vidé si ce calcul disparaît), jour des données, modèle, texte, date de rédaction. Réécrit le même jour, il remplace le précédent |
 | `price_alerts` | `id` ; unique `(market_id, item_key, direction)` | Alerte de prix : marché, objet, sens (`below` ou `above`), seuil en pièces de cuivre (strictement positif). Supprimée avec son marché |
 | `item_names` | `item_id` | Nom de repli d'un objet jamais possédé : nom, qualité, source (`wago` ou `client`), version du jeu (`build`). Un import `wago` ne remplace jamais une ligne `client` et supprime ses propres lignes d'une version précédente |
+| `icon_files` | `file_id` | Nom de fichier d'une icône du jeu (`inv_scroll_03`) sous l'identifiant que relève l'addon (`items.icon`), version du jeu (`build`). Importé de la table `ManifestInterfaceData` de wago.tools ; un import supprime les icônes d'une version précédente |
 
 ### Objectifs par personnage
 
@@ -263,6 +264,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0011_character_ledger_days` | `character_ledger_days` et son index (ajout seul) |
 | `0012_account_featured` | colonne `wow_accounts.featured` (ajout seul, `false` par défaut) |
 | `0013_baganator_holdings` | `character_holdings`, `character_holding_sources`, `guild_banks`, `guild_bank_items` et leurs index (ajouts seuls) |
+| `0014_icon_files` | `icon_files` (ajout seul) |
 
 ## Checkpoint B
 

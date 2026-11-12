@@ -27,6 +27,9 @@ export function holdingNote(expiresAt: Date | string | null, now: Date): { text:
 export const VIEWS = ["items", "characters"] as const;
 export type InventoryView = (typeof VIEWS)[number];
 
+/** Un personnage choisi s'affiche sac par sac, comme en jeu ; sinon les objets de tous sont regroupés. */
+export const defaultView = (character: string): InventoryView => (character === "" ? "items" : "characters");
+
 export const SORTS = ["total", "name", "quality"] as const;
 export type InventorySort = (typeof SORTS)[number];
 
@@ -79,7 +82,7 @@ export function readInventoryState(params: { get(name: string): string | null })
     places: places.length === 0 ? [...PLACES] : places,
     minQuality: quality !== null && /^[0-7]$/.test(quality) ? quality : "",
     expired: params.get(PARAMS.expired) === "1",
-    view: VIEWS.find((view) => VIEW_VALUES[view] === params.get(PARAMS.view)) ?? DEFAULT_STATE.view,
+    view: VIEWS.find((view) => VIEW_VALUES[view] === params.get(PARAMS.view)) ?? defaultView(isId(character) ? character : ""),
     sort: SORTS.find((sort) => SORT_VALUES[sort] === params.get(PARAMS.sort)) ?? DEFAULT_STATE.sort,
   };
 }
@@ -97,11 +100,19 @@ export function writeInventoryState(state: InventoryState, current = ""): string
   }
   if (state.minQuality !== "") params.set(PARAMS.minQuality, state.minQuality);
   if (state.expired) params.set(PARAMS.expired, "1");
-  if (state.view !== DEFAULT_STATE.view) params.set(PARAMS.view, VIEW_VALUES[state.view]);
+  if (state.view !== defaultView(state.character)) params.set(PARAMS.view, VIEW_VALUES[state.view]);
   if (state.sort !== DEFAULT_STATE.sort) params.set(PARAMS.sort, SORT_VALUES[state.sort]);
 
   const search = params.toString();
   return search === "" ? "" : `?${search}`;
+}
+
+/** Quantité inscrite dans une case, comme en jeu : au-delà de 9 999, en milliers (« 12,3k », « 245k »). */
+export function slotCount(quantity: number): string {
+  if (quantity < 10_000) return String(quantity);
+  const thousands = quantity / 1000;
+  const shown = thousands < 100 ? Math.floor(thousands * 10) / 10 : Math.floor(thousands);
+  return `${String(shown).replace(".", ",")}k`;
 }
 
 /** Minuscules sans accents : « epee » trouve « Épée ». */
@@ -187,6 +198,18 @@ export function groupByItem(holdings: Holding[], items: InventoryData["items"], 
     quality: (a, b) => (b.quality ?? -1) - (a.quality ?? -1) || byName(a, b),
   };
   return [...rows.values()].sort(compare[sort]);
+}
+
+/** Lignes d'un même endroit rangées comme la grille des objets : quantité, nom ou qualité. */
+export function sortHoldings(holdings: readonly Holding[], items: InventoryData["items"], sort: InventorySort): Holding[] {
+  const name = (holding: Holding) => items[holding.itemKey]?.name ?? `~${holding.itemKey}`;
+  const byName = (a: Holding, b: Holding) => collator.compare(name(a), name(b));
+  const compare: Record<InventorySort, (a: Holding, b: Holding) => number> = {
+    total: (a, b) => b.quantity - a.quantity || byName(a, b),
+    name: byName,
+    quality: (a, b) => (items[b.itemKey]?.quality ?? -1) - (items[a.itemKey]?.quality ?? -1) || byName(a, b),
+  };
+  return [...holdings].sort(compare[sort]);
 }
 
 /** Objets d'un même endroit, du plus nombreux au moins nombreux. */

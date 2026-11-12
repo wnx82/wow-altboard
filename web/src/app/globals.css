@@ -1115,6 +1115,208 @@ body {
     text-transform: uppercase;
     color: var(--faint);
   }
+
+  /* ---------------------------------------------------------------------------
+     Inventaires, à la manière du jeu : grande recherche, fenêtres de sac, cases d'objet à liseré
+     de qualité et quantité au coin, bulle d'objet sombre au survol.
+     --------------------------------------------------------------------------- */
+  .inventory-search { position: relative; }
+  .inventory-search input {
+    width: 100%;
+    border: 1px solid rgb(227 189 106 / 0.35);
+    border-radius: 1.1rem;
+    background: linear-gradient(180deg, rgb(14 19 32 / 0.94), rgb(7 10 18 / 0.94));
+    color: var(--text);
+    padding: 1rem 3.4rem;
+    font-size: 1.05rem;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 22px 44px -26px rgb(0 0 0 / 0.9);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .inventory-search input::placeholder { color: var(--faint); }
+  .inventory-search input:hover { border-color: rgb(227 189 106 / 0.55); }
+  .inventory-search input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 4px rgb(227 189 106 / 0.16), 0 22px 44px -26px rgb(0 0 0 / 0.9);
+  }
+  .inventory-search input::-webkit-search-cancel-button { appearance: none; }
+  .inventory-search .search-glyph {
+    position: absolute;
+    left: 1.15rem;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--gold);
+    pointer-events: none;
+  }
+  .inventory-search .search-end {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    translate: 0 -50%;
+  }
+  .inventory-search kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: rgb(255 255 255 / 0.04);
+  }
+  .inventory-search .search-clear {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .inventory-search .search-clear:hover { color: var(--text); background: rgb(255 255 255 / 0.08); }
+  .inventory-search .search-clear:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+  /* Fenêtre de sac : cuir sombre et filet doré, titre gravé. */
+  .bag-window {
+    border: 1px solid rgb(227 189 106 / 0.24);
+    border-radius: 0.95rem;
+    background:
+      radial-gradient(120% 80% at 50% 0%, rgb(227 189 106 / 0.07), transparent 60%),
+      linear-gradient(180deg, rgb(29 25 20 / 0.93), rgb(12 11 10 / 0.95));
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.65) inset,
+      0 1px 0 rgb(255 255 255 / 0.06) inset,
+      0 22px 44px -26px rgb(0 0 0 / 0.9);
+  }
+  .bag-title {
+    font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+    letter-spacing: 0.04em;
+  }
+  .bag-section + .bag-section { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid rgb(227 189 106 / 0.12); }
+  .bag-section-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(227 189 106 / 0.85);
+  }
+  .bag-section-title small { font-size: 0.72rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
+
+  .bag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(2.85rem, 1fr));
+    gap: 0.3rem;
+  }
+  @media (min-width: 640px) {
+    .bag-grid { grid-template-columns: repeat(auto-fill, minmax(3.1rem, 1fr)); }
+  }
+  .bag-grid[data-size="lg"] { grid-template-columns: repeat(auto-fill, minmax(3.25rem, 1fr)); }
+  @media (min-width: 640px) {
+    .bag-grid[data-size="lg"] { grid-template-columns: repeat(auto-fill, minmax(3.6rem, 1fr)); }
+  }
+
+  /* Case d'objet : icône, liseré de qualité à partir de « peu commun », quantité au coin. */
+  .item-slot {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #000;
+    border-radius: 0.3rem;
+    background: radial-gradient(circle at 50% 35%, #2b2b33, #0d0d11 75%);
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+    cursor: pointer;
+  }
+  .item-slot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .item-slot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.55), inset 0 0 7px rgb(0 0 0 / 0.6);
+    pointer-events: none;
+  }
+  .item-slot[data-quality="2"],
+  .item-slot[data-quality="3"],
+  .item-slot[data-quality="4"],
+  .item-slot[data-quality="5"],
+  .item-slot[data-quality="6"],
+  .item-slot[data-quality="7"] {
+    border-color: var(--quality);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--quality) 45%, transparent), 0 0 9px -2px var(--quality);
+  }
+  .item-slot[data-quality="0"] img { filter: saturate(0.55) brightness(0.85); }
+  .item-slot:hover::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: rgb(255 255 255 / 0.14);
+    pointer-events: none;
+  }
+  .item-slot:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .item-slot[aria-expanded="true"] { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .item-slot[data-expired] img { filter: grayscale(1) brightness(0.6); }
+  .item-count {
+    position: absolute;
+    right: 0.2rem;
+    bottom: 0.05rem;
+    z-index: 2;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
+    pointer-events: none;
+  }
+  .item-flag {
+    position: absolute;
+    left: 0.2rem;
+    top: 0.15rem;
+    z-index: 2;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #ff6b62;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    pointer-events: none;
+  }
+
+  /* Bulle d'objet, comme en jeu : fond bleu nuit, bord gris, nom à la couleur de la qualité. */
+  .game-tooltip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 60;
+    width: max-content;
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: 0.6rem 0.8rem 0.65rem;
+    border: 1px solid rgb(176 186 214 / 0.55);
+    border-radius: 0.45rem;
+    background: linear-gradient(180deg, rgb(9 13 34 / 0.97), rgb(3 5 15 / 0.97));
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 0.85), 0 20px 44px -14px rgb(0 0 0 / 0.95);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: #fff;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .game-tooltip[data-placed] { visibility: visible; }
+  .game-tooltip[data-pinned] { pointer-events: auto; }
+  .game-tooltip .tooltip-name { font-size: 0.95rem; font-weight: 600; color: var(--quality); }
+  .game-tooltip .tooltip-rule { margin: 0.45rem 0; border-top: 1px solid rgb(176 186 214 / 0.18); }
+  .game-tooltip .tooltip-hint { margin-top: 0.45rem; font-size: 0.7rem; color: #8f9bb8; }
 }
 
 @keyframes refresh-pulse {

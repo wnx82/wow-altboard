@@ -125,6 +125,16 @@ export const itemNames = pgTable(
   (t) => [check("item_names_source_check", sql`${t.source} in ('wago', 'client')`)],
 );
 
+// Nom de fichier de chaque icône du jeu (« inv_scroll_03 »), sous l'identifiant de fichier que
+// l'addon relève (items.icon). Importé de la table ManifestInterfaceData de wago.tools ; le nom
+// donne l'adresse de l'image sur le CDN de Blizzard.
+export const iconFiles = pgTable("icon_files", {
+  fileId: integer("file_id").primaryKey(),
+  name: text("name").notNull(),
+  build: text("build").notNull(),
+  updatedAt: updatedAt(),
+});
+
 // ---------------------------------------------------------------------------
 // Personnages
 // ---------------------------------------------------------------------------

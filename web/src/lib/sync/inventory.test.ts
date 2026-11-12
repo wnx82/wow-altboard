@@ -146,6 +146,13 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
       [["Ordre Fictif", [[1, "Composants", [{ itemKey: "2318", quantity: 25 }]]]]],
     );
     assert.equal(data.items["15210:1017"].name, "Épée large de l'ours");
+    assert.equal(data.items["15210:1017"].icon, null, "aucun nom d'icône importé");
+
+    // L'icône relevée par l'addon (identifiant de fichier) devient son nom, importé de wago.tools.
+    const [sword] = await database.db.select({ icon: t.items.icon }).from(t.items).where(eq(t.items.itemKey, "15210:1017"));
+    assert.equal(typeof sword.icon, "number");
+    await database.db.insert(t.iconFiles).values({ fileId: sword.icon!, name: "inv_sword_04", build: "1.60.1.70888" });
+    assert.equal((await loadInventory(database.db)).items["15210:1017"].icon, "inv_sword_04");
 
     // Royaume sans personnage du compte : la guilde n'est plus montrée, avant même sa suppression.
     await database.db.update(t.guildBanks).set({ realm: "RoyaumeDisparu" });

@@ -161,6 +161,13 @@ nom de l'addon reste prioritaire ; une clé `g:1234:60` prend le nom de `1234`, 
 (`p:…`) ou une clé à suffixe de l'addon (`1234:567`) n'en reçoit pas. Les noms servent au Marché,
 au Craft, au Farm, aux Opportunités, aux faits de l'assistant et aux libellés des objectifs.
 
+Depuis le site 0.19.0, le même contrôle importe ensuite les **noms des icônes** (`icon-files.ts`,
+table `icon_files`) : la table `ManifestInterfaceData` de la même version (8,8 Mo, 30 167 icônes
+pour 1.60.1.70888), dont seuls les fichiers de `Interface\ICONS\` à nom simple sont gardés. L'addon
+relève l'icône d'un objet par son identifiant de fichier ; ce nom donne l'adresse de l'image sur le
+CDN de Blizzard (`render.worldofwarcraft.com`, par l'optimiseur d'images). Les icônes propres à WoW
+Forever y manquent : la page Inventaires affiche alors le point d'interrogation du jeu.
+
 L'agent 0.7.0 complète ces noms avec ceux du cache local du client (`DBCache.bin`), envoyés à la
 synchronisation quand ce cache change (`storeClientNames`). Ce sont les enregistrements que le
 serveur du jeu a transmis au client, correctifs compris : plus récents que la table de wago.tools,

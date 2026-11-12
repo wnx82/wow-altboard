@@ -8,6 +8,8 @@ import {
   groupByItem,
   readInventoryState,
   selectHoldings,
+  slotCount,
+  sortHoldings,
   writeInventoryState,
   type InventoryState,
 } from "./inventory-view";
@@ -68,6 +70,31 @@ describe("page Inventaires : état dans l'adresse", () => {
 
   test("les valeurs illisibles gardent leur valeur par défaut", () => {
     assert.deepEqual(read("compte=abc&perso=-1&lieux=nulle-part&qualite=9&vue=x&tri=y&echus=oui"), DEFAULT_STATE);
+  });
+
+  test("un personnage choisi s'affiche sac par sac, sauf présentation demandée", () => {
+    assert.equal(read("perso=17").view, "characters");
+    assert.equal(read("perso=17&vue=objets").view, "items");
+    assert.equal(writeInventoryState(state({ character: "17", view: "characters" })), "?perso=17");
+    assert.equal(writeInventoryState(state({ character: "17", view: "items" })), "?perso=17&vue=objets");
+    assert.equal(writeInventoryState(state({ view: "characters" })), "?vue=personnages");
+  });
+});
+
+describe("page Inventaires : cases", () => {
+  test("quantité au coin d'une case : entière jusqu'à 9 999, puis en milliers arrondis vers le bas", () => {
+    assert.deepEqual(
+      [1, 20, 9999, 10_000, 12_345, 99_999, 100_000, 245_678].map(slotCount),
+      ["1", "20", "9999", "10k", "12,3k", "99,9k", "100k", "245k"],
+    );
+  });
+
+  test("les cases d'un endroit suivent le tri de la grille", () => {
+    const bags = select({ character: "1", expired: true });
+    const order = (sort: InventoryState["sort"]) => sortHoldings(bags, DATA.items, sort).map((holding) => `${holding.itemKey}×${holding.quantity}`);
+    assert.deepEqual(order("total"), ["2589×20", "2589×5", "15210:1017×1"]);
+    assert.deepEqual(order("name"), ["15210:1017×1", "2589×20", "2589×5"]);
+    assert.deepEqual(order("quality"), ["15210:1017×1", "2589×20", "2589×5"]);
   });
 });
 

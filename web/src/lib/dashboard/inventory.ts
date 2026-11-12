@@ -1,6 +1,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { loadIconNames } from "@/lib/wow/icon-files";
 import { accountLabel } from "./queries";
 
 // Page Inventaires : le contenu des sacs, de la banque (AltBoard), du courrier, des enchères en
@@ -33,7 +34,8 @@ export type InventoryGuild = {
   tabs: { index: number; name: string | null; items: { itemKey: string; quantity: number }[] }[];
 };
 
-export type InventoryItemInfo = { name: string | null; quality: number | null; icon: number | null };
+/** icon : nom de fichier de l'icône (« inv_scroll_03 »), null quand il est inconnu. */
+export type InventoryItemInfo = { name: string | null; quality: number | null; icon: string | null };
 
 export type InventoryData = {
   characters: InventoryCharacter[];
@@ -147,7 +149,8 @@ export async function loadInventory(db: Database): Promise<InventoryData> {
     keys.length === 0
       ? []
       : await db.select({ itemKey: t.items.itemKey, name: t.items.name, quality: t.items.quality, icon: t.items.icon }).from(t.items).where(inArray(t.items.itemKey, keys));
-  const items = Object.fromEntries(itemRows.map(({ itemKey, ...info }) => [itemKey, info]));
+  const icons = await loadIconNames(db, itemRows.flatMap((row) => (row.icon === null ? [] : [row.icon])));
+  const items = Object.fromEntries(itemRows.map(({ itemKey, icon, ...info }) => [itemKey, { ...info, icon: icon === null ? null : (icons.get(icon) ?? null) }]));
 
   return { characters, entries, guilds, items };
 }
