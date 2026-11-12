@@ -220,3 +220,65 @@ describe("page Inventaires : filtres et regroupements", () => {
     );
   });
 });
+
+// Une épée à une main (au courrier, échue), un gilet de cuir chez Zoé, des jambières de plaques
+// réservées aux guerriers chez Élodie.
+const GEAR: InventoryData = {
+  ...DATA,
+  entries: [
+    ...DATA.entries,
+    { characterId: 2, location: "bags", itemKey: "2316", quantity: 1, expiresAt: null },
+    { characterId: 1, location: "bank", itemKey: "16866", quantity: 1, expiresAt: null },
+  ],
+  items: {
+    ...DATA.items,
+    "15210:1017": { ...DATA.items["15210:1017"], gear: { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null } },
+    "2316": { name: "Gilet en cuir", quality: 1, icon: null, gear: { itemClass: 4, subclass: 2, inventoryType: 5, itemLevel: 16, requiredLevel: 11, allowableClass: null } },
+    "16866": { name: "Jambières de puissance", quality: 4, icon: null, gear: { itemClass: 4, subclass: 4, inventoryType: 7, itemLevel: 66, requiredLevel: 60, allowableClass: 1 } },
+  },
+};
+const gear = (patch: Partial<InventoryState>) => [...new Set(selectHoldings(GEAR, state({ expired: true, ...patch }), NOW).map((holding) => holding.itemKey))].sort();
+
+describe("page Inventaires : filtres d'équipement", () => {
+  test("type d'armure ou d'arme et emplacement ; le reste des objets disparaît", () => {
+    assert.deepEqual(gear({ gearType: "cuir" }), ["2316"]);
+    assert.deepEqual(gear({ gearType: "armure" }), ["16866", "2316"]);
+    assert.deepEqual(gear({ gearType: "arme" }), ["15210:1017"]);
+    assert.deepEqual(gear({ gearType: "epee-2m" }), []);
+    assert.deepEqual(gear({ gearSlot: "jambes" }), ["16866"]);
+    assert.deepEqual(gear({}), ["15210:1017", "16866", "20576", "2316", "2589"]);
+  });
+
+  test("tranche de niveau requis, bornes comprises", () => {
+    assert.deepEqual(gear({ minLevel: "10", maxLevel: "20" }), ["15210:1017", "2316"]);
+    assert.deepEqual(gear({ minLevel: "60" }), ["16866"]);
+    assert.deepEqual(gear({ maxLevel: "10" }), []);
+  });
+
+  test("pour une classe : ce qu'elle peut porter ; pour un personnage : à son niveau", () => {
+    assert.deepEqual(gear({ wearer: "ROGUE" }), ["15210:1017", "2316"]);
+    assert.deepEqual(gear({ wearer: "MAGE" }), ["15210:1017"]);
+    assert.deepEqual(gear({ wearer: "WARRIOR" }), ["15210:1017", "16866", "2316"]);
+    // Zoé, voleuse de niveau 12 ; Élodie, mage de niveau 60.
+    assert.deepEqual(gear({ wearer: "2" }), ["15210:1017", "2316"]);
+    assert.deepEqual(gear({ wearer: "1" }), ["15210:1017"]);
+    assert.deepEqual(gear({ wearer: "99" }), [], "personnage inconnu");
+  });
+
+  test("tri par niveau requis, du plus haut au plus bas, l'équipement d'abord", () => {
+    const rows = groupByItem(selectHoldings(GEAR, state({ expired: true }), NOW), GEAR.items, "level");
+    assert.deepEqual(
+      rows.map((row) => row.itemKey),
+      ["16866", "15210:1017", "2316", "2589", "20576"],
+    );
+  });
+
+  test("dans l'adresse, en français ; les valeurs illisibles sont ignorées", () => {
+    const full = state({ gearType: "cuir", gearSlot: "torse", minLevel: "10", maxLevel: "20", wearer: "HUNTER", sort: "level" });
+    const search = writeInventoryState(full);
+    assert.equal(search, "?type=cuir&emplacement=torse&nmin=10&nmax=20&pour=chasseur&tri=niveau");
+    assert.deepEqual(read(search), full);
+    assert.equal(read("?pour=12").wearer, "12");
+    assert.deepEqual(read("?type=sabre&emplacement=nez&nmin=0&nmax=abc&pour=paysan"), DEFAULT_STATE);
+  });
+});

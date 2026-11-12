@@ -121,9 +121,9 @@ export async function wagoGet(fetchImpl: Fetch, url: string, timeoutMs = TIMEOUT
   }
 }
 
-/** Version la plus récente du client publiée par wago.tools. */
-export async function latestBuild(fetchImpl: Fetch = fetch): Promise<Parsed<string>> {
-  const result = await wagoGet(fetchImpl, BUILD_URL);
+/** Version la plus récente du client publiée par wago.tools (WoW Forever, sauf autre adresse). */
+export async function latestBuild(fetchImpl: Fetch = fetch, url = BUILD_URL): Promise<Parsed<string>> {
+  const result = await wagoGet(fetchImpl, url);
   if (!result.ok) return result;
   const body = (await readLimited(result.response, 64 * 1024).catch(() => null)) ?? "";
   let version: unknown;

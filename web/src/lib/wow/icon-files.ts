@@ -83,7 +83,7 @@ export async function itemIconsSummary(db: Database): Promise<{ count: number; b
 }
 
 /** Télécharge et lit un fichier de wago.tools ; un message d'erreur en cas d'échec. */
-async function download<T>(fetchImpl: Fetch, url: string, max: number, parse: (text: string) => Parsed<T>): Promise<Parsed<T>> {
+export async function downloadWago<T>(fetchImpl: Fetch, url: string, max: number, parse: (text: string) => Parsed<T>): Promise<Parsed<T>> {
   const response = await wagoGet(fetchImpl, url, DOWNLOAD_TIMEOUT_MS);
   if (!response.ok) return response;
   let text: string | null;
@@ -113,9 +113,9 @@ export async function importIconFiles(db: Database, options: { now: Date; fetch?
     }
   }
 
-  const manifest = await download(fetchImpl, iconManifestUrl(build.value), MAX_MANIFEST_BYTES, parseIconManifest);
+  const manifest = await downloadWago(fetchImpl, iconManifestUrl(build.value), MAX_MANIFEST_BYTES, parseIconManifest);
   if (!manifest.ok) return manifest;
-  const itemTable = await download(fetchImpl, itemTableUrl(build.value), MAX_ITEM_TABLE_BYTES, parseItemTable);
+  const itemTable = await downloadWago(fetchImpl, itemTableUrl(build.value), MAX_ITEM_TABLE_BYTES, parseItemTable);
   if (!itemTable.ok) return itemTable;
 
   const removed = await db.transaction(async (tx) => {
@@ -147,7 +147,7 @@ export async function loadIconNames(db: Database, fileIds: Iterable<number>): Pr
 }
 
 /** Liste d'entiers passée en un seul paramètre, quel que soit son nombre, convertie par PostgreSQL. */
-const intArray = (ids: readonly number[]) => sql`string_to_array(${ids.join(",")}, ',')::int[]`;
+export const intArray = (ids: readonly number[]) => sql`string_to_array(${ids.join(",")}, ',')::int[]`;
 
 /**
  * Objet de la table Item désigné par une clé : « 1234 », « 1234:567 » (suffixe de l'addon, même

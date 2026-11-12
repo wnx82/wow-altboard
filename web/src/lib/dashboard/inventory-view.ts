@@ -1,4 +1,5 @@
 import { formatRelative } from "@/lib/wow/format";
+import { canUse, CLASSIC_CLASSES, type GearSpec, isGearSlot, isGearType, matchesGearSlot, matchesGearType } from "@/lib/wow/gear";
 import type { InventoryData, InventoryItemInfo, InventoryLocation } from "./inventory";
 
 // Page Inventaires : filtres, regroupement par objet ou par personnage, et état porté par l'adresse
@@ -53,7 +54,7 @@ export type InventoryView = (typeof VIEWS)[number];
 /** Un personnage choisi s'affiche sac par sac, comme en jeu ; sinon les objets de tous sont regroupés. */
 export const defaultView = (character: string): InventoryView => (character === "" ? "items" : "characters");
 
-export const SORTS = ["total", "value", "name", "quality"] as const;
+export const SORTS = ["total", "value", "name", "quality", "level"] as const;
 export type InventorySort = (typeof SORTS)[number];
 
 export type InventoryState = {
@@ -69,6 +70,15 @@ export type InventoryState = {
   expired: boolean;
   /** Seulement les courriers et ventes dont l'échéance est proche (SOON_DAYS). */
   soon: boolean;
+  /** Équipement : type d'armure ou d'arme (valeur de gear.ts), ou vide. */
+  gearType: string;
+  /** Équipement : emplacement (valeur de gear.ts), ou vide. */
+  gearSlot: string;
+  /** Niveau requis minimal et maximal (« 20 », « 30 »), ou vide. */
+  minLevel: string;
+  maxLevel: string;
+  /** Équipement portable par une classe (« MAGE ») ou par un personnage (son identifiant), ou vide. */
+  wearer: string;
   view: InventoryView;
   sort: InventorySort;
 };
@@ -81,6 +91,11 @@ export const DEFAULT_STATE: InventoryState = {
   minQuality: "",
   expired: false,
   soon: false,
+  gearType: "",
+  gearSlot: "",
+  minLevel: "",
+  maxLevel: "",
+  wearer: "",
   view: "items",
   sort: "total",
 };
@@ -94,15 +109,39 @@ const PARAMS = {
   minQuality: "qualite",
   expired: "echus",
   soon: "bientot",
+  gearType: "type",
+  gearSlot: "emplacement",
+  minLevel: "nmin",
+  maxLevel: "nmax",
+  wearer: "pour",
   view: "vue",
   sort: "tri",
 } as const;
 const OWNED = Object.values(PARAMS);
 const VIEW_VALUES: Record<InventoryView, string> = { items: "objets", characters: "personnages" };
-const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", value: "valeur", name: "nom", quality: "qualite" };
+const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", value: "valeur", name: "nom", quality: "qualite", level: "niveau" };
 const PLACE_VALUES: Record<InventoryPlace, string> = { bags: "sacs", bank: "banque", mail: "courrier", auctions: "encheres", guild: "guilde" };
 
 const isId = (value: string | null): value is string => value !== null && /^\d{1,9}$/.test(value);
+const isLevel = (value: string | null): value is string => value !== null && /^\d{1,3}$/.test(value) && Number(value) >= 1;
+
+/** Classes dans l'adresse, en français : « pour=chasseur ». */
+export const CLASS_SLUGS: Readonly<Record<string, string>> = {
+  WARRIOR: "guerrier",
+  PALADIN: "paladin",
+  HUNTER: "chasseur",
+  ROGUE: "voleur",
+  PRIEST: "pretre",
+  SHAMAN: "chaman",
+  MAGE: "mage",
+  WARLOCK: "demoniste",
+  DRUID: "druide",
+};
+
+function readWearer(value: string | null): string {
+  if (isId(value)) return value;
+  return CLASSIC_CLASSES.find((token) => CLASS_SLUGS[token] === value) ?? "";
+}
 
 /** État lu dans les paramètres de l'adresse ; une valeur illisible garde sa valeur par défaut. */
 export function readInventoryState(params: { get(name: string): string | null }): InventoryState {
@@ -110,6 +149,10 @@ export function readInventoryState(params: { get(name: string): string | null })
   const character = params.get(PARAMS.character);
   const quality = params.get(PARAMS.minQuality);
   const placesValue = params.get(PARAMS.places);
+  const gearType = params.get(PARAMS.gearType);
+  const gearSlot = params.get(PARAMS.gearSlot);
+  const minLevel = params.get(PARAMS.minLevel);
+  const maxLevel = params.get(PARAMS.maxLevel);
   const places = placesValue === null ? [...PLACES] : PLACES.filter((place) => placesValue.split(",").includes(PLACE_VALUES[place]));
   return {
     query: (params.get(PARAMS.query) ?? "").slice(0, MAX_TEXT),
@@ -119,6 +162,11 @@ export function readInventoryState(params: { get(name: string): string | null })
     minQuality: quality !== null && /^[0-7]$/.test(quality) ? quality : "",
     expired: params.get(PARAMS.expired) === "1",
     soon: params.get(PARAMS.soon) === "1",
+    gearType: gearType !== null && isGearType(gearType) ? gearType : "",
+    gearSlot: gearSlot !== null && isGearSlot(gearSlot) ? gearSlot : "",
+    minLevel: isLevel(minLevel) ? String(Number(minLevel)) : "",
+    maxLevel: isLevel(maxLevel) ? String(Number(maxLevel)) : "",
+    wearer: readWearer(params.get(PARAMS.wearer)),
     view: VIEWS.find((view) => VIEW_VALUES[view] === params.get(PARAMS.view)) ?? defaultView(isId(character) ? character : ""),
     sort: SORTS.find((sort) => SORT_VALUES[sort] === params.get(PARAMS.sort)) ?? DEFAULT_STATE.sort,
   };
@@ -138,6 +186,11 @@ export function writeInventoryState(state: InventoryState, current = ""): string
   if (state.minQuality !== "") params.set(PARAMS.minQuality, state.minQuality);
   if (state.expired) params.set(PARAMS.expired, "1");
   if (state.soon) params.set(PARAMS.soon, "1");
+  if (state.gearType !== "") params.set(PARAMS.gearType, state.gearType);
+  if (state.gearSlot !== "") params.set(PARAMS.gearSlot, state.gearSlot);
+  if (state.minLevel !== "") params.set(PARAMS.minLevel, state.minLevel);
+  if (state.maxLevel !== "") params.set(PARAMS.maxLevel, state.maxLevel);
+  if (state.wearer !== "") params.set(PARAMS.wearer, CLASS_SLUGS[state.wearer] ?? state.wearer);
   if (state.view !== defaultView(state.character)) params.set(PARAMS.view, VIEW_VALUES[state.view]);
   if (state.sort !== DEFAULT_STATE.sort) params.set(PARAMS.sort, SORT_VALUES[state.sort]);
 
@@ -173,6 +226,32 @@ function matchesQuery(itemKey: string, info: InventoryItemInfo | undefined, need
   return fold(info?.name ?? "").includes(needle);
 }
 
+/** Un filtre d'équipement est actif : seules les armures et les armes connues restent. */
+export const gearFiltered = (state: InventoryState) =>
+  state.gearType !== "" || state.gearSlot !== "" || state.minLevel !== "" || state.maxLevel !== "" || state.wearer !== "";
+
+/**
+ * L'équipement passe-t-il les filtres de type, d'emplacement, de niveau requis et de porteur ? Un
+ * niveau requis inconnu ne passe pas un filtre de niveau ; un objet sans niveau requis compte
+ * pour le niveau 1. Un personnage peut porter ce que sa classe sait porter à son niveau.
+ */
+export function gearMatches(spec: GearSpec | undefined, state: InventoryState, characters: InventoryData["characters"]): boolean {
+  if (!gearFiltered(state)) return true;
+  if (!spec) return false;
+  if (state.gearType !== "" && !matchesGearType(spec, state.gearType)) return false;
+  if (state.gearSlot !== "" && !matchesGearSlot(spec, state.gearSlot)) return false;
+  if (state.minLevel !== "" || state.maxLevel !== "") {
+    if (spec.requiredLevel === null) return false;
+    const level = Math.max(spec.requiredLevel, 1);
+    if (state.minLevel !== "" && level < Number(state.minLevel)) return false;
+    if (state.maxLevel !== "" && level > Number(state.maxLevel)) return false;
+  }
+  if (state.wearer === "") return true;
+  if (!isId(state.wearer)) return canUse(spec, state.wearer);
+  const wearer = characters.find((character) => String(character.id) === state.wearer);
+  return wearer?.class != null && canUse(spec, wearer.class, wearer.level ?? 1);
+}
+
 /** Toutes les lignes qui passent les filtres. */
 export function selectHoldings(data: InventoryData, state: InventoryState, now: Date): Holding[] {
   const needle = fold(state.query.trim());
@@ -180,6 +259,13 @@ export function selectHoldings(data: InventoryData, state: InventoryState, now: 
   const accountId = state.account === "" ? null : Number(state.account);
   const characterId = state.character === "" ? null : Number(state.character);
   const accountOf = new Map(data.characters.map((character) => [character.id, character.account.id]));
+  // Calculé une fois par objet : un même objet revient chez plusieurs détenteurs.
+  const gear = new Map<string, boolean>();
+  const gearOk = (itemKey: string) => {
+    let ok = gear.get(itemKey);
+    if (ok === undefined) gear.set(itemKey, (ok = gearMatches(data.items[itemKey]?.gear, state, data.characters)));
+    return ok;
+  };
 
   const keep = (holding: Holding) => {
     if (!state.places.includes(holdingPlace(holding))) return false;
@@ -187,6 +273,7 @@ export function selectHoldings(data: InventoryData, state: InventoryState, now: 
     if (state.soon && (holding.kind !== "character" || !isSoon(holding.expiresAt, now))) return false;
     const info = data.items[holding.itemKey];
     if (minQuality !== null && (info?.quality ?? -1) < minQuality) return false;
+    if (!gearOk(holding.itemKey)) return false;
     return matchesQuery(holding.itemKey, info, needle);
   };
 
@@ -258,6 +345,8 @@ export function rowFlag(holdings: readonly Holding[], now: Date): ExpiryFlag | n
 }
 
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
+/** Niveau requis pour le tri : 0 sans exigence, −1 pour un objet qui n'est pas de l'équipement. */
+const requiredLevel = (info: InventoryItemInfo | undefined) => (info?.gear ? (info.gear.requiredLevel ?? 0) : -1);
 
 /** Un objet par ligne, quantités additionnées sur tous les détenteurs, du plus gros détenteur au plus petit. */
 export function groupByItem(holdings: Holding[], items: InventoryData["items"], sort: InventorySort, prices: Prices = {}): ItemRow[] {
@@ -285,6 +374,8 @@ export function groupByItem(holdings: Holding[], items: InventoryData["items"], 
     value: (a, b) => (b.value ?? -1) - (a.value ?? -1) || byName(a, b),
     name: byName,
     quality: (a, b) => (b.quality ?? -1) - (a.quality ?? -1) || byName(a, b),
+    // Niveau requis, du plus haut au plus bas ; les objets qui ne sont pas de l'équipement ensuite.
+    level: (a, b) => requiredLevel(items[b.itemKey]) - requiredLevel(items[a.itemKey]) || byName(a, b),
   };
   return [...rows.values()].sort(compare[sort]);
 }
@@ -299,6 +390,7 @@ export function sortHoldings(holdings: readonly Holding[], items: InventoryData[
     value: (a, b) => value(b) - value(a) || byName(a, b),
     name: byName,
     quality: (a, b) => (items[b.itemKey]?.quality ?? -1) - (items[a.itemKey]?.quality ?? -1) || byName(a, b),
+    level: (a, b) => requiredLevel(items[b.itemKey]) - requiredLevel(items[a.itemKey]) || byName(a, b),
   };
   return [...holdings].sort(compare[sort]);
 }

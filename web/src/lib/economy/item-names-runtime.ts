@@ -1,11 +1,13 @@
 import type { Database } from "@/db/client";
 import { importIconFiles, type IconImportResult } from "@/lib/wow/icon-files";
+import { importItemSpecs, type SpecsImportResult } from "@/lib/wow/item-specs";
 import { importItemNames, type ImportResult } from "./item-names";
 
 // Noms des objets tenus à jour sans intervention : la table du jeu est importée de wago.tools peu
 // après le démarrage du serveur, puis une fois par jour, et seulement quand une nouvelle version du
 // client est publiée. Le bouton de la page Paramètres reste disponible pour forcer un import.
-// Les noms des icônes suivent, de la même version et au même rythme.
+// Les noms des icônes, puis les caractéristiques des armures et des armes suivent, de la même
+// version et au même rythme.
 
 /** Premier contrôle une minute après le démarrage : le serveur répond d'abord aux pages. */
 export const FIRST_CHECK_MS = 60_000;
@@ -13,7 +15,12 @@ export const CHECK_INTERVAL_MS = 24 * 60 * 60_000;
 
 export type ImportTrigger = "start" | "daily" | "manual";
 
-type Holder = { running: Promise<ImportResult> | null; icons: Promise<IconImportResult> | null; timer: ReturnType<typeof setTimeout> | null };
+type Holder = {
+  running: Promise<ImportResult> | null;
+  icons: Promise<IconImportResult> | null;
+  specs?: Promise<SpecsImportResult> | null;
+  timer: ReturnType<typeof setTimeout> | null;
+};
 type GlobalWithItemNames = typeof globalThis & { __wowAltboardItemNames?: Holder };
 
 // Sur globalThis : instrumentation.ts et les actions sont compilées séparément, elles ne partagent
@@ -81,6 +88,33 @@ export function runIconFilesImport(db: Database, options: { trigger: ImportTrigg
   return held.icons;
 }
 
+/** Import des armures et des armes, un seul à la fois ; le résultat est consigné dans le journal du serveur. */
+export function runItemSpecsImport(db: Database, options: { trigger: ImportTrigger; onlyIfNewer: boolean; fetch?: typeof globalThis.fetch }): Promise<SpecsImportResult> {
+  const held = holder();
+  if (held.specs) return held.specs;
+  const started = Date.now();
+  held.specs = importItemSpecs(db, { now: new Date(), fetch: options.fetch, onlyIfNewer: options.onlyIfNewer })
+    .catch((): SpecsImportResult => ({ ok: false, error: "Import interrompu : la base de données a refusé l'écriture." }))
+    .then((result) => {
+      console.log(
+        JSON.stringify({
+          event: "item_specs.import",
+          trigger: options.trigger,
+          ok: result.ok,
+          ms: Date.now() - started,
+          ...(result.ok
+            ? { build: result.build, count: result.count, fromForever: result.fromForever, fromEra: result.fromEra, removed: result.removed, unchanged: result.unchanged === true }
+            : { error: result.error }),
+        }),
+      );
+      return result;
+    })
+    .finally(() => {
+      held.specs = null;
+    });
+  return held.specs;
+}
+
 /** Contrôle au démarrage puis quotidien ; un second appel ne programme rien de plus. */
 export function startItemNamesRuntime(database: () => Database): void {
   const held = holder();
@@ -90,6 +124,8 @@ export function startItemNamesRuntime(database: () => Database): void {
       void runItemNamesImport(database(), { trigger, onlyIfNewer: true })
         .catch(() => undefined)
         .then(() => runIconFilesImport(database(), { trigger, onlyIfNewer: true }))
+        .catch(() => undefined)
+        .then(() => runItemSpecsImport(database(), { trigger, onlyIfNewer: true }))
         .catch(() => undefined);
       schedule(CHECK_INTERVAL_MS, "daily");
     }, delay);

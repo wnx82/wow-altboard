@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from "react-dom";
 import { slotCount, type ExpiryFlag } from "@/lib/dashboard/inventory-view";
 import { formatInteger } from "@/lib/wow/format";
+import { allowedClassesLabel, type GearSpec, gearSlotLabel, gearTypeLabel } from "@/lib/wow/gear";
 import { itemIconUrl } from "@/lib/wow/icons";
 import { Money } from "./ui";
 
@@ -13,7 +14,7 @@ import { Money } from "./ui";
 // les attributs style.
 
 /** Ce qu'une case affiche d'un objet ; icon : nom de fichier de l'icône, null quand il est inconnu. */
-export type SlotItem = { name: string | null; quality: number | null; icon: string | null };
+export type SlotItem = { name: string | null; quality: number | null; icon: string | null; gear?: GearSpec };
 
 export const TOOLTIP_ID = "item-tooltip";
 
@@ -269,6 +270,27 @@ export function GameTooltip({
       {!tip.pinned && <p className="tooltip-hint">Clic : garder la bulle ouverte</p>}
     </div>,
     document.body,
+  );
+}
+
+/** Lignes d'équipement d'une bulle, comme en jeu : emplacement et type, niveaux, classes autorisées. */
+export function TooltipGear({ gear }: { gear: GearSpec | undefined }) {
+  if (!gear) return null;
+  const slot = gearSlotLabel(gear);
+  const type = gearTypeLabel(gear);
+  const classes = allowedClassesLabel(gear);
+  return (
+    <div className="mt-1 space-y-0.5">
+      {(slot || type) && (
+        <p className="flex items-baseline justify-between gap-6">
+          <span>{slot}</span>
+          <span>{type}</span>
+        </p>
+      )}
+      {classes && <p>Classes : {classes}</p>}
+      {gear.requiredLevel !== null && gear.requiredLevel > 1 && <p>Niveau {gear.requiredLevel} requis</p>}
+      {gear.itemLevel !== null && <p className="text-[0.72rem] text-[#8f9bb8]">Niveau d&apos;objet {gear.itemLevel}</p>}
+    </div>
   );
 }
 

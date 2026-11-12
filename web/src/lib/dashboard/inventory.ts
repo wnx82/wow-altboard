@@ -3,6 +3,8 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
+import type { GearSpec } from "@/lib/wow/gear";
+import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { accountLabel } from "./queries";
 
 // Page Inventaires : le contenu des sacs, de la banque (AltBoard), du courrier, des enchères en
@@ -35,8 +37,11 @@ export type InventoryGuild = {
   tabs: { index: number; name: string | null; items: { itemKey: string; quantity: number }[] }[];
 };
 
-/** icon : nom de fichier de l'icône (« inv_scroll_03 »), null quand il est inconnu. */
-export type InventoryItemInfo = { name: string | null; quality: number | null; icon: string | null };
+/**
+ * icon : nom de fichier de l'icône (« inv_scroll_03 »), null quand il est inconnu. gear : type,
+ * emplacement et niveaux d'une armure ou d'une arme ; absent pour les autres objets.
+ */
+export type InventoryItemInfo = { name: string | null; quality: number | null; icon: string | null; gear?: GearSpec };
 
 export type InventoryData = {
   characters: InventoryCharacter[];
@@ -150,15 +155,16 @@ export async function loadInventory(db: Database, now: Date = new Date()): Promi
     });
 
   const keys = [...new Set([...entries.map((entry) => entry.itemKey), ...guilds.flatMap((guild) => guild.tabs.flatMap((tab) => tab.items.map((item) => item.itemKey)))])];
-  const [names, prices] = await Promise.all([loadItemNames(db, keys), loadMarketValues(db, keys, now)]);
+  const [names, prices, specs] = await Promise.all([loadItemNames(db, keys), loadMarketValues(db, keys, now), loadItemSpecs(db, keys)]);
   const items: Record<string, InventoryItemInfo> = {};
   for (const key of keys) {
     // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
     const own = names.get(key);
     const id = catalogId(key);
     const base = id === null ? undefined : names.get(String(id));
-    const info = { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null };
-    if (info.name !== null || info.quality !== null || info.icon !== null) items[key] = info;
+    const gear = specs.get(key);
+    const info: InventoryItemInfo = { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null, ...(gear ? { gear } : {}) };
+    if (info.name !== null || info.quality !== null || info.icon !== null || gear) items[key] = info;
   }
 
   return { characters, entries, guilds, items, prices: Object.fromEntries(prices.values), market: prices.market };

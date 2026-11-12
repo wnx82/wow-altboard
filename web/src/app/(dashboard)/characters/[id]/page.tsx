@@ -18,6 +18,7 @@ import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboa
 import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
+import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
 import {
   classKey,
@@ -77,11 +78,12 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
   const now = new Date();
   const heldKeys = [...character.bags, ...character.bank, ...character.mail, ...character.auctions].map((item) => item.itemKey);
   const equipmentKeys = character.equipment.flatMap((item) => (item.itemId === null ? [] : [String(item.itemId)]));
-  const [goals, templates, itemNames, values] = await Promise.all([
+  const [goals, templates, itemNames, values, specs] = await Promise.all([
     listCharacterGoals(db, character.id),
     listTemplates(db),
     loadItemNames(db, [...heldKeys, ...equipmentKeys]),
     loadMarketValues(db, heldKeys, now),
+    loadItemSpecs(db, heldKeys),
   ]);
   // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
   const slotItems = Object.fromEntries(
@@ -89,7 +91,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       const own = itemNames.get(key);
       const id = catalogId(key);
       const base = id === null ? undefined : itemNames.get(String(id));
-      return [key, { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null }];
+      const gear = specs.get(key);
+      return [key, { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null, ...(gear ? { gear } : {}) }];
     }),
   );
   const inventoryPlaces: CharacterInventoryPlace[] = [

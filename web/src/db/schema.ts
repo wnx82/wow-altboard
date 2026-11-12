@@ -145,6 +145,29 @@ export const itemIcons = pgTable("item_icons", {
   updatedAt: updatedAt(),
 });
 
+// Armures et armes du jeu : type (table Item de WoW Forever), niveaux et classes autorisées (table
+// ItemSparse de WoW Forever, sinon de WoW Classic Era). build : « <WoW Forever>/<Classic Era> ».
+export const itemSpecs = pgTable(
+  "item_specs",
+  {
+    itemId: integer("item_id").primaryKey(),
+    itemClass: smallint("item_class").notNull(),
+    subclass: smallint("subclass").notNull(),
+    inventoryType: smallint("inventory_type").notNull(),
+    itemLevel: smallint("item_level"),
+    requiredLevel: smallint("required_level"),
+    allowableClass: integer("allowable_class"),
+    /** Table d'où viennent les niveaux : `wowf` (WoW Forever) ou `era` (Classic Era). */
+    levelSource: text("level_source"),
+    build: text("build").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("item_specs_class_check", sql`${t.itemClass} in (2, 4)`),
+    check("item_specs_level_source_check", sql`${t.levelSource} in ('wowf', 'era')`),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Personnages
 // ---------------------------------------------------------------------------

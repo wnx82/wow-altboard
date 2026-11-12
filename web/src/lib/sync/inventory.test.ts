@@ -156,6 +156,13 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
     await database.db.insert(t.iconFiles).values({ fileId: sword.icon!, name: "inv_sword_04", build: "1.60.1.70888" });
     assert.equal((await loadInventory(database.db)).items["15210:1017"].icon, "inv_sword_04");
 
+    // Caractéristiques d'équipement de l'objet de base, pour toutes ses variantes ; rien pour le reste.
+    assert.equal(data.items["15210:1017"].gear, undefined);
+    await database.db.insert(t.itemSpecs).values({ itemId: 15210, itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, levelSource: "era", build: "b" });
+    const withGear = await loadInventory(database.db);
+    assert.deepEqual(withGear.items["15210:1017"].gear, { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null });
+    assert.equal(Object.values(withGear.items).filter((info) => info.gear).length, 1);
+
     // Royaume sans personnage du compte : la guilde n'est plus montrée, avant même sa suppression.
     await database.db.update(t.guildBanks).set({ realm: "RoyaumeDisparu" });
     assert.deepEqual((await loadInventory(database.db)).guilds, []);

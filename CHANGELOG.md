@@ -4,6 +4,29 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.21.0 — 2026-11-13
+
+### Ajouté
+
+- **Filtres d'équipement sur la page Inventaires** (ligne « Équipement » des filtres) :
+  - **type** d'armure (tissu, cuir, mailles, plaques, boucliers, bijoux et divers, reliques) ou
+    d'arme (épées, haches et masses à une ou deux mains, dagues, armes de pugilat et d'hast, bâtons,
+    arcs, armes à feu, arbalètes, baguettes, armes de jet, cannes à pêche) ;
+  - **emplacement** (tête, torse, mains, doigt…) ;
+  - **tranche de niveau requis** (de … à …) ;
+  - **pour** une classe (tout ce qu'elle peut apprendre à porter) ou pour un personnage (ce qu'il
+    peut porter à son niveau, mailles et plaques au niveau 40 comprises) ;
+  - nouveau tri « Niveau requis ». Tous ces filtres se gardent dans l'adresse
+    (`?type=cuir&nmin=20&nmax=30&pour=chasseur`).
+- **Bulle d'objet** : emplacement et type, classes autorisées, niveau requis et niveau d'objet,
+  comme en jeu, sur la page Inventaires et dans l'inventaire de la fiche d'un personnage.
+- Le contrôle quotidien de wago.tools importe les caractéristiques des armures et des armes : type
+  et emplacement de WoW Forever, niveaux et classes de WoW Forever ou, à défaut, de WoW Classic Era
+  (sans Classic Era joignable au premier import, WoW Forever seul, complété ensuite).
+  Les objets propres à WoW Forever dont aucun niveau n'est publié sont signalés sous la grille
+  quand un filtre de niveau est actif.
+- Migration `0016_item_specs` : table `item_specs` (ajout seul).
+
 ## Site 0.20.0 — 2026-11-12
 
 ### Ajouté

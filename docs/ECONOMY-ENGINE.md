@@ -184,6 +184,24 @@ tables sont remplacées dans la même transaction ; un échec du téléchargemen
 icônes déjà importées intactes. Les icônes accompagnent le nom des objets sur les pages de
 l'économie, la page Inventaires, la fiche d'un personnage et la recherche globale.
 
+Depuis le site 0.21.0, le contrôle importe ensuite les **caractéristiques des armures et des
+armes** (`item-specs.ts`, table `item_specs`), pour les filtres d'équipement de la page
+Inventaires. Le type et l'emplacement viennent de la table `Item` de WoW Forever (19 079
+équipements en 1.60.1). Sa table `ItemSparse` ne décrit qu'une partie des objets, le serveur
+envoyant les autres au client : niveau d'objet, niveau requis et classes autorisées viennent
+d'elle quand elle les a (7 848), sinon de la table `ItemSparse` de WoW Classic Era (9 219), dont
+le niveau requis est le même pour 99 % des 5 720 objets que les deux tables partagent. Les
+objets propres à WoW Forever absents des deux (un sur huit des équipements détenus le
+2026-11-13) gardent leur type mais n'ont pas de niveau : un filtre de niveau les écarte. Un
+import a lieu quand l'une des deux versions change.
+
+Les filtres « Pour » suivent les règles de port de WoW Classic (`gear.ts`) : armes que chaque
+classe peut apprendre, cuir sans mage, prêtre ni démoniste, mailles pour le chasseur et le
+chaman et plaques pour le guerrier et le paladin à partir du niveau 40, boucliers pour le
+guerrier, le paladin et le chaman, reliques pour leur classe, puis les classes autorisées par
+l'objet. Pour une classe, tout ce qu'elle pourra porter ; pour un personnage, ce qu'il peut
+porter à son niveau (niveau requis et niveau 40 compris).
+
 L'agent 0.7.0 complète ces noms avec ceux du cache local du client (`DBCache.bin`), envoyés à la
 synchronisation quand ce cache change (`storeClientNames`). Ce sont les enregistrements que le
 serveur du jeu a transmis au client, correctifs compris : plus récents que la table de wago.tools,

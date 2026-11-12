@@ -8,6 +8,7 @@ import {
   DEFAULT_STATE,
   defaultView,
   expiryFlag,
+  gearFiltered,
   groupByCharacter,
   groupByGuild,
   groupByItem,
@@ -29,8 +30,9 @@ import {
   writeInventoryState,
 } from "@/lib/dashboard/inventory-view";
 import { itemHref } from "@/lib/economy/view";
-import { classKey, formatDateTime, formatInteger, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
-import { GameTooltip, ItemSlot, itemName, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
+import { classKey, classLabel, formatDateTime, formatInteger, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
+import { ARMOR_TYPES, CLASSIC_CLASSES, GEAR_SLOTS, WEAPON_TYPES } from "@/lib/wow/gear";
+import { GameTooltip, ItemSlot, itemName, TooltipGear, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
 import { ClassAvatar, EmptyState, Money } from "./ui";
 
 /** Cases affichées d'un coup dans la grille des objets ; le bouton du bas en ajoute autant. */
@@ -38,7 +40,13 @@ const PAGE_SIZE = 160;
 /** Détenteurs listés dans la bulle d'un objet ; les suivants sont comptés. */
 const TOOLTIP_HOLDERS = 12;
 
-const SORT_LABELS: Record<InventorySort, string> = { total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité" };
+const SORT_LABELS: Record<InventorySort, string> = { total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité", level: "Niveau requis" };
+
+/** Niveau saisi : chiffres seulement, vide pour zéro. */
+function levelInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 3);
+  return digits === "" || Number(digits) === 0 ? "" : String(Number(digits));
+}
 
 const plural = (count: number, word: string) => `${formatInteger(count)} ${word}${count > 1 ? "s" : ""}`;
 
@@ -106,6 +114,13 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
     [data.entries, now],
   );
 
+  // Filtres d'équipement proposés dès qu'une armure ou une arme est connue.
+  const hasGear = useMemo(() => Object.values(data.items).some((info) => info.gear !== undefined), [data.items]);
+  // Équipements propres à WoW Forever dont aucune table publiée ne donne le niveau requis.
+  const unknownLevels = useMemo(() => Object.values(data.items).filter((info) => info.gear && info.gear.requiredLevel === null).length, [data.items]);
+  // Classes de Classic seulement : les règles de port ne connaissent pas les autres.
+  const wearers = useMemo(() => data.characters.filter((character) => character.class !== null && CLASSIC_CLASSES.includes(character.class)), [data.characters]);
+  const lostWearer = /^\d+$/.test(state.wearer) && !wearers.some((character) => String(character.id) === state.wearer);
   const holdings = useMemo(() => selectHoldings(data, state, now), [data, state, now]);
   const rows = useMemo(() => groupByItem(holdings, data.items, state.sort, data.prices), [holdings, data.items, state.sort, data.prices]);
   const rowsByKey = useMemo(() => new Map(rows.map((row) => [row.itemKey, row])), [rows]);
@@ -136,12 +151,14 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
     state.character !== "" ||
     state.minQuality !== "" ||
     state.soon ||
+    gearFiltered(state) ||
     available.some((place) => !state.places.includes(place));
   const activeFilters =
     [state.account, state.character, state.minQuality].filter((value) => value !== "").length +
     (available.some((place) => !state.places.includes(place)) ? 1 : 0) +
     (state.expired ? 1 : 0) +
-    (state.soon ? 1 : 0);
+    (state.soon ? 1 : 0) +
+    [state.gearType, state.gearSlot, state.minLevel + state.maxLevel, state.wearer].filter((value) => value !== "").length;
   const tipRow = tip ? rowsByKey.get(tip.itemKey) : undefined;
   const slot: SlotContext = { items: data.items, prices: data.prices, tip, events: slotEvents };
   const viewNav = (
@@ -290,6 +307,102 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
           <div className="hidden sm:block">{viewNav}</div>
         </div>
 
+        {(hasGear || gearFiltered(state)) && (
+          <fieldset className="flex flex-wrap items-center gap-2">
+            <legend className="sr-only">Équipement</legend>
+            <span aria-hidden="true" className="w-full text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted sm:w-auto">
+              Équipement
+            </span>
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Type d'armure ou d'arme"
+              value={state.gearType}
+              onChange={(event) => update({ gearType: event.target.value })}
+            >
+              <option value="">Armures et armes</option>
+              <optgroup label="Armures">
+                {ARMOR_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Armes">
+                {WEAPON_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Emplacement"
+              value={state.gearSlot}
+              onChange={(event) => update({ gearSlot: event.target.value })}
+            >
+              <option value="">Tous les emplacements</option>
+              {GEAR_SLOTS.map((slot) => (
+                <option key={slot.value} value={slot.value}>
+                  {slot.label}
+                </option>
+              ))}
+            </select>
+            <span className="flex items-center gap-1.5 text-xs text-muted">
+              Niveau requis
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={999}
+                className="field w-[4.5rem]"
+                aria-label="Niveau requis minimal"
+                placeholder="de"
+                value={state.minLevel}
+                onChange={(event) => update({ minLevel: levelInput(event.target.value) })}
+              />
+              à
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={999}
+                className="field w-[4.5rem]"
+                aria-label="Niveau requis maximal"
+                placeholder="à"
+                value={state.maxLevel}
+                onChange={(event) => update({ maxLevel: levelInput(event.target.value) })}
+              />
+            </span>
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Équipement portable par"
+              title="Une classe : tout ce qu'elle peut apprendre à porter. Un personnage : ce qu'il peut porter à son niveau."
+              value={state.wearer}
+              onChange={(event) => update({ wearer: event.target.value })}
+            >
+              <option value="">Pour toutes les classes</option>
+              {/* Lien vers un personnage supprimé ou d'une autre classe : visible, pour pouvoir changer. */}
+              {lostWearer && <option value={state.wearer}>Personnage introuvable</option>}
+              <optgroup label="Classe">
+                {CLASSIC_CLASSES.map((token) => (
+                  <option key={token} value={token}>
+                    {classLabel(token)}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Personnage, à son niveau">
+                {wearers.map((character) => (
+                  <option key={character.id} value={character.id}>
+                    {character.name} · {classLabel(character.class)}
+                    {character.level === null ? "" : ` ${character.level}`}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </fieldset>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           {available.map((place) => (
             <button key={place} type="button" className="button" aria-pressed={state.places.includes(place)} onClick={() => togglePlace(place)}>
@@ -373,6 +486,12 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
 
       {tip && tipRow && <ItemTooltip row={tipRow} data={data} tip={tip} characters={characters} guilds={guilds} now={now} onClose={closeTip} />}
 
+      {(state.minLevel !== "" || state.maxLevel !== "") && unknownLevels > 0 && (
+        <p className="text-xs text-faint">
+          {unknownLevels > 1 ? `${formatInteger(unknownLevels)} équipements propres à WoW Forever n'ont` : "Un équipement propre à WoW Forever n'a"} pas de niveau requis
+          connu : un filtre de niveau les écarte. Type, emplacement et classe s&apos;appliquent à eux normalement.
+        </p>
+      )}
       {data.market && rows.length > 0 && (
         <p className="text-xs text-faint">
           Valeurs estimées à l&apos;hôtel des ventes {data.market.label} : médiane des prix les plus bas relevés par Auctionator sur les quatorze
@@ -411,6 +530,7 @@ function ItemTooltip({
       <p className="text-[0.72rem] text-[#8f9bb8]">
         {info?.quality == null ? "" : `${QUALITY_LABELS[info.quality]} · `}objet n° {itemId}
       </p>
+      <TooltipGear gear={info?.gear} />
       <div className="tooltip-rule" />
       <p className="flex items-baseline justify-between gap-6">
         <span className="text-[#ffd100]">Total</span>
