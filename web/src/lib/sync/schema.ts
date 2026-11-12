@@ -236,6 +236,41 @@ const recipes = z.strictObject({
     .max(200),
 });
 
+// Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator (Syndicator.lua),
+// envoyés depuis l'agent 0.8.0. Chaque personnage d'AltBoard que Baganator connaît figure, listes
+// vides comprises : un courrier retiré disparaît.
+const holding = z.strictObject({ key: itemKey, count, expiresAt: unixSeconds.optional() });
+const baganator = z.strictObject({
+  file: sourceFile,
+  characters: z
+    .array(
+      z.strictObject({
+        guid: z.string().regex(/^[A-Za-z0-9-]{1,64}$/),
+        mail: z.array(holding).max(2_000),
+        auctions: z.array(holding).max(2_000),
+      }),
+    )
+    .max(200),
+  guilds: z
+    .array(
+      z.strictObject({
+        name,
+        realm: name,
+        moneyCopper: z.int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+        tabs: z
+          .array(
+            z.strictObject({
+              index: z.int().min(1).max(16),
+              name: text(60).optional(),
+              items: z.array(z.strictObject({ key: itemKey, count })).max(500),
+            }),
+          )
+          .max(16),
+      }),
+    )
+    .max(50),
+});
+
 /** Empreinte d'un nom de dossier de compte, calculée comme AccountKey.Compute dans l'agent. */
 export const accountKeyOf = (folderName: string) => sha256Hex(`wow-altboard-account:${folderName.trim().toUpperCase()}`);
 
@@ -256,6 +291,8 @@ const account = z
     // Facultatifs : un agent antérieur à 0.5.0 ne les envoie pas.
     auctionator: auctionator.optional(),
     recipes: recipes.optional(),
+    // Facultatif : un agent antérieur à 0.8.0 ne l'envoie pas.
+    baganator: baganator.optional(),
   })
   .refine((a) => a.folderName === undefined || accountKeyOf(a.folderName) === a.accountKey, {
     message: "nom de dossier sans rapport avec l'empreinte du compte",
@@ -297,3 +334,4 @@ export type ItemPayload = AccountPayload["items"][number];
 export type AuctionatorPayload = NonNullable<AccountPayload["auctionator"]>;
 export type MarketPayload = AuctionatorPayload["markets"][number];
 export type RecipesPayload = NonNullable<AccountPayload["recipes"]>;
+export type BaganatorPayload = NonNullable<AccountPayload["baganator"]>;

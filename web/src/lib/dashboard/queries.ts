@@ -192,7 +192,7 @@ export async function getCharacterDetail(db: Database, id: number) {
     .where(eq(t.characters.id, id));
   if (!character) return null;
 
-  const [stats, professions, equipment, reputations, currencies, items, snapshots, playtime, levelTimes, sessions] = await Promise.all([
+  const [stats, professions, equipment, reputations, currencies, items, snapshots, playtime, levelTimes, sessions, holdings, holdingSource] = await Promise.all([
     db.select().from(t.characterStats).where(eq(t.characterStats.characterId, id)),
     db.select().from(t.characterProfessions).where(eq(t.characterProfessions.characterId, id)).orderBy(asc(t.characterProfessions.position)),
     db.select().from(t.characterEquipment).where(eq(t.characterEquipment.characterId, id)).orderBy(asc(t.characterEquipment.slot)),
@@ -228,6 +228,21 @@ export async function getCharacterDetail(db: Database, id: number) {
       .where(eq(t.characterSessions.characterId, id))
       .orderBy(desc(t.characterSessions.startedAt))
       .limit(SESSIONS_SHOWN),
+    // Courrier et enchères, relevés par Baganator.
+    db
+      .select({
+        location: t.characterHoldings.location,
+        itemKey: t.characterHoldings.itemKey,
+        quantity: t.characterHoldings.quantity,
+        expiresAt: t.characterHoldings.expiresAt,
+        name: t.items.name,
+        quality: t.items.quality,
+      })
+      .from(t.characterHoldings)
+      .leftJoin(t.items, eq(t.items.itemKey, t.characterHoldings.itemKey))
+      .where(eq(t.characterHoldings.characterId, id))
+      .orderBy(desc(t.items.quality), asc(t.items.name)),
+    db.select({ fileModifiedAt: t.characterHoldingSources.fileModifiedAt }).from(t.characterHoldingSources).where(eq(t.characterHoldingSources.characterId, id)),
   ]);
 
   return {
@@ -244,6 +259,10 @@ export async function getCharacterDetail(db: Database, id: number) {
     currencies,
     bags: items.filter((item) => item.location === "bags"),
     bank: items.filter((item) => item.location === "bank"),
+    mail: holdings.filter((item) => item.location === "mail"),
+    auctions: holdings.filter((item) => item.location === "auctions"),
+    /** Date du fichier Baganator qui a fourni courrier et enchères ; null sans Baganator. */
+    holdingsAt: holdingSource[0]?.fileModifiedAt ?? null,
     // Du plus ancien au plus récent, pour les courbes et le calcul des changements.
     snapshots: snapshots.reverse(),
     playtime: playtime[0] ?? null,

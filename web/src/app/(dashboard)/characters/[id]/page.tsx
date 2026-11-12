@@ -12,6 +12,7 @@ import { getDatabase } from "@/db/client";
 import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
 import { buildHistory } from "@/lib/dashboard/history";
+import { holdingNote } from "@/lib/dashboard/inventory-view";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
 import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
@@ -414,7 +415,26 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
               </p>
             )}
           </div>
+          {/* Relevés par Baganator : absents tant que l'agent 0.8.0 n'a rien envoyé pour ce personnage. */}
+          {character.holdingsAt && (
+            <>
+              <div className="panel p-5">
+                <h3 className="eyebrow mb-3">Courrier</h3>
+                <InventoryList items={character.mail.map((item) => ({ ...item, note: holdingNote(item.expiresAt, now) }))} label="le courrier" />
+              </div>
+              <div className="panel p-5">
+                <h3 className="eyebrow mb-3">Enchères en cours</h3>
+                <InventoryList items={character.auctions.map((item) => ({ ...item, note: holdingNote(item.expiresAt, now) }))} label="les enchères" />
+              </div>
+            </>
+          )}
         </div>
+        {character.holdingsAt && (
+          <p className="mt-3 text-xs text-faint">
+            Courrier et enchères relevés par Baganator ({formatRelative(character.holdingsAt, now)}) : le courrier à la dernière ouverture
+            de la boîte aux lettres, les enchères à leur mise en vente.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="level-times" className="mt-8">

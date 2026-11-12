@@ -60,7 +60,7 @@ avant ne voit pas les derniers changements.
 | aucune, par double-clic | ouvre la fenêtre (comme `ui`) |
 | aucune, depuis un terminal | affiche l'aide |
 | `ui` | ouvre la fenêtre de l'agent ; celle de la surveillance en cours s'il y en a une |
-| `sync` | lit tous les `AltBoard.lua` (et les `AllemanoLedger.lua`, `Auctionator.lua`, `NaowhForever.lua` voisins) et envoie le document |
+| `sync` | lit tous les `AltBoard.lua` (et les `AllemanoLedger.lua`, `Auctionator.lua`, `NaowhForever.lua`, `Syndicator.lua` voisins) et envoie le document |
 | `watch` | synchronise à chaque écriture du jeu, jusqu'à l'arrêt |
 | `autostart` / `autostart on` / `autostart off` | affiche, active ou désactive le lancement de `watch` à l'ouverture de session ; `on` le lance aussi tout de suite, `off` arrête celui qui tourne |
 | `scan` | lit et affiche, **sans rien envoyer** (équivaut à `sync --dry-run`) |
@@ -168,6 +168,12 @@ jamais bloquants) :
 - `NaowhForever.lua` (addon NaowhForever) : recettes connues de chaque personnage, relevées à
   l'ouverture de la fenêtre d'un métier ([PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md)).
 
+Depuis 0.8.0, `Syndicator.lua` (addon Baganator) apporte, avec la même règle, le **courrier**, les
+**ventes en cours** et les **banques de guilde** ([BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md)).
+Sacs et banque restent ceux d'AltBoard. Syndicator nomme les personnages sans GUID : un nom inconnu
+d'AltBoard sur le compte n'est pas transmis, avec un avertissement. `scan` en affiche le résumé :
+`Baganator : 42 objets au courrier, 3 objets aux enchères, 1 banque de guilde`.
+
 Depuis 0.7.0, l'agent lit aussi, une fois par client, le cache local du jeu
 `Cache\ADB\<langue>\DBCache.bin` (langue de `SET textLocale` dans `WTF\Config.wtf`, sinon le seul
 cache présent) : il n'en garde que les noms d'objets (table `ItemSparse`, environ 5 200 noms sur un
@@ -215,7 +221,7 @@ ne s'ouvre que sur demande. Un double-clic sur l'exécutable lance la même surv
 ouverte.
 
 ```text
-AltBoard.lua, AllemanoLedger.lua, Auctionator.lua ou NaowhForever.lua modifié (FileSystemWatcher sur WTF\Account)
+AltBoard.lua, AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua ou Syndicator.lua modifié (FileSystemWatcher sur WTF\Account)
         ↓
 anti-rebond : attendre 5 s sans nouvel événement (le jeu écrit en plusieurs fois)
         ↓

@@ -154,10 +154,39 @@ Deux blocs facultatifs par compte, ajoutés par l'agent 0.5.0 quand les fichiers
   ajoute `marketsImported`, `marketsUnchanged`, `marketObservations` et `recipeCharacters`.
 - Compatibilité : comme `playtime`, ces blocs exigent un serveur à jour avant les agents.
 
+### Courrier, enchères et banques de guilde (facultatif)
+
+Bloc facultatif par compte, ajouté par l'agent 0.8.0 quand `Syndicator.lua` (addon Baganator)
+existe :
+
+```json
+"baganator": {
+  "file": { "hash": "<SHA-256>", "modifiedAt": "2026-11-12T11:06:00.55+00:00", "size": 4212 },
+  "characters": [
+    { "guid": "Player-9999-00000001",
+      "mail": [{ "key": "249428", "count": 5, "expiresAt": 1796500000 }],
+      "auctions": [{ "key": "20576", "count": 1, "expiresAt": 1794091265 }] }
+  ],
+  "guilds": [
+    { "name": "Ordre Fictif", "realm": "ClassicBetaPvE2", "moneyCopper": 4699,
+      "tabs": [{ "index": 1, "name": "Composants", "items": [{ "key": "2318", "count": 25 }] }] }
+  ]
+}
+```
+
+- `expiresAt` : secondes Unix, facultatif. 2000 lignes au plus par liste, 50 guildes, 16 onglets
+  (`index` de 1 à 16), 500 objets par onglet. Format et rattachement des personnages :
+  [BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md).
+- Un GUID inconnu du serveur est ignoré. Une banque de guilde n'est gardée que si son royaume est
+  celui d'un personnage du compte. Un fichier plus ancien que le relevé gardé, ou de même contenu,
+  ne change rien.
+- Compatibilité : un serveur antérieur au site 0.18.0 refuse ce bloc (schéma strict).
+
 Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miroir côté agent est
 `agent/src/AltBoardSync.Core/Sync/SyncPayload.cs`. Le fichier
 `tests/fixtures/payloads/two-accounts.json`, produit par l'agent réel, sert de contrat aux tests de l'API ;
-`tests/fixtures/payloads/economy-account.json` fait de même pour les prix et les recettes.
+`tests/fixtures/payloads/economy-account.json` fait de même pour les prix et les recettes, et
+`tests/fixtures/payloads/baganator-account.json` pour le courrier, les enchères et les banques de guilde.
 
 ### Réponse `200`
 

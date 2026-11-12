@@ -4,6 +4,47 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.18.0 — 2026-11-12
+
+### Ajouté
+
+- **Page Inventaires** (menu Personnages) : tout ce que possèdent les personnages, en une page.
+  - **Endroits** : sacs et banque relevés par AltBoard, courrier, ventes en cours et banques de
+    guilde relevés par Baganator. Chaque endroit s'active ou se masque d'un bouton.
+  - **Par objet** : le total d'un objet, tous détenteurs confondus, puis chaque détenteur
+    (personnage et endroit, ou guilde et onglet) avec sa quantité. Tri par quantité, nom ou qualité.
+  - **Par personnage** : le contenu de chaque personnage par endroit, avec la date du relevé, puis
+    les banques de guilde par onglet, avec leur or.
+  - Recherche par nom (sans accent) ou par identifiant, filtres par compte, personnage et qualité
+    minimale. Les courriers et ventes dont l'échéance est passée sont masqués (bouton « Échus »).
+    L'état des filtres est porté par l'adresse de la page.
+- **Fiche d'un personnage** : panneaux « Courrier » et « Enchères en cours », avec l'échéance de
+  chaque objet.
+- **Objets** : la recherche compte aussi le courrier et les ventes en cours.
+- Contrat de `POST /api/sync` : bloc facultatif `baganator` par compte (courrier, ventes, banques de
+  guilde), envoyé par l'agent 0.8.0. Voir [BAGANATOR-DATA-MODEL](docs/BAGANATOR-DATA-MODEL.md).
+- Migration `0013_baganator_holdings` : tables `character_holdings`, `character_holding_sources`,
+  `guild_banks`, `guild_bank_items` (ajouts seuls).
+
+### Déploiement
+
+- Déployer ce site **avant** d'installer l'agent 0.8.0 sur les PC : un serveur antérieur refuse le
+  bloc `baganator`.
+
+## Agent 0.8.0 — 2026-11-12
+
+### Ajouté
+
+- Lit `Syndicator.lua`, le fichier de l'addon **Baganator** : courrier, ventes en cours et banques
+  de guilde de chaque compte. Sacs et banque restent ceux d'AltBoard. Fichier facultatif : absent,
+  rien ne change ; illisible, un avertissement est joint et la synchronisation continue.
+- Syndicator nomme les personnages sans GUID : chacun est rattaché au personnage d'AltBoard du même
+  nom sur le compte, le plus récemment vu en cas d'homonymes. Un nom inconnu d'AltBoard n'est pas
+  transmis ; un avertissement le signale.
+- `scan` affiche le résumé : objets au courrier, objets aux enchères, banques de guilde.
+- `watch` synchronise aussi quand `Syndicator.lua` change.
+- Exige le site 0.18.0.
+
 ## Site 0.17.0 — 2026-11-12
 
 ### Ajouté

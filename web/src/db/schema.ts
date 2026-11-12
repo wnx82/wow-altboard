@@ -306,6 +306,77 @@ export const characterItems = pgTable(
   ],
 );
 
+// Courrier et enchères en cours, relevés par l'addon Baganator (voir docs/BAGANATOR-DATA-MODEL.md).
+// À part de character_items : ces objets ne sont pas à portée de main, et l'économie (stocks,
+// sessions de farm) ne compte que les sacs et la banque. Une ligne par objet : quantité totale,
+// échéance la plus proche (courrier rendu ou supprimé, vente close).
+export const characterHoldings = pgTable(
+  "character_holdings",
+  {
+    characterId: characterId(),
+    location: text("location").notNull(),
+    itemKey: text("item_key").notNull(),
+    quantity: integer("quantity").notNull(),
+    expiresAt: ts("expires_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.characterId, t.location, t.itemKey] }),
+    check("character_holdings_location_check", sql`${t.location} in ('mail', 'auctions')`),
+    check("character_holdings_quantity_check", sql`${t.quantity} >= 0`),
+  ],
+);
+
+// Fichier Syndicator.lua qui a fourni le courrier et les enchères d'un personnage : un fichier plus
+// ancien (autre PC) ne les remplace pas.
+export const characterHoldingSources = pgTable("character_holding_sources", {
+  characterId: characterId().primaryKey(),
+  fileModifiedAt: ts("file_modified_at").notNull(),
+  contentHash: text("content_hash").notNull(),
+  updatedAt: updatedAt(),
+});
+
+// Banques de guilde relevées par Baganator, à leur dernière ouverture. Rattachées au compte qui les
+// a vues : une même guilde vue depuis deux comptes a deux relevés, le plus récent l'emporte à
+// l'affichage. realm : royaume tel que le jeu le donne pour la guilde.
+export const guildBanks = pgTable(
+  "guild_banks",
+  {
+    id: id(),
+    accountId: bigint("account_id", { mode: "number" })
+      .notNull()
+      .references(() => wowAccounts.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    realm: text("realm").notNull(),
+    moneyCopper: bigint("money_copper", { mode: "number" }),
+    // Noms des onglets relevés, par numéro d'onglet.
+    tabNames: jsonb("tab_names").$type<Record<string, string>>().notNull(),
+    fileModifiedAt: ts("file_modified_at").notNull(),
+    contentHash: text("content_hash").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("guild_banks_account_guild_idx").on(t.accountId, t.name, t.realm),
+    check("guild_banks_money_copper_check", sql`${t.moneyCopper} >= 0`),
+  ],
+);
+
+export const guildBankItems = pgTable(
+  "guild_bank_items",
+  {
+    guildBankId: bigint("guild_bank_id", { mode: "number" })
+      .notNull()
+      .references(() => guildBanks.id, { onDelete: "cascade" }),
+    tab: smallint("tab").notNull(),
+    itemKey: text("item_key").notNull(),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.guildBankId, t.tab, t.itemKey] }),
+    check("guild_bank_items_quantity_check", sql`${t.quantity} >= 0`),
+  ],
+);
+
 // Temps de jeu, issu de l'addon Allemano Ledger (voir docs/LEDGER-DATA-MODEL.md).
 // Dernier /played connu et début du niveau en cours.
 export const characterPlaytime = pgTable("character_playtime", {

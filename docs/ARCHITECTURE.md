@@ -5,7 +5,8 @@
 ```text
 ┌────────────────────────────── PC Windows (1 à n) ──────────────────────────────┐
 │  WTF\Account\<COMPTE>\SavedVariables\AltBoard.lua   (lecture seule)             │
-│    + AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua (facultatifs)        │
+│    + AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua, Syndicator.lua     │
+│      (facultatifs)                                                              │
 │                         │                                                       │
 │  AltBoardSync.exe  ─ découverte ─ lecture stable ─ parser ─ normalisation       │
 └─────────────────────────┬──────────────────────────────────────────────────────┘
@@ -36,6 +37,7 @@ Trois notions sont strictement séparées, du fichier jusqu'à la base : **machi
 | `AltBoard/LedgerReader` | Temps de jeu et sessions d'Allemano Ledger ([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)) |
 | `Economy/AuctionatorReader`, `Lua/CborDecoder` | Prix d'Auctionator, sérialisés en CBOR dans une chaîne Lua ; décodage borné ([AUCTIONATOR-DATA-MODEL](AUCTIONATOR-DATA-MODEL.md)) |
 | `Economy/RecipeReader` | Recettes connues par personnage, relevées par NaowhForever ([PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md)) |
+| `Inventory/SyndicatorReader` | Courrier, ventes en cours et banques de guilde relevés par Baganator ; personnages rattachés par leur nom dans `PayloadBuilder` ([BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md)) |
 | `Discovery/AccountScanner` | Trouve chaque `SavedVariables\AltBoard.lua` ; aucun nombre de comptes codé en dur |
 | `IO/StableFileReader` | Ne lit que si taille et date sont stables avant et après ; partage total, jamais d'écriture |
 | `Sync/PayloadBuilder`, `SyncClient` | Construit le document v1 et l'envoie ; HTTPS obligatoire hors localhost |
@@ -50,7 +52,7 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | Dossier | Rôle |
 |---|---|
 | `src/db` | Schéma Drizzle (source unique), migrations SQL générées, garde-fou de cible |
-| `src/lib/sync` | Schéma Zod du document, traitement transactionnel, gestionnaire HTTP |
+| `src/lib/sync` | Schéma Zod du document, traitement transactionnel, gestionnaire HTTP ; `inventory.ts` applique le bloc Baganator |
 | `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, suppression d'un compte, actions serveur ; calculs purs testés sans base : bloc « À surveiller », or cumulé, temps de jeu, réputations comparées |
 | `src/lib/goals` | Objectifs par personnage : évaluation, modèles, tableau d'un modèle par personnage |
 | `src/lib/auth` | Mots de passe scrypt, sessions en base, cookie, mot de passe redemandé avant une suppression définitive |
@@ -83,6 +85,7 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | État des serveurs par **sonde TCP du serveur web**, adresses en configuration ou réglées sur le site | Aucune API documentée pour WoW Forever ; un navigateur ne peut pas ouvrir de connexion TCP ; pas de dépendance à un site tiers ni de nouveau service à déployer |
 | Moniteur lancé par `instrumentation.ts`, état lu en base | Un seul processus web : pas d'ordonnanceur externe. La page ne dépend pas de la mémoire du moniteur |
 | Prix lus dans **Auctionator**, pas Auctioneer | Auctioneer, prévu par la roadmap de l'économie, n'est installé sur aucun compte ; Auctionator l'est et garde un relevé par jour |
+| De **Baganator**, seuls le courrier, les ventes et les banques de guilde | AltBoard relève déjà sacs et banque avec les mêmes totaux. Tables séparées de `character_items` : l'économie et les sessions de farm ne changent pas. Personnages rattachés par leur nom, Syndicator n'ayant pas de GUID |
 | Moteur économique **déterministe**, en fonctions pures | Mêmes relevés, mêmes résultats ; testable sans base. Aucune valeur inventée : une donnée absente donne « attendre » |
 | Calcul d'opportunités conservé et réutilisé tant que sa base ne change pas | Chaque opportunité garde ses entrées : on peut toujours dire d'où vient un chiffre |
 | Assistant IA **facultatif**, qui explique et ne calcule pas | Il ne reçoit que les faits du moteur ; une réponse qui cite un nombre absent des faits est refusée |

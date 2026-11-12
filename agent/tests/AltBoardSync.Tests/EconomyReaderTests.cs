@@ -261,7 +261,8 @@ public class EconomyPayloadTests
         Assert.Equal(40, payload.Auctionator!.Markets.Single().Items.Count);
         Assert.Equal(Fixture.Bytes("auctionator-multi-day.lua").LongLength, payload.Auctionator.File.Size);
         Assert.Equal(37, payload.Recipes!.Characters.Single().Recipes.Count);
-        Assert.EndsWith($":{payload.Auctionator.File.Hash}:{payload.Recipes.File.Hash}", result.Fingerprint);
+        // Le dernier champ, Baganator, est absent ici.
+        Assert.EndsWith($":{payload.Auctionator.File.Hash}:{payload.Recipes.File.Hash}:-", result.Fingerprint);
         Assert.StartsWith($"{PayloadBuilder.PayloadFormat}:", result.Fingerprint);
 
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(payload, SyncJsonContext.Default.AccountPayload));

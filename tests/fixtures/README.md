@@ -13,6 +13,8 @@ Aucun nom de dossier de compte réel n'y figure.
 | `auctionator-multi-day.lua` | produit par `tools/make-economy-fixtures.mjs` depuis un `Auctionator.lua` réel : 40 objets de l'hôtel des ventes « PvE » (30 relevés plusieurs jours, 10 un seul), réencodés en CBOR comme le fait le client, et 15 prix marchands |
 | `naowh-recipes.lua` | produit par le même outil : `NaowhForeverDB.account.profMakes` d'un `NaowhForever.lua` réel, GUID remplacé par `Player-9999-00000001` |
 | `payloads/economy-account.json` | document produit par l'agent à partir de `account-four-characters.lua`, `auctionator-multi-day.lua` et `naowh-recipes.lua` ; contrat des blocs `auctionator` et `recipes` |
+| `syndicator-small.lua` | écrit à la main sur le modèle d'un `Syndicator.lua` réel (Baganator) : personnages et guildes fictifs. Courrier en double du même objet, objet à suffixe, vente en cours, personnage vide, personnage inconnu d'AltBoard, banque de guilde avec un onglet et banque jamais ouverte |
+| `payloads/baganator-account.json` | document produit par l'agent 0.8.0 à partir de `account-four-characters.lua` et `syndicator-small.lua` ; contrat du bloc `baganator` |
 
 ## Régénérer
 
@@ -43,3 +45,8 @@ puis, pour `payloads/economy-account.json`, placer `account-four-characters.lua`
 temporaire, lancer `scan --out` comme ci-dessus et remplacer `machine` par une identité fictive.
 Le GUID fictif doit être celui d'un personnage de `account-four-characters.lua`, sans quoi le
 serveur n'attache aucune recette.
+
+Pour `payloads/baganator-account.json`, même démarche avec `account-four-characters.lua` (renommé
+`AltBoard.lua`) et `syndicator-small.lua` (renommé `Syndicator.lua`). Les noms des personnages de
+`syndicator-small.lua` doivent rester ceux de `account-four-characters.lua`, sans quoi l'agent ne
+les rattache à aucun GUID.

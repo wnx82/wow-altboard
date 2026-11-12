@@ -1,4 +1,4 @@
-import { and, asc, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, gt, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 
@@ -31,7 +31,8 @@ export type Holding = {
   characterClass: string | null;
   level: number | null;
   realm: string;
-  location: "bags" | "bank" | "equipped";
+  /** mail et auctions : courrier et enchères en cours, relevés par Baganator. */
+  location: "bags" | "bank" | "equipped" | "mail" | "auctions";
   quantity: number;
   /** Variante portée ou rangée (suffixe « de l'aigle »…), quand elle diffère du nom de l'objet. */
   variant: string | null;
@@ -41,8 +42,11 @@ export type Holding = {
 
 export type ItemOwners = { itemId: number; name: string | null; quality: number | null; total: number; holdings: Holding[] };
 
-/** Objets correspondant à la recherche, les plus détenus d'abord, avec chacun de leurs détenteurs. */
-export async function searchItemOwners(db: DatabaseOrTransaction, query: ItemQuery): Promise<{ items: ItemOwners[]; truncated: boolean }> {
+/**
+ * Objets correspondant à la recherche, les plus détenus d'abord, avec chacun de leurs détenteurs.
+ * now : un courrier rendu ou une vente close à cette date ne compte plus.
+ */
+export async function searchItemOwners(db: DatabaseOrTransaction, query: ItemQuery, now: Date = new Date()): Promise<{ items: ItemOwners[]; truncated: boolean }> {
   let itemIds: number[];
   if ("itemId" in query) {
     itemIds = [query.itemId];
@@ -74,7 +78,8 @@ export async function searchItemOwners(db: DatabaseOrTransaction, query: ItemQue
     realm: t.realms.name,
   };
   const baseId = sql<number>`split_part(${t.characterItems.itemKey}, ':', 1)::int`;
-  const [names, stored, worn] = await Promise.all([
+  const heldId = sql<number>`split_part(${t.characterHoldings.itemKey}, ':', 1)::int`;
+  const [names, stored, worn, held] = await Promise.all([
     db
       .select({ itemKey: t.items.itemKey, itemId: t.items.itemId, suffixId: t.items.suffixId, name: t.items.name, quality: t.items.quality })
       .from(t.items)
@@ -100,6 +105,20 @@ export async function searchItemOwners(db: DatabaseOrTransaction, query: ItemQue
       .innerJoin(t.characters, sql`${t.characters.id} = ${t.characterEquipment.characterId}`)
       .innerJoin(t.realms, sql`${t.realms.id} = ${t.characters.realmId}`)
       .where(inArray(t.characterEquipment.itemId, itemIds)),
+    db
+      .select({
+        ...character,
+        itemId: heldId,
+        itemKey: t.characterHoldings.itemKey,
+        location: t.characterHoldings.location,
+        quantity: t.characterHoldings.quantity,
+        seenAt: t.characterHoldingSources.fileModifiedAt,
+      })
+      .from(t.characterHoldings)
+      .innerJoin(t.characters, sql`${t.characters.id} = ${t.characterHoldings.characterId}`)
+      .innerJoin(t.realms, sql`${t.realms.id} = ${t.characters.realmId}`)
+      .leftJoin(t.characterHoldingSources, sql`${t.characterHoldingSources.characterId} = ${t.characterHoldings.characterId}`)
+      .where(and(inArray(heldId, itemIds), or(isNull(t.characterHoldings.expiresAt), gt(t.characterHoldings.expiresAt, now)))),
   ]);
 
   const byKey = new Map(names.map((row) => [row.itemKey, row]));
@@ -131,6 +150,22 @@ export async function searchItemOwners(db: DatabaseOrTransaction, query: ItemQue
       quantity: row.quantity,
       variant: variantName && variantName !== item?.name ? variantName : null,
       seenAt: row.location === "bank" ? row.bankAt : row.bagsAt,
+    });
+  }
+  for (const row of held) {
+    const item = results.get(row.itemId);
+    const variantName = byKey.get(row.itemKey)?.name ?? null;
+    if (item && item.name === null && variantName) item.name = variantName;
+    add(row.itemId, {
+      characterId: row.characterId,
+      characterName: row.characterName,
+      characterClass: row.characterClass,
+      level: row.level,
+      realm: row.realm,
+      location: row.location === "auctions" ? "auctions" : "mail",
+      quantity: row.quantity,
+      variant: variantName && variantName !== item?.name ? variantName : null,
+      seenAt: row.seenAt,
     });
   }
   for (const row of worn) {

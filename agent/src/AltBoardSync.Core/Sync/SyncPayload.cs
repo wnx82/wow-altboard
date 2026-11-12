@@ -42,7 +42,26 @@ public sealed record AccountPayload(
 
     /// <summary>Recettes apprises relevées par l'addon NaowhForever du même compte ; absentes si l'addon n'en a relevé aucune.</summary>
     public RecipesPayload? Recipes { get; init; }
+
+    /// <summary>Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator du même compte ; absents sans l'addon.</summary>
+    public BaganatorPayload? Baganator { get; init; }
 }
+
+/// <summary>
+/// Syndicator.lua, les données de Baganator. Characters : chaque personnage d'AltBoard que Baganator
+/// connaît, listes vides comprises (un courrier relevé puis retiré doit disparaître).
+/// </summary>
+public sealed record BaganatorPayload(SourceFilePayload File, IReadOnlyList<CharacterHoldingsPayload> Characters, IReadOnlyList<GuildBankPayload> Guilds);
+
+public sealed record CharacterHoldingsPayload(string Guid, IReadOnlyList<HoldingPayload> Mail, IReadOnlyList<HoldingPayload> Auctions);
+
+/// <summary>Un objet du courrier ou mis aux enchères : quantité totale et échéance la plus proche (secondes Unix).</summary>
+public sealed record HoldingPayload(string Key, int Count, long? ExpiresAt);
+
+/// <summary>Banque de guilde, telle que relevée à sa dernière ouverture. Royaume : celui que donne le jeu pour la guilde.</summary>
+public sealed record GuildBankPayload(string Name, string Realm, long? MoneyCopper, IReadOnlyList<GuildBankTabPayload> Tabs);
+
+public sealed record GuildBankTabPayload(int Index, string? Name, IReadOnlyList<ItemCountPayload> Items);
 
 public sealed record SourceFilePayload(string Hash, DateTimeOffset ModifiedAt, long Size);
 

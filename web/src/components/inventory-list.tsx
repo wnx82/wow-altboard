@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { QUALITY_LABELS } from "@/lib/wow/format";
 
-export type InventoryItem = { itemKey: string; name: string | null; quality: number | null; quantity: number };
+/** note : précision affichée avant la quantité, par exemple l'échéance d'un courrier. */
+export type InventoryItem = { itemKey: string; name: string | null; quality: number | null; quantity: number; note?: { text: string; warn: boolean } };
 
 const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
@@ -39,7 +40,10 @@ export function InventoryList({ items, label }: { items: InventoryItem[]; label:
               <span className="quality-text min-w-0 truncate" title={item.quality === null ? undefined : QUALITY_LABELS[item.quality]}>
                 {item.name ?? `Objet n° ${item.itemKey}`}
               </span>
-              <span className="whitespace-nowrap tabular-nums text-muted">× {item.quantity}</span>
+              <span className="flex flex-none items-baseline gap-3">
+                {item.note && <span className={`whitespace-nowrap text-xs ${item.note.warn ? "text-danger" : "text-faint"}`}>{item.note.text}</span>}
+                <span className="whitespace-nowrap tabular-nums text-muted">× {item.quantity}</span>
+              </span>
             </li>
           ))}
         </ul>

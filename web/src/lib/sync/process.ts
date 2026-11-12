@@ -6,6 +6,7 @@ import { recordAchievements } from "@/lib/goals/store";
 import { canonicalHash } from "@/lib/hash";
 import { readSettings } from "@/lib/settings/store";
 import { applyAuctionator, applyRecipes, emptyEconomyCounters, type EconomyCounters } from "./economy";
+import { applyBaganator } from "./inventory";
 import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
 
 export type SyncResult = {
@@ -152,6 +153,7 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       // Après les personnages : les recettes se rattachent à des personnages déjà connus.
       await applyAuctionator(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
       await applyRecipes(tx, account, now, economy);
+      await applyBaganator(tx, account, accountId, now);
     }
     if (payload.itemNames) economy.itemNamesStored = await storeClientNames(tx, payload.itemNames, now);
 

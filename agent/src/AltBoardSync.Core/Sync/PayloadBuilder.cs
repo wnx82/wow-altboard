@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using AltBoardSync.Core.AltBoard;
 using AltBoardSync.Core.Discovery;
 using AltBoardSync.Core.Economy;
+using AltBoardSync.Core.Inventory;
 using AltBoardSync.Core.IO;
 using AltBoardSync.Core.Lua;
 
@@ -32,9 +33,10 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// Préfixe de <see cref="AccountReadResult.Fingerprint"/>, à changer quand le document gagne un champ :
     /// les empreintes enregistrées par l'agent précédent ne correspondent plus, et chaque compte est
     /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
-    /// 3 : finances par jour d'Allemano Ledger (0.7.0).
+    /// 3 : finances par jour d'Allemano Ledger (0.7.0). 4 : courrier, enchères et banques de guilde de
+    /// Baganator (0.8.0).
     /// </summary>
-    public const string PayloadFormat = "3";
+    public const string PayloadFormat = "4";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -48,6 +50,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
             var economyWarnings = new List<string>();
             var auctionator = await ReadAuctionatorAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
             var recipes = await ReadRecipesAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
+            var (baganator, baganatorItems) = await ReadBaganatorAsync(source, characters, economyWarnings, cancellationToken).ConfigureAwait(false);
             var payload = new AccountPayload(
                 AccountKey.Compute(source.AccountFolder),
                 AccountKey.Hint(source.AccountFolder),
@@ -56,16 +59,17 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 AccountScanner.ReadAddonVersion(source.FlavorPath),
                 new SourceFilePayload(fileHash, snapshot.ModifiedAt, snapshot.Content.LongLength),
                 characters,
-                document.Items,
+                MergeItems(document.Items, baganatorItems),
                 [.. document.Warnings, .. ledgerWarnings, .. economyWarnings.Take(MaxEconomyWarnings)])
             {
                 FolderName = AccountKey.FullName(source.AccountFolder),
                 Auctionator = auctionator,
                 Recipes = recipes,
+                Baganator = baganator,
             };
             return new AccountReadResult(source, payload, null)
             {
-                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}",
+                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}:{baganator?.File.Hash ?? "-"}",
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException or AltBoardFormatException)
@@ -146,6 +150,60 @@ public sealed class PayloadBuilder(StableFileReader reader)
             warnings.Add(Truncate($"NaowhForever illisible, recettes non transmises : {e.Message}"));
             return null;
         }
+    }
+
+    /// <summary>
+    /// Courrier, enchères en cours et banques de guilde relevés par Baganator (Syndicator.lua). Source
+    /// facultative, comme Auctionator. Syndicator nomme les personnages sans GUID : chacun est rattaché
+    /// au personnage d'AltBoard du même nom sur ce compte, le plus récemment vu quand il y en a plusieurs
+    /// (un personnage de la bêta et son homonyme de WoW Forever, que Syndicator confond).
+    /// </summary>
+    private async Task<(BaganatorPayload? Payload, IReadOnlyList<ItemPayload> Items)> ReadBaganatorAsync(
+        AccountSource source, IReadOnlyList<CharacterPayload> characters, List<string> warnings, CancellationToken cancellationToken)
+    {
+        if (source.SyndicatorFilePath is null) return (null, []);
+        try
+        {
+            var snapshot = await reader.ReadAsync(source.SyndicatorFilePath, cancellationToken).ConfigureAwait(false);
+            var data = SyndicatorReader.Read(SavedVariablesParser.Parse(snapshot.Content), warnings);
+            if (data is null) return (null, []);
+
+            var guidByName = characters
+                .GroupBy(c => c.Name, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.MaxBy(c => c.LastSeen)!.Guid, StringComparer.Ordinal);
+            var held = new List<CharacterHoldingsPayload>();
+            var unknown = 0;
+            foreach (var character in data.Characters)
+            {
+                if (!guidByName.TryGetValue(character.Name, out var guid)) unknown++;
+                else if (held.All(h => h.Guid != guid)) held.Add(new CharacterHoldingsPayload(guid, character.Mail, character.Auctions));
+            }
+
+            if (unknown > 0)
+            {
+                warnings.Add(unknown == 1
+                    ? "Baganator : 1 personnage absent d'AltBoard sur ce compte, son courrier et ses enchères ne sont pas transmis."
+                    : $"Baganator : {unknown} personnages absents d'AltBoard sur ce compte, leur courrier et leurs enchères ne sont pas transmis.");
+            }
+            if (held.Count == 0 && data.Guilds.Count == 0) return (null, []);
+            held.Sort((a, b) => string.CompareOrdinal(a.Guid, b.Guid));
+            return (new BaganatorPayload(FileOf(snapshot), held, data.Guilds), data.Items);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
+        {
+            warnings.Add(Truncate($"Baganator illisible, courrier, enchères et banques de guilde non transmis : {e.Message}"));
+            return (null, []);
+        }
+    }
+
+    /// <summary>Référentiel d'objets du compte : celui d'AltBoard d'abord, complété par les objets que lui seul ignore.</summary>
+    private static IReadOnlyList<ItemPayload> MergeItems(IReadOnlyList<ItemPayload> altBoard, IReadOnlyList<ItemPayload> others)
+    {
+        if (others.Count == 0) return altBoard;
+        var known = altBoard.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+        var merged = altBoard.Concat(others.Where(item => !known.Contains(item.Key))).ToList();
+        merged.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
+        return merged;
     }
 
     /// <summary>

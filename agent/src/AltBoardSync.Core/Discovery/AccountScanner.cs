@@ -11,6 +11,9 @@ public sealed record AccountSource(string AccountFolder, string Flavor, string F
 
     /// <summary>Fichier de l'addon NaowhForever du même compte, s'il existe (recettes apprises).</summary>
     public string? RecipesFilePath { get; init; }
+
+    /// <summary>Fichier de Syndicator (données de l'addon Baganator) du même compte, s'il existe (courrier, enchères, banques de guilde).</summary>
+    public string? SyndicatorFilePath { get; init; }
 }
 
 /// <summary>
@@ -29,6 +32,9 @@ public static class AccountScanner
     public const string LedgerFile = "AllemanoLedger.lua";
     public const string AuctionatorFile = "Auctionator.lua";
     public const string RecipesFile = "NaowhForever.lua";
+
+    /// <summary>Baganator range ses données dans les SavedVariables de sa bibliothèque, Syndicator.</summary>
+    public const string SyndicatorFile = "Syndicator.lua";
 
     private static string? Sibling(string accountPath, string fileName)
     {
@@ -57,6 +63,7 @@ public static class AccountScanner
                     LedgerFilePath = Sibling(accountPath, LedgerFile),
                     AuctionatorFilePath = Sibling(accountPath, AuctionatorFile),
                     RecipesFilePath = Sibling(accountPath, RecipesFile),
+                    SyndicatorFilePath = Sibling(accountPath, SyndicatorFile),
                 });
             }
         }

@@ -251,7 +251,8 @@ internal sealed class WatchLoop(
         if (string.Equals(name, AccountScanner.SavedVariablesFile, StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, AccountScanner.LedgerFile, StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, AccountScanner.AuctionatorFile, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, AccountScanner.RecipesFile, StringComparison.OrdinalIgnoreCase))
+            || string.Equals(name, AccountScanner.RecipesFile, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, AccountScanner.SyndicatorFile, StringComparison.OrdinalIgnoreCase))
         {
             _signals.Writer.TryWrite(Signal.FileChanged);
         }

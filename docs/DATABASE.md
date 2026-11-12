@@ -4,13 +4,14 @@
 > `web/drizzle/`. Structure des données d'origine : [ALTBOARD-DATA-MODEL](ALTBOARD-DATA-MODEL.md),
 > [LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md) pour le temps de jeu,
 > [AUCTIONATOR-DATA-MODEL](AUCTIONATOR-DATA-MODEL.md) pour les prix,
-> [PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md) pour les recettes.
+> [PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md) pour les recettes,
+> [BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md) pour le courrier, les enchères et les banques de guilde.
 
 ## État
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (44 tables, 12 migrations, 2026-11-09) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (48 tables, 14 migrations, 2026-11-12) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -26,7 +27,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (41)
+## Tables (48)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -60,6 +61,19 @@ Conventions : clés `bigint` générées, dates en `timestamptz`, argent en piè
 
 Colonnes volontairement absentes, faute de donnée dans AltBoard : genre, région, quêtes. Les
 recettes viennent de NaowhForever (tables de l'économie).
+
+### Courrier, enchères et banques de guilde
+
+Relevés par l'addon Baganator, envoyés par l'agent 0.8.0 ; ajoutées par `0013_baganator_holdings`.
+Voir [BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md). Séparées de `character_items` : l'économie ne
+les lit pas.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `character_holdings` | `(character_id, location, item_key)` | Courrier (`mail`) et ventes en cours (`auctions`) : quantité, échéance. Remplacés à chaque fichier plus récent |
+| `character_holding_sources` | `character_id` | Date et empreinte du dernier fichier Syndicator appliqué au personnage |
+| `guild_banks` | `id` ; unique `(account_id, name, realm)` | Une banque de guilde vue depuis un compte : or, noms des onglets (`jsonb`), date et empreinte du relevé. Supprimée avec son compte, ou à la synchronisation quand son royaume n'a plus de personnage du compte |
+| `guild_bank_items` | `(guild_bank_id, tab, item_key)` | Contenu d'une banque de guilde par onglet (1 à 16) |
 
 ### Historique et journal
 
@@ -247,6 +261,8 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0009_account_folder_name` | colonne `wow_accounts.folder_name` (ajout seul, null pour les comptes existants) |
 | `0010_item_names_price_alerts` | `item_names`, `price_alerts` (ajouts seuls) |
 | `0011_character_ledger_days` | `character_ledger_days` et son index (ajout seul) |
+| `0012_account_featured` | colonne `wow_accounts.featured` (ajout seul, `false` par défaut) |
+| `0013_baganator_holdings` | `character_holdings`, `character_holding_sources`, `guild_banks`, `guild_bank_items` et leurs index (ajouts seuls) |
 
 ## Checkpoint B
 

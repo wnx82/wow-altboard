@@ -4,7 +4,9 @@ Centralise dans PostgreSQL les données de l'addon World of Warcraft **AltBoard*
 dans un tableau de bord web privé : tous les personnages de tous les comptes, depuis tous les PC.
 Les prix de l'hôtel des ventes (addon **Auctionator**) et les recettes connues (addon
 **NaowhForever**) alimentent un moteur économique : marché, rentabilité des crafts, farm et
-opportunités ([ECONOMY-ENGINE](docs/ECONOMY-ENGINE.md)).
+opportunités ([ECONOMY-ENGINE](docs/ECONOMY-ENGINE.md)). L'addon **Baganator** ajoute le courrier,
+les ventes en cours et les banques de guilde : la page Inventaires montre tout ce que possèdent les
+personnages.
 
 En production : **https://wow.ekreativ.be**
 
@@ -75,6 +77,7 @@ pas par `wow_altboard` : voir `web/src/db/env.ts`.
 | [LEDGER-DATA-MODEL](docs/LEDGER-DATA-MODEL.md) | Temps de jeu par niveau et sessions, issus de l'addon Allemano Ledger |
 | [AUCTIONATOR-DATA-MODEL](docs/AUCTIONATOR-DATA-MODEL.md) | Prix de l'hôtel des ventes relevés par l'addon Auctionator |
 | [PROFESSIONS-DATA-MODEL](docs/PROFESSIONS-DATA-MODEL.md) | Recettes connues par personnage, relevées par l'addon NaowhForever |
+| [BAGANATOR-DATA-MODEL](docs/BAGANATOR-DATA-MODEL.md) | Courrier, ventes en cours et banques de guilde relevés par l'addon Baganator |
 | [ECONOMY-ENGINE](docs/ECONOMY-ENGINE.md) | Règles du moteur économique : prix, confiance, craft, farm, opportunités, assistant |
 | [DATABASE](docs/DATABASE.md) | Schéma PostgreSQL, identifiants, snapshots |
 | [API](docs/API.md) | Contrat de `POST /api/sync` et des autres routes |

@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Version de l'agent : envoyée au serveur dans agentVersion. -->
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

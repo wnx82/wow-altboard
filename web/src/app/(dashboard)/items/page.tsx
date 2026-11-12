@@ -8,7 +8,7 @@ import { classKey, formatDateTime, formatInteger, formatRelative, QUALITY_LABELS
 
 export const metadata: Metadata = { title: "Objets" };
 
-const LOCATIONS: Record<Holding["location"], string> = { bags: "Sacs", bank: "Banque", equipped: "Porté" };
+const LOCATIONS: Record<Holding["location"], string> = { bags: "Sacs", bank: "Banque", equipped: "Porté", mail: "Courrier", auctions: "Enchères" };
 
 export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
   await requireSession();
@@ -21,8 +21,8 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
   return (
     <>
       <PageHeader art="throne" section="characters" title="Objets">
-        Qui possède un objet, et combien : sacs, banque et équipement de tous les personnages, tels que relevés à leur dernière
-        synchronisation.
+        Qui possède un objet, et combien : sacs, banque, équipement, courrier et enchères en cours de tous les personnages, tels
+        que relevés à leur dernière synchronisation.
       </PageHeader>
 
       <form className="mt-6 flex max-w-xl flex-wrap gap-2" role="search" action="">
