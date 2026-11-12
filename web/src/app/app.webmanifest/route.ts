@@ -31,6 +31,10 @@ export function GET(): Response {
       { src: `${base}/icons/icon-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },
       { src: `${base}/icons/maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Le manifeste se désigne lui-même : depuis un onglet, navigator.getInstalledRelatedApps() dit
+    // alors si l'application est déjà installée (bandeau tu, aide adaptée sur la page Application).
+    // prefer_related_applications reste faux : l'installation n'est pas renvoyée vers un magasin.
+    related_applications: [{ platform: "webapp", url: `${base}/app.webmanifest` }],
     shortcuts: [
       shortcut("Objectifs", "/goals"),
       shortcut("Opportunités", "/opportunities"),

@@ -60,7 +60,7 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | `src/lib/economy` | Import des prix et des recettes, moteur économique déterministe (prix, craft, farm, opportunités), faits structurés, assistant facultatif ([ECONOMY-ENGINE](ECONOMY-ENGINE.md)) |
 | `src/lib/wow` | Libellés et formats du jeu ; icônes (`icons.ts`) et illustrations de WoW Forever (`art.ts`) lues sur les CDN de Blizzard par l'optimiseur d'images, jamais copiées dans le dépôt |
 | `src/app` | Pages et routes, manifeste du site installable (`app.webmanifest`) ; `src/proxy.ts` pose la CSP et filtre les requêtes sans session |
-| `public/sw.js` | Service worker du site installable : rien en cache, page « Hors ligne » sans réseau. Inscrit, avec le bandeau qui propose l'installation sur téléphone, par `src/components/app-install.tsx` |
+| `public/sw.js` | Service worker du site installable : rien en cache, page « Hors ligne » sans réseau. Inscrit, avec le bandeau qui propose l'installation sur téléphone, par `src/components/app-install.tsx` ; la page Application (`src/components/app-install-panel.tsx`) guide l'installation et affiche l'état lu sur l'appareil |
 | `scripts` | Outils lancés à la main, dont `generate-icons.ts` qui redessine les icônes du site installable |
 | `src/instrumentation.ts` | Lance le moniteur d'état au démarrage du serveur |
 

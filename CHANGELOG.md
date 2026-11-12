@@ -4,6 +4,29 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.17.0 — 2026-11-12
+
+### Ajouté
+
+- **Page Application** (menu Gestion). Elle indique comment installer AltBoard sur l'appareil
+  utilisé : le bouton « Installer » quand Chrome est prêt, sinon les étapes pour Android, iPhone ou
+  ordinateur. Elle explique aussi les cas où le menu du navigateur ne propose rien : page ouverte
+  depuis une autre application, application déjà installée, navigation privée.
+- Le **diagnostic** de cette page montre ce que le navigateur dit de l'appareil : navigateur,
+  affichage, pointeur, manifeste reçu ou non, service worker, invite de Chrome, application déjà
+  installée, bandeau tu. « Copier le diagnostic » le met en texte, pour le transmettre.
+- « Réafficher le bandeau » annule un « Compris » ou un « Plus tard ».
+
+### Corrigé
+
+- **Bandeau d'installation absent sur certains téléphones.** Un téléphone à stylet (Galaxy à
+  S Pen) annonce un pointeur précis, comme un ordinateur, et le bandeau ne s'affichait jamais. Le
+  téléphone est maintenant reconnu aussi par le système que déclare le navigateur.
+- Le bandeau se taisait pour toujours après une installation, même si l'application avait été
+  désinstallée depuis. Quand Chrome sait dire si l'application est installée, sa réponse
+  l'emporte : le manifeste se déclare dans `related_applications`.
+- Le bandeau, sans invite de Chrome, renvoie vers la page Application (« Pas dans le menu ? »).
+
 ## Site 0.16.0 — 2026-11-11
 
 ### Ajouté
