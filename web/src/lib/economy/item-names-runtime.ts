@@ -70,7 +70,7 @@ export function runIconFilesImport(db: Database, options: { trigger: ImportTrigg
           trigger: options.trigger,
           ok: result.ok,
           ms: Date.now() - started,
-          ...(result.ok ? { build: result.build, count: result.count, removed: result.removed, unchanged: result.unchanged === true } : { error: result.error }),
+          ...(result.ok ? { build: result.build, count: result.count, items: result.items, removed: result.removed, unchanged: result.unchanged === true } : { error: result.error }),
         }),
       );
       return result;

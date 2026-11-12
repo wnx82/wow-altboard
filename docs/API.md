@@ -260,6 +260,22 @@ Faits structurés du moteur économique, en JSON, pour une explication par IA
 Réponse `Cache-Control: private, no-store`. Le calcul d'opportunités qu'il cite est conservé, ou
 réutilisé si sa base n'a pas changé.
 
+## `GET /api/search`
+
+Recherche globale du tableau de bord (Ctrl+K). Session requise (`401` sinon), vérifiée par la
+route elle-même. `?q=` : 2 caractères au moins ou un identifiant d'objet, 60 au plus ; accents et
+majuscules ignorés. Réponse `Cache-Control: private, no-store` :
+
+```json
+{"characters":[{"id":6,"name":"…","realm":"…","class":"PALADIN","level":6}],
+ "items":[{"itemKey":"2589","name":"Étoffe de lin","quality":1,"icon":"inv_fabric_linen_01","owned":550,"href":"/inventory?q=…"}]}
+```
+
+6 personnages et 8 objets au plus, rangés par pertinence (le nom commence par le texte, puis l'un
+de ses mots, puis ailleurs). Les objets possédés passent d'abord et mènent à la page Inventaires ;
+les autres ne sont proposés que si l'hôtel des ventes les a déjà vus, et mènent à leur fiche de
+marché. Les pages du menu sont cherchées par le navigateur, sans appel.
+
 ## `GET /api/health`
 
 Publique. `200` si la base répond, `503` sinon, avec la construction en service :

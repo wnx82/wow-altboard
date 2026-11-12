@@ -5,6 +5,7 @@ import { REASON_LABELS } from "@/lib/economy/opportunities";
 import { holdingPlace } from "@/lib/economy/stock-view";
 import { confidenceTone, formatChange, itemHref } from "@/lib/economy/view";
 import { classKey, formatDateTime, formatInteger } from "@/lib/wow/format";
+import { ItemThumb } from "./item-slots";
 
 // Éléments partagés des pages de l'économie. Composants serveur : aucun état côté navigateur.
 
@@ -28,12 +29,13 @@ export function MarketSelector({ path, market, markets }: { path: string; market
   );
 }
 
-/** Nom d'un objet (couleur de sa qualité quand elle est connue), lié à sa fiche de marché. */
+/** Nom d'un objet (couleur de sa qualité quand elle est connue) précédé de son icône, lié à sa fiche de marché. */
 export function ItemName({ itemKey, names, query = "" }: { itemKey: string; names: ReadonlyMap<string, ItemName>; query?: string }) {
   const quality = itemQuality(names, itemKey);
   return (
-    <Link href={itemHref(itemKey, query)} prefetch={false} className="font-semibold hover:underline" data-quality={quality ?? undefined}>
-      <span className={quality === null ? undefined : "quality-text"}>{itemLabel(names, itemKey)}</span>
+    <Link href={itemHref(itemKey, query)} prefetch={false} className="item-link group font-semibold" data-quality={quality ?? undefined}>
+      <ItemThumb icon={names.get(itemKey)?.icon} quality={quality} />
+      <span className={`min-w-0 group-hover:underline ${quality === null ? "" : "quality-text"}`}>{itemLabel(names, itemKey)}</span>
     </Link>
   );
 }

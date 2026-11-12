@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { CharacterGoals } from "@/components/character-goals";
-import { InventoryList } from "@/components/inventory-list";
+import { CharacterInventory, type CharacterInventoryPlace } from "@/components/character-inventory";
+import { ItemThumb } from "@/components/item-slots";
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
@@ -12,10 +13,11 @@ import { getDatabase } from "@/db/client";
 import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
 import { buildHistory } from "@/lib/dashboard/history";
-import { holdingNote } from "@/lib/dashboard/inventory-view";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
 import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
+import { catalogId, loadItemNames } from "@/lib/economy/item-names";
+import { loadMarketValues } from "@/lib/economy/load";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
 import {
   classKey,
@@ -72,9 +74,48 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
   const character = await load(params);
   if (!character) notFound();
   const db = getDatabase();
-  const [goals, templates] = await Promise.all([listCharacterGoals(db, character.id), listTemplates(db)]);
-
   const now = new Date();
+  const heldKeys = [...character.bags, ...character.bank, ...character.mail, ...character.auctions].map((item) => item.itemKey);
+  const equipmentKeys = character.equipment.flatMap((item) => (item.itemId === null ? [] : [String(item.itemId)]));
+  const [goals, templates, itemNames, values] = await Promise.all([
+    listCharacterGoals(db, character.id),
+    listTemplates(db),
+    loadItemNames(db, [...heldKeys, ...equipmentKeys]),
+    loadMarketValues(db, heldKeys, now),
+  ]);
+  // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
+  const slotItems = Object.fromEntries(
+    [...new Set(heldKeys)].map((key) => {
+      const own = itemNames.get(key);
+      const id = catalogId(key);
+      const base = id === null ? undefined : itemNames.get(String(id));
+      return [key, { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null }];
+    }),
+  );
+  const inventoryPlaces: CharacterInventoryPlace[] = [
+    {
+      place: "bags",
+      seen: character.bagsAt?.toISOString() ?? null,
+      never: "Sacs jamais relevés par l'addon.",
+      items: character.bags.map((item) => ({ itemKey: item.itemKey, quantity: item.quantity, expiresAt: null })),
+    },
+    {
+      place: "bank",
+      seen: character.bankAt?.toISOString() ?? null,
+      never: "Banque jamais relevée : l'addon ne la lit que lorsqu'elle est ouverte en jeu avec ce personnage.",
+      items: character.bank.map((item) => ({ itemKey: item.itemKey, quantity: item.quantity, expiresAt: null })),
+    },
+    // Relevés par Baganator : absents tant que l'agent 0.8.0 n'a rien envoyé pour ce personnage.
+    ...(character.holdingsAt
+      ? (["mail", "auctions"] as const).map((place) => ({
+          place,
+          seen: character.holdingsAt!.toISOString(),
+          never: "",
+          items: character[place].map((item) => ({ itemKey: item.itemKey, quantity: item.quantity, expiresAt: item.expiresAt?.toISOString() ?? null })),
+        }))
+      : []),
+  ];
+
   const stats = character.stats;
   const history = buildHistory(character.snapshots);
   const levelTimes = buildLevelTimes(character.levelTimes, character.playtime, character.level);
@@ -151,7 +192,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         {/* Grande icône de la classe, floue, en fond : la même signature que le podium de l'accueil. */}
         {classIcon && <GameIcon src={classIcon} size={56} className="champion-backdrop" />}
         <ClassAvatar name={character.name} classToken={character.class} size="lg" level={character.level} />
-        <div className="min-w-0 flex-1">
+        {/* Base de 14 rem : sur téléphone, les dates passent sous le nom au lieu de l'écraser. */}
+        <div className="min-w-0 flex-[1_1_14rem]">
           <h1 className="display break-words text-3xl font-bold leading-tight class-text sm:text-[2.6rem]">{character.name}</h1>
           <p className="mt-1 text-lg">
             {classLabel(character.class)}
@@ -316,10 +358,13 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                     <tr key={item.slot} data-quality={item.quality ?? undefined}>
                       <td className="whitespace-nowrap text-muted">{SLOT_LABELS[item.slot] ?? `Emplacement ${item.slot}`}</td>
                       <td>
-                        <span className="quality-text font-medium" title={item.quality === null ? undefined : QUALITY_LABELS[item.quality]}>
-                          {item.name ?? (item.itemId === null ? "Objet inconnu" : `Objet n° ${item.itemId}`)}
+                        <span className="item-link">
+                          <ItemThumb icon={item.itemId === null ? null : itemNames.get(String(item.itemId))?.icon} quality={item.quality} />
+                          <span className="quality-text font-medium" title={item.quality === null ? undefined : QUALITY_LABELS[item.quality]}>
+                            {item.name ?? (item.itemId === null ? "Objet inconnu" : `Objet n° ${item.itemId}`)}
+                          </span>
                         </span>
-                        {item.enchantId !== null && <span className="block text-xs text-ok">Enchantement n° {item.enchantId}</span>}
+                        {item.enchantId !== null && <span className="block pl-[1.9rem] text-xs text-ok">Enchantement n° {item.enchantId}</span>}
                       </td>
                       <td className="num">{item.itemLevel ?? "—"}</td>
                     </tr>
@@ -396,39 +441,14 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         <SectionTitle>
           <span id="inventory">Inventaire</span>
         </SectionTitle>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="panel p-5">
-            <h3 className="eyebrow mb-3">Sacs</h3>
-            {character.bagsAt ? (
-              <InventoryList items={character.bags} label="les sacs" />
-            ) : (
-              <p className="text-sm text-muted">Sacs jamais relevés par l&apos;addon.</p>
-            )}
-          </div>
-          <div className="panel p-5">
-            <h3 className="eyebrow mb-3">Banque</h3>
-            {character.bankAt ? (
-              <InventoryList items={character.bank} label="la banque" />
-            ) : (
-              <p className="text-sm text-muted">
-                Banque jamais relevée : l&apos;addon ne la lit que lorsqu&apos;elle est ouverte en jeu avec ce personnage.
-              </p>
-            )}
-          </div>
-          {/* Relevés par Baganator : absents tant que l'agent 0.8.0 n'a rien envoyé pour ce personnage. */}
-          {character.holdingsAt && (
-            <>
-              <div className="panel p-5">
-                <h3 className="eyebrow mb-3">Courrier</h3>
-                <InventoryList items={character.mail.map((item) => ({ ...item, note: holdingNote(item.expiresAt, now) }))} label="le courrier" />
-              </div>
-              <div className="panel p-5">
-                <h3 className="eyebrow mb-3">Enchères en cours</h3>
-                <InventoryList items={character.auctions.map((item) => ({ ...item, note: holdingNote(item.expiresAt, now) }))} label="les enchères" />
-              </div>
-            </>
-          )}
-        </div>
+        <CharacterInventory
+          characterId={character.id}
+          places={inventoryPlaces}
+          items={slotItems}
+          prices={Object.fromEntries(values.values)}
+          market={values.market?.label ?? null}
+          now={now.toISOString()}
+        />
         {character.holdingsAt && (
           <p className="mt-3 text-xs text-faint">
             Courrier et enchères relevés par Baganator ({formatRelative(character.holdingsAt, now)}) : le courrier à la dernière ouverture

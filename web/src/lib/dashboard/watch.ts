@@ -1,6 +1,7 @@
-import { and, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { expiryFlag, SOON_DAYS } from "./inventory-view";
 import { machineLabel, type CharacterListItem } from "./queries";
 
 // Bloc « À surveiller » de l'accueil : ce qui demande une action en jeu, calculé à partir des
@@ -32,13 +33,17 @@ export type WatchFacts = {
   bankAt: Date | null;
   /** Emplacements occupés ; null si l'équipement n'a jamais été relevé. */
   equippedSlots: number[] | null;
+  /** Courriers qui expirent dans les SOON_DAYS jours (Baganator) : objets et première échéance ; null sinon. */
+  mail: { items: number; nextExpiry: Date } | null;
 };
 
 export type WatchMachine = { id: number; label: string; lastSeenAt: Date };
 
-export type WatchEntry = { character: WatchCharacter; detail: string };
+/** href : lien de la pastille, la fiche du personnage par défaut. */
+export type WatchEntry = { character: WatchCharacter; detail: string; href?: string };
 
 export type WatchList = {
+  mail: WatchEntry[];
   bags: WatchEntry[];
   bank: WatchEntry[];
   stale: WatchEntry[];
@@ -61,11 +66,21 @@ export function silentDays(lastSeenAt: Date, now: Date): number | null {
  * reçu (niveau décroissant) est conservé dans chaque liste.
  */
 export function buildWatchList(characters: WatchCharacter[], facts: Map<number, WatchFacts>, machines: WatchMachine[], now: Date): WatchList {
-  const list: WatchList = { bags: [], bank: [], stale: [], emptySlots: [], professions: [], silentMachines: [] };
+  const list: WatchList = { mail: [], bags: [], bank: [], stale: [], emptySlots: [], professions: [], silentMachines: [] };
 
   for (const character of characters) {
     if (character.hidden) continue;
     const fact = facts.get(character.id);
+
+    // Un courrier expiré est renvoyé à l'expéditeur, ou supprimé (hôtel des ventes, système).
+    const flag = fact?.mail ? expiryFlag(fact.mail.nextExpiry, now) : null;
+    if (fact?.mail && flag?.tone === "soon") {
+      list.mail.push({
+        character,
+        detail: `${plural(fact.mail.items, "objet", "objets")}, ${flag.text}`,
+        href: `/inventory?perso=${character.id}&bientot=1`,
+      });
+    }
 
     if (fact?.bagSlotsTotal && fact.bagSlotsUsed !== null) {
       const free = Math.max(0, fact.bagSlotsTotal - fact.bagSlotsUsed);
@@ -99,13 +114,14 @@ export function buildWatchList(characters: WatchCharacter[], facts: Map<number, 
 }
 
 export const watchCount = (list: WatchList) =>
+  list.mail.length +
   list.bags.length + list.bank.length + list.stale.length + list.emptySlots.length + list.professions.length + list.silentMachines.length;
 
-/** Sacs, banque et emplacements équipés de chaque personnage, en deux requêtes. */
-export async function loadWatchFacts(db: Database, characterIds: number[]): Promise<Map<number, WatchFacts>> {
+/** Sacs, banque, emplacements équipés et courrier bientôt expiré de chaque personnage, en trois requêtes. */
+export async function loadWatchFacts(db: Database, characterIds: number[], now: Date): Promise<Map<number, WatchFacts>> {
   const facts = new Map<number, WatchFacts>();
   if (characterIds.length === 0) return facts;
-  const [rows, equipment] = await Promise.all([
+  const [rows, equipment, mail] = await Promise.all([
     db
       .select({ id: t.characters.id, bagSlotsUsed: t.characters.bagSlotsUsed, bagSlotsTotal: t.characters.bagSlotsTotal, bankAt: t.characters.bankAt })
       .from(t.characters)
@@ -114,7 +130,24 @@ export async function loadWatchFacts(db: Database, characterIds: number[]): Prom
       .select({ characterId: t.characterEquipment.characterId, slot: t.characterEquipment.slot })
       .from(t.characterEquipment)
       .where(and(inArray(t.characterEquipment.characterId, characterIds), isNotNull(t.characterEquipment.itemId))),
+    db
+      .select({
+        characterId: t.characterHoldings.characterId,
+        items: sql<number>`count(*)::int`,
+        nextExpiry: sql<Date>`min(${t.characterHoldings.expiresAt})`,
+      })
+      .from(t.characterHoldings)
+      .where(
+        and(
+          inArray(t.characterHoldings.characterId, characterIds),
+          eq(t.characterHoldings.location, "mail"),
+          gt(t.characterHoldings.expiresAt, now),
+          lte(t.characterHoldings.expiresAt, new Date(now.getTime() + SOON_DAYS * DAY)),
+        ),
+      )
+      .groupBy(t.characterHoldings.characterId),
   ]);
+  const mailByCharacter = new Map(mail.map((row) => [row.characterId, { items: row.items, nextExpiry: new Date(row.nextExpiry) }]));
   const slots = Map.groupBy(equipment, (row) => row.characterId);
   for (const row of rows) {
     facts.set(row.id, {
@@ -122,6 +155,7 @@ export async function loadWatchFacts(db: Database, characterIds: number[]): Prom
       bagSlotsTotal: row.bagSlotsTotal,
       bankAt: row.bankAt,
       equippedSlots: slots.get(row.id)?.map((entry) => entry.slot) ?? null,
+      mail: mailByCharacter.get(row.id) ?? null,
     });
   }
   return facts;

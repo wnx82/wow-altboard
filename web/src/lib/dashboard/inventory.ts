@@ -1,7 +1,8 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
-import { loadIconNames } from "@/lib/wow/icon-files";
+import { catalogId, loadItemNames } from "@/lib/economy/item-names";
+import { loadMarketValues } from "@/lib/economy/load";
 import { accountLabel } from "./queries";
 
 // Page Inventaires : le contenu des sacs, de la banque (AltBoard), du courrier, des enchères en
@@ -42,11 +43,15 @@ export type InventoryData = {
   entries: InventoryEntry[];
   guilds: InventoryGuild[];
   items: Record<string, InventoryItemInfo>;
+  /** Valeur de marché d'une unité, en pièces de cuivre ; un objet sans prix connu est absent. */
+  prices: Record<string, number>;
+  /** Hôtel des ventes dont viennent les prix ; null tant qu'aucun relevé n'a été reçu. */
+  market: { id: number; label: string } | null;
 };
 
 const iso = (date: Date | null) => (date === null ? null : date.toISOString());
 
-export async function loadInventory(db: Database): Promise<InventoryData> {
+export async function loadInventory(db: Database, now: Date = new Date()): Promise<InventoryData> {
   const [characterRows, stored, held, sources, guildRows, guildItems] = await Promise.all([
     db
       .select({
@@ -145,12 +150,16 @@ export async function loadInventory(db: Database): Promise<InventoryData> {
     });
 
   const keys = [...new Set([...entries.map((entry) => entry.itemKey), ...guilds.flatMap((guild) => guild.tabs.flatMap((tab) => tab.items.map((item) => item.itemKey)))])];
-  const itemRows =
-    keys.length === 0
-      ? []
-      : await db.select({ itemKey: t.items.itemKey, name: t.items.name, quality: t.items.quality, icon: t.items.icon }).from(t.items).where(inArray(t.items.itemKey, keys));
-  const icons = await loadIconNames(db, itemRows.flatMap((row) => (row.icon === null ? [] : [row.icon])));
-  const items = Object.fromEntries(itemRows.map(({ itemKey, icon, ...info }) => [itemKey, { ...info, icon: icon === null ? null : (icons.get(icon) ?? null) }]));
+  const [names, prices] = await Promise.all([loadItemNames(db, keys), loadMarketValues(db, keys, now)]);
+  const items: Record<string, InventoryItemInfo> = {};
+  for (const key of keys) {
+    // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
+    const own = names.get(key);
+    const id = catalogId(key);
+    const base = id === null ? undefined : names.get(String(id));
+    const info = { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null };
+    if (info.name !== null || info.quality !== null || info.icon !== null) items[key] = info;
+  }
 
-  return { characters, entries, guilds, items };
+  return { characters, entries, guilds, items, prices: Object.fromEntries(prices.values), market: prices.market };
 }

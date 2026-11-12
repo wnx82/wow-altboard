@@ -21,6 +21,7 @@ const facts = (extra: Partial<WatchFacts> = {}): WatchFacts => ({
   bagSlotsTotal: 40,
   bankAt: ago(2),
   equippedSlots: [...EXPECTED_SLOTS],
+  mail: null,
   ...extra,
 });
 
@@ -74,6 +75,28 @@ describe("à surveiller", () => {
     ];
     const list = buildWatchList([character(1, { professions })], new Map(), [], NOW);
     assert.deepEqual(list.professions.map((entry) => entry.detail), ["Couture 75/75"]);
+  });
+
+  test("courrier qui expire dans les trois jours : objets et temps restant, lien vers l'inventaire filtré", () => {
+    const list = buildWatchList(
+      [character(1), character(2), character(3)],
+      new Map([
+        [1, facts({ mail: { items: 3, nextExpiry: new Date(NOW.getTime() + 2.5 * DAY) } })],
+        [2, facts({ mail: { items: 1, nextExpiry: new Date(NOW.getTime() + 5 * 3_600_000) } })],
+        // Déjà expiré depuis le relevé : plus rien à récupérer.
+        [3, facts({ mail: { items: 2, nextExpiry: ago(1) } })],
+      ]),
+      [],
+      NOW,
+    );
+    assert.deepEqual(
+      list.mail.map((entry) => [entry.character.id, entry.detail, entry.href]),
+      [
+        [1, "3 objets, 2 j", "/inventory?perso=1&bientot=1"],
+        [2, "1 objet, 5 h", "/inventory?perso=2&bientot=1"],
+      ],
+    );
+    assert.equal(watchCount(list), 2);
   });
 
   test("un personnage masqué dans l'addon est ignoré", () => {

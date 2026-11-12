@@ -46,6 +46,14 @@ Moyenne géométrique pondérée de quatre facteurs entre 0 et 1 ; un facteur nu
 Plafond à **30** pour un marché à une ou deux unités en vente, et pour un objet relevé moins de
 trois jours : jamais assez pour décider seul.
 
+### Valeur des inventaires (`loadMarketValues`)
+
+Depuis le site 0.20.0, la page Inventaires et la fiche d'un personnage estiment les objets
+détenus à leur **valeur de marché** sur l'hôtel des ventes relevé le plus récemment, arrondie au
+cuivre, **commission non déduite** : la même règle que la colonne « Valeur détenue » du Marché.
+Un objet sans valeur de marché n'est jamais valorisé ; le total indique combien d'exemplaires il
+laisse de côté. Le tri « Valeur » range ces objets en dernier.
+
 ## Craft (`craft.ts`)
 
 Pour chaque recette connue d'au moins un personnage :
@@ -167,6 +175,14 @@ pour 1.60.1.70888), dont seuls les fichiers de `Interface\ICONS\` à nom simple 
 relève l'icône d'un objet par son identifiant de fichier ; ce nom donne l'adresse de l'image sur le
 CDN de Blizzard (`render.worldofwarcraft.com`, par l'optimiseur d'images). Les icônes propres à WoW
 Forever y manquent : la page Inventaires affiche alors le point d'interrogation du jeu.
+
+Depuis le site 0.20.0, il importe aussi la table `Item` (1,4 Mo, table `item_icons`) : l'icône
+de chaque objet, y compris ceux que l'addon n'a jamais relevés. Une icône se cherche d'abord dans
+`items.icon` (addon), puis dans `item_icons` par l'identifiant de base de la clé (`1234`,
+`1234:567` et `g:1234:60` prennent celle de `1234` ; une mascotte `p:…` n'en a pas). Les deux
+tables sont remplacées dans la même transaction ; un échec du téléchargement de `Item` laisse les
+icônes déjà importées intactes. Les icônes accompagnent le nom des objets sur les pages de
+l'économie, la page Inventaires, la fiche d'un personnage et la recherche globale.
 
 L'agent 0.7.0 complète ces noms avec ceux du cache local du client (`DBCache.bin`), envoyés à la
 synchronisation quand ce cache change (`storeClientNames`). Ce sont les enregistrements que le

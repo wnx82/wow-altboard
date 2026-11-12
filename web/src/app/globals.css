@@ -1292,6 +1292,103 @@ body {
     text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
     pointer-events: none;
   }
+  /* Échéance proche : le temps restant, en jaune comme les alertes du jeu. */
+  .item-flag[data-tone="soon"] { color: #ffd100; text-transform: none; font-size: 0.66rem; }
+
+  /* Petite case devant un nom d'objet, dans les listes et les tableaux. */
+  .item-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    vertical-align: middle;
+  }
+  .item-thumb {
+    display: inline-block;
+    flex: none;
+    width: 1.45rem;
+    height: 1.45rem;
+    overflow: hidden;
+    border: 1px solid #000;
+    border-radius: 0.22rem;
+    background: #0d0d11;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+    vertical-align: middle;
+  }
+  .item-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .item-thumb[data-quality="2"],
+  .item-thumb[data-quality="3"],
+  .item-thumb[data-quality="4"],
+  .item-thumb[data-quality="5"],
+  .item-thumb[data-quality="6"],
+  .item-thumb[data-quality="7"] { border-color: var(--quality); }
+  .item-thumb[data-quality="0"] img { filter: saturate(0.55) brightness(0.85); }
+
+  /* Recherche globale (Ctrl+K) : fenêtre modale en haut de l'écran, résultats groupés. */
+  .search-kbd {
+    place-items: center;
+    min-width: 1.5rem;
+    height: 1.35rem;
+    padding: 0 0.35rem;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    border-radius: 0.35rem;
+    font-size: 0.68rem;
+    font-family: inherit;
+    color: var(--faint);
+    background: rgb(255 255 255 / 0.04);
+  }
+  .search-dialog {
+    width: min(40rem, calc(100vw - 2rem));
+    max-width: none;
+    max-height: min(36rem, calc(100dvh - 3rem));
+    margin: max(1.5rem, 9vh) auto auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 1rem;
+    background: rgb(11 16 28);
+    color: var(--text);
+    box-shadow: 0 30px 70px -20px rgb(0 0 0 / 0.95), 0 0 0 1px rgb(227 189 106 / 0.12);
+  }
+  .search-dialog::backdrop { background: rgb(2 4 9 / 0.62); backdrop-filter: blur(3px); }
+  .search-dialog-frame { display: flex; flex-direction: column; max-height: inherit; }
+  .search-dialog-input {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--line);
+    color: var(--gold);
+  }
+  .search-dialog-input input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.05rem;
+    outline: none;
+  }
+  .search-dialog-input input::placeholder { color: var(--faint); }
+  .search-dialog-results { flex: 1; overflow-y: auto; padding: 0.35rem 0.5rem 0.5rem; overscroll-behavior: contain; }
+  .search-dialog-group {
+    padding: 0.6rem 0.6rem 0.25rem;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(227 189 106 / 0.8);
+  }
+  .search-dialog-option {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 2.6rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.6rem;
+  }
+  .search-dialog-option[aria-selected="true"] { background: rgb(227 189 106 / 0.12); box-shadow: inset 0 0 0 1px rgb(227 189 106 / 0.3); }
+  .search-dialog-status { padding: 0.55rem 1rem; border-top: 1px solid var(--line); font-size: 0.72rem; color: var(--faint); }
 
   /* Bulle d'objet, comme en jeu : fond bleu nuit, bord gris, nom à la couleur de la qualité. */
   .game-tooltip {

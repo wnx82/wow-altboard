@@ -2,6 +2,7 @@ import { inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import type { Parsed } from "@/lib/settings/input";
+import { attachItemIcons } from "@/lib/wow/icon-files";
 import type { ItemName } from "./load";
 
 // Noms des objets qu'aucun personnage n'a possédés. L'addon ne nomme que les objets vus dans les
@@ -245,7 +246,7 @@ export async function catalogSummary(db: Database): Promise<Record<"wago" | "cli
  * (« p:… », identifiant d'espèce), ni une clé à suffixe de l'addon (« 1234:567 ») : leur nombre
  * désignerait un autre objet.
  */
-function catalogId(key: string): number | null {
+export function catalogId(key: string): number | null {
   const match = /^(?:g:)?(\d{1,10})(?::\d{1,5})?$/.exec(key);
   if (!match || (key.includes(":") && !key.startsWith("g:"))) return null;
   const id = Number(match[1]);
@@ -275,12 +276,13 @@ export async function fillCatalogNames(db: Database, names: Map<string, ItemName
   }
 }
 
-/** Noms de quelques objets : ceux relevés par l'addon, complétés par les noms du jeu. */
+/** Noms et icônes de quelques objets : ceux relevés par l'addon, complétés par les tables du jeu. */
 export async function loadItemNames(db: Database, keys: readonly string[]): Promise<Map<string, ItemName>> {
   const unique = [...new Set(keys)];
   if (unique.length === 0) return new Map();
   const rows = await db.select({ itemKey: t.items.itemKey, name: t.items.name, quality: t.items.quality }).from(t.items).where(inArray(t.items.itemKey, unique));
-  const names = new Map(rows.map((row) => [row.itemKey, { name: row.name, quality: row.quality }]));
+  const names = new Map<string, ItemName>(rows.map((row) => [row.itemKey, { name: row.name, quality: row.quality }]));
   await fillCatalogNames(db, names, unique);
+  await attachItemIcons(db, names, unique);
   return names;
 }

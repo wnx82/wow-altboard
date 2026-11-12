@@ -5,6 +5,7 @@ import { readSettings } from "@/lib/settings/store";
 import { DEFAULT_CRAFT_OPTIONS, evaluateRecipe, type CraftEvaluation, type Recipe } from "./craft";
 import { addDays, todayInBrussels } from "./days";
 import { farmSignal, type FarmSignal } from "./farm";
+import { attachItemIcons } from "@/lib/wow/icon-files";
 import { fillCatalogNames } from "./item-names";
 import { computeItemStats, type DayObservation, type ItemStats } from "./prices";
 
@@ -21,7 +22,8 @@ export type MarketSummary = {
   lastReceivedAt: Date | null;
 };
 
-export type ItemName = { name: string | null; quality: number | null };
+/** icon : nom de fichier de l'icône (« inv_scroll_03 »), quand il est connu. */
+export type ItemName = { name: string | null; quality: number | null; icon?: string | null };
 
 /** Quantité d'un objet chez un personnage : total, dont sacs et banque. */
 export type Holding = { characterId: number; characterName: string; characterClass: string | null; quantity: number; bags: number; bank: number };
@@ -139,6 +141,14 @@ export async function loadHoldings(db: Database, itemKeys?: readonly string[]): 
   return holdings;
 }
 
+/** Jours lus pour les statistiques : la fenêtre, sans rien d'antérieur au début de l'historique. */
+function statsWindow(settings: { marketHistoryFrom: Date | null; charactersCutoffAt: Date | null }, now: Date) {
+  const historyFrom = historyStart(settings);
+  const today = todayInBrussels(now);
+  const windowStart = addDays(today, -WINDOW_DAYS);
+  return { historyFrom, today, from: historyFrom && historyFrom > windowStart ? historyFrom : windowStart };
+}
+
 /** Contexte complet, ou null tant qu'aucun prix n'a été reçu. */
 export async function loadEconomy(db: Database, options: { marketId?: number; now: Date }): Promise<EconomyContext | null> {
   const markets = await listMarkets(db);
@@ -146,11 +156,8 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
   if (!market) return null;
 
   const settings = await readSettings(db);
-  const historyFrom = historyStart(settings);
+  const { historyFrom, today, from } = statsWindow(settings, options.now);
   const auctionCut = (settings.auctionCutPercent ?? 5) / 100;
-  const today = todayInBrussels(options.now);
-  const windowStart = addDays(today, -WINDOW_DAYS);
-  const from = historyFrom && historyFrom > windowStart ? historyFrom : windowStart;
 
   const [dayRows, latestRows, vendorRows, itemRows, holdings, recipeRows, reagentRows, knownRows, lastImportRows, lastRun, professionRows, newestImport] = await Promise.all([
     db
@@ -226,11 +233,13 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
     }));
 
   // Objets jamais possédés : le nom vient de la table du jeu (Paramètres → Noms des objets).
-  await fillCatalogNames(db, names, [
+  const shownKeys = [
     ...stats.keys(),
     ...holdings.keys(),
     ...recipes.flatMap((recipe) => [String(recipe.outputItemId), ...recipe.reagents.map((reagent) => String(reagent.itemId))]),
-  ]);
+  ];
+  await fillCatalogNames(db, names, shownKeys);
+  await attachItemIcons(db, names, shownKeys);
 
   const craftOptions = { ...DEFAULT_CRAFT_OPTIONS, auctionCut };
   const crafts = recipes.map((recipe) =>
@@ -264,6 +273,45 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
     newestImportId: newestImport[0]?.id ?? null,
     lastSyncRunId: lastRun[0]?.id ?? null,
   };
+}
+
+export type MarketValues = {
+  /** Marché dont viennent les valeurs : le plus récemment relevé, comme sur les pages de l'économie. */
+  market: { id: number; label: string } | null;
+  /** Valeur de marché d'une unité, en pièces de cuivre ; les objets sans valeur sont absents. */
+  values: Map<string, number>;
+};
+
+/**
+ * Valeur de marché de quelques objets (médiane des plus bas journaliers, voir computeItemStats) :
+ * la même que la colonne « Valeur détenue » de la page Marché, commission non déduite.
+ */
+export async function loadMarketValues(db: Database, itemKeys: readonly string[], now: Date): Promise<MarketValues> {
+  const market = (await listMarkets(db)).find((m) => m.lastDay !== null);
+  const keys = [...new Set(itemKeys)];
+  if (!market || keys.length === 0) return { market: market ? { id: market.id, label: market.label } : null, values: new Map() };
+
+  const { historyFrom, today, from } = statsWindow(await readSettings(db), now);
+  const [dayRows, latestRows] = await Promise.all([
+    db
+      .select({ itemKey: t.marketItemDays.itemKey, day: t.marketItemDays.day, low: t.marketItemDays.lowCopper, high: t.marketItemDays.highCopper, available: t.marketItemDays.available })
+      .from(t.marketItemDays)
+      .where(and(eq(t.marketItemDays.marketId, market.id), gte(t.marketItemDays.day, from), inArray(t.marketItemDays.itemKey, keys))),
+    db
+      .select({ itemKey: t.marketItemLatest.itemKey, minCopper: t.marketItemLatest.minCopper, day: t.marketItemLatest.day })
+      .from(t.marketItemLatest)
+      .where(and(eq(t.marketItemLatest.marketId, market.id), inArray(t.marketItemLatest.itemKey, keys))),
+  ]);
+  const days = new Map<string, DayObservation[]>();
+  for (const { itemKey, ...day } of dayRows) days.set(itemKey, [...(days.get(itemKey) ?? []), day]);
+  const latest = new Map(latestRows.map((row) => [row.itemKey, { minCopper: row.minCopper, day: row.day }]));
+
+  const values = new Map<string, number>();
+  for (const itemKey of new Set([...days.keys(), ...latest.keys()])) {
+    const value = computeItemStats(itemKey, days.get(itemKey) ?? [], latest.get(itemKey) ?? null, today, historyFrom).marketValue;
+    if (value !== null) values.set(itemKey, Math.round(value));
+  }
+  return { market: { id: market.id, label: market.label }, values };
 }
 
 /** Historique complet d'un objet sur un marché, du plus ancien au plus récent. */

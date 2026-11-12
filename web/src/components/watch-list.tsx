@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SOON_DAYS } from "@/lib/dashboard/inventory-view";
 import { EQUIPMENT_MIN_LEVEL, SILENT_MACHINE_DAYS, STALE_CHARACTER_DAYS, watchCount, type WatchEntry, type WatchList } from "@/lib/dashboard/watch";
 import { classKey } from "@/lib/wow/format";
 
@@ -12,9 +13,9 @@ function CharacterChips({ entries }: { entries: WatchEntry[] }) {
   const shown = entries.slice(0, SHOWN);
   return (
     <>
-      {shown.map(({ character, detail }) => (
+      {shown.map(({ character, detail, href }) => (
         <li key={`${character.id}-${detail}`} data-class={classKey(character.class)}>
-          <Link href={`/characters/${character.id}`} prefetch={false} className="badge gap-1.5 hover:border-gold/60">
+          <Link href={href ?? `/characters/${character.id}`} prefetch={false} className="badge gap-1.5 hover:border-gold/60">
             <span className="font-semibold class-text">{character.name}</span>
             <span className="text-muted">{detail}</span>
           </Link>
@@ -69,6 +70,11 @@ export function WatchListPanel({ list, alerts = [] }: { list: WatchList; alerts?
                 </Link>
               </li>
             )}
+          </Row>
+        )}
+        {list.mail.length > 0 && (
+          <Row label="Courrier à récupérer" hint={`Expire dans les ${SOON_DAYS} jours : renvoyé ou supprimé ensuite`}>
+            <CharacterChips entries={list.mail} />
           </Row>
         )}
         {list.silentMachines.length > 0 && (

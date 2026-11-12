@@ -6,7 +6,9 @@ import { asc, eq } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { countRows, openTestDatabase, type TestDatabase } from "@/db/testing";
 import { createAgentToken } from "@/lib/agent-tokens";
+import { searchEverything } from "@/lib/dashboard/global-search";
 import { loadInventory } from "@/lib/dashboard/inventory";
+import { loadWatchFacts } from "@/lib/dashboard/watch";
 import { processSync } from "./process";
 import { syncPayloadSchema, type AccountPayload, type SyncPayload } from "./schema";
 
@@ -157,6 +159,98 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
     // Royaume sans personnage du compte : la guilde n'est plus montrée, avant même sa suppression.
     await database.db.update(t.guildBanks).set({ realm: "RoyaumeDisparu" });
     assert.deepEqual((await loadInventory(database.db)).guilds, []);
+  });
+
+  test("valeur de marché des objets possédés, sur le marché relevé le plus récemment", async () => {
+    await sync(clone());
+    assert.deepEqual((await loadInventory(database.db, NOW)).market, null);
+
+    const [{ accountId }] = await database.db.select({ accountId: t.wowAccounts.id }).from(t.wowAccounts).limit(1);
+    const [market] = await database.db.insert(t.markets).values({ flavor: "_forever_", auctionKey: "PvE" }).returning();
+    await database.db.insert(t.marketImports).values({
+      marketId: market.id,
+      accountId,
+      contentHash: "c",
+      fileHash: "f",
+      fileModifiedAt: NOW,
+      itemsCount: 1,
+      observationsCount: 3,
+      lastDay: "2026-11-12",
+    });
+    // Trois jours relevés : la valeur est la médiane des plus bas (voir computeItemStats).
+    await database.db.insert(t.marketItemDays).values(
+      [
+        ["2026-11-10", 100],
+        ["2026-11-11", 140],
+        ["2026-11-12", 120],
+      ].map(([day, low]) => ({ marketId: market.id, itemKey: "2318", day: day as string, lowCopper: low as number, highCopper: 200 })),
+    );
+    await database.db.insert(t.marketItemLatest).values({ marketId: market.id, itemKey: "2318", minCopper: 120, day: "2026-11-12", observedAt: NOW });
+
+    const data = await loadInventory(database.db, NOW);
+    assert.deepEqual(data.market, { id: market.id, label: "PvE · WoW Forever" });
+    assert.deepEqual(data.prices, { "2318": 120 });
+  });
+
+  test("recherche globale : personnages et objets, possédés d'abord, sans accent", async () => {
+    await sync(clone());
+    assert.deepEqual(await searchEverything(database.db, "e"), { characters: [], items: [] });
+
+    const found = await searchEverything(database.db, "ELODIE");
+    assert.deepEqual(
+      found.characters.map((character) => character.name),
+      ["Élodie Brisefer"],
+    );
+
+    const sword = await searchEverything(database.db, "epee large");
+    assert.deepEqual(
+      sword.items.map((item) => [item.itemKey, item.owned, item.href]),
+      [["15210:1017", 1, "/inventory?q=%C3%89p%C3%A9e%20large%20de%20l'ours"]],
+    );
+
+    // Jamais possédé : trouvé seulement s'il a été vu à l'hôtel des ventes, et mène à sa fiche.
+    const [{ accountId }] = await database.db.select({ accountId: t.wowAccounts.id }).from(t.wowAccounts).limit(1);
+    const [market] = await database.db.insert(t.markets).values({ flavor: "_forever_", auctionKey: "PvE" }).returning();
+    const [importRow] = await database.db
+      .insert(t.marketImports)
+      .values({ marketId: market.id, accountId, contentHash: "c", fileHash: "f", fileModifiedAt: NOW, itemsCount: 1, observationsCount: 1, lastDay: "2026-11-12" })
+      .returning();
+    await database.db.insert(t.itemNames).values([
+      { itemId: 999001, name: "Étoffe de nuée céleste", quality: 1, source: "wago", build: "1.60.1.70888" },
+      { itemId: 999002, name: "Étoffe de brume", quality: 1, source: "wago", build: "1.60.1.70888" },
+    ]);
+    await database.db.insert(t.marketItemLatest).values({ marketId: market.id, itemKey: "999001", minCopper: 90, day: "2026-11-12", observedAt: NOW, importId: importRow.id });
+    const cloth = await searchEverything(database.db, "étoffe de");
+    const keys = cloth.items.map((item) => item.itemKey);
+    assert.equal(cloth.items.find((item) => item.itemKey === "999001")?.href, "/market/999001");
+    assert.equal(keys.includes("999002"), false, "jamais vu en vente");
+    const owned = cloth.items.map((item) => item.owned > 0);
+    assert.deepEqual(owned, [...owned].sort((a, b) => Number(b) - Number(a)), "possédés d'abord");
+    assert.deepEqual((await searchEverything(database.db, "999001")).items.map((item) => item.itemKey), ["999001"]);
+    // Les caractères spéciaux de LIKE sont cherchés tels quels.
+    assert.deepEqual(await searchEverything(database.db, "%%"), { characters: [], items: [] });
+    // Au-delà de 9 chiffres, aucun identifiant d'objet possible : pas d'erreur de la colonne integer.
+    assert.deepEqual(await searchEverything(database.db, "99999999999"), { characters: [], items: [] });
+
+    // Des objets relevés un jour mais plus détenus, mieux classés, ne chassent pas l'objet possédé.
+    await database.db.insert(t.items).values(
+      Array.from({ length: 90 }, (_, index) => ({ itemKey: String(990000 + index), itemId: 990000 + index, name: `Épée large ancienne ${index}`, quality: 5 })),
+    );
+    const crowded = await searchEverything(database.db, "epee large");
+    assert.deepEqual(
+      crowded.items.map((item) => item.itemKey),
+      ["15210:1017"],
+    );
+  });
+
+  test("à surveiller : le courrier qui expire dans les trois jours, objets et première échéance", async () => {
+    await sync(clone());
+    const [mage] = await database.db.select({ id: t.characters.id }).from(t.characters).where(eq(t.characters.guid, MAGE));
+    const soon = new Date((1796500000 - 24 * 3600) * 1000);
+    assert.deepEqual((await loadWatchFacts(database.db, [mage.id], soon)).get(mage.id)?.mail, { items: 1, nextExpiry: new Date(1796500000 * 1000) });
+    // Plus de trois jours avant, ou une fois expiré : rien.
+    assert.equal((await loadWatchFacts(database.db, [mage.id], new Date((1796500000 - 4 * 24 * 3600) * 1000))).get(mage.id)?.mail, null);
+    assert.equal((await loadWatchFacts(database.db, [mage.id], new Date(1797999134 * 1000))).get(mage.id)?.mail, null);
   });
 
   test("un agent antérieur à 0.8.0, sans bloc Baganator, laisse le relevé en place", async () => {

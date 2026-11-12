@@ -4,6 +4,37 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.20.0 — 2026-11-12
+
+### Ajouté
+
+- **Valeur des inventaires.** Chaque objet est estimé à sa valeur de marché sur l'hôtel des ventes
+  relevé le plus récemment, commission non déduite, comme la colonne « Valeur détenue » du Marché.
+  - La bulle d'objet affiche le prix unitaire et la valeur de la pile. Épinglée, elle mène au cours
+    de l'objet au marché.
+  - Total estimé en tête de la page Inventaires, puis par personnage et par banque de guilde dans la
+    vue sac par sac. Les exemplaires sans prix connu ne sont pas comptés ; le total le signale.
+  - Nouveau tri « Valeur » (`?tri=valeur`) : les objets sans prix passent en dernier.
+- **Échéances proches.** Un courrier ou une vente qui expire dans les 3 jours porte le temps restant
+  au coin de sa case (« 20 h », « 2 j »). Bouton « Bientôt échus » (`?bientot=1`) sur la page
+  Inventaires. Sur l'accueil, le bloc « À surveiller » liste le courrier à récupérer, avec un lien
+  vers les objets concernés.
+- **Recherche globale** : loupe dans l'en-tête, ou Ctrl+K (⌘K sur Mac). Personnages, objets
+  (possédés d'abord, puis ceux déjà vus à l'hôtel des ventes) et pages du menu, sans tenir compte
+  des accents ; flèches et Entrée au clavier. Route `GET /api/search`.
+- **Icônes des objets partout** : devant les noms d'objets du Marché, du Craft, des Opportunités et
+  du Farm, et dans l'équipement d'un personnage. Le contrôle de wago.tools importe aussi la table
+  `Item` du jeu, qui donne l'icône des objets que l'addon n'a jamais relevés.
+- Migration `0015_item_icons` : table `item_icons` (ajout seul).
+
+### Modifié
+
+- **Fiche d'un personnage** : l'inventaire (sacs, banque, courrier, enchères) s'affiche en fenêtre de
+  sac comme sur la page Inventaires, avec la même bulle, une recherche locale, la valeur estimée et
+  un lien vers la page Inventaires limitée à ce personnage.
+- Sur téléphone, les informations de la fiche d'un personnage passent sous son nom au lieu de
+  l'écraser.
+
 ## Site 0.19.0 — 2026-11-12
 
 ### Modifié

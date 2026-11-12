@@ -3,10 +3,13 @@ import { describe, test } from "node:test";
 import type { InventoryData } from "./inventory";
 import {
   DEFAULT_STATE,
+  expiryFlag,
   groupByCharacter,
   groupByGuild,
   groupByItem,
+  holdingsValue,
   readInventoryState,
+  rowFlag,
   selectHoldings,
   slotCount,
   sortHoldings,
@@ -51,6 +54,8 @@ const DATA: InventoryData = {
     "15210:1017": { name: "Épée large de l'ours", quality: 2, icon: null },
     "20576": { name: "Peau noire", quality: 3, icon: null },
   },
+  prices: { "2589": 150, "20576": 12_000 },
+  market: { id: 1, label: "PvE · WoW Forever" },
 };
 
 const select = (patch: Partial<InventoryState> = {}) => selectHoldings(DATA, state(patch), NOW);
@@ -62,14 +67,25 @@ describe("page Inventaires : état dans l'adresse", () => {
   });
 
   test("aller-retour d'un état complet, les autres paramètres gardés", () => {
-    const full = state({ query: "étoffe", account: "10", character: "1", places: ["bags", "guild"], minQuality: "2", expired: true, view: "characters", sort: "name" });
+    const full = state({
+      query: "étoffe",
+      account: "10",
+      character: "1",
+      places: ["bags", "guild"],
+      minQuality: "2",
+      expired: true,
+      soon: true,
+      view: "characters",
+      sort: "value",
+    });
     const search = writeInventoryState(full, "?autre=1");
     assert.match(search, /autre=1/);
     assert.deepEqual(read(search), full);
   });
 
   test("les valeurs illisibles gardent leur valeur par défaut", () => {
-    assert.deepEqual(read("compte=abc&perso=-1&lieux=nulle-part&qualite=9&vue=x&tri=y&echus=oui"), DEFAULT_STATE);
+    assert.deepEqual(read("compte=abc&perso=-1&lieux=nulle-part&qualite=9&vue=x&tri=y&echus=oui&bientot=2"), DEFAULT_STATE);
+    assert.equal(writeInventoryState(state({ soon: true, sort: "value" })), "?bientot=1&tri=valeur");
   });
 
   test("un personnage choisi s'affiche sac par sac, sauf présentation demandée", () => {
@@ -93,8 +109,58 @@ describe("page Inventaires : cases", () => {
     const bags = select({ character: "1", expired: true });
     const order = (sort: InventoryState["sort"]) => sortHoldings(bags, DATA.items, sort).map((holding) => `${holding.itemKey}×${holding.quantity}`);
     assert.deepEqual(order("total"), ["2589×20", "2589×5", "15210:1017×1"]);
+    assert.deepEqual(
+      sortHoldings(bags, DATA.items, "value", DATA.prices).map((holding) => `${holding.itemKey}×${holding.quantity}`),
+      ["2589×20", "2589×5", "15210:1017×1"],
+    );
     assert.deepEqual(order("name"), ["15210:1017×1", "2589×20", "2589×5"]);
     assert.deepEqual(order("quality"), ["15210:1017×1", "2589×20", "2589×5"]);
+  });
+});
+
+describe("page Inventaires : échéances", () => {
+  test("au coin d'une case : échu, puis le temps restant dans les trois derniers jours", () => {
+    const at = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000).toISOString();
+    assert.deepEqual(expiryFlag(null, NOW), null);
+    assert.deepEqual(expiryFlag(at(-1), NOW), { text: "échu", tone: "expired" });
+    assert.deepEqual(expiryFlag(at(0.5), NOW), { text: "< 1 h", tone: "soon" });
+    assert.deepEqual(expiryFlag(at(5.9), NOW), { text: "5 h", tone: "soon" });
+    assert.deepEqual(expiryFlag(at(47), NOW), { text: "47 h", tone: "soon" });
+    assert.deepEqual(expiryFlag(at(60), NOW), { text: "2 j", tone: "soon" });
+    assert.deepEqual(expiryFlag(at(72), NOW), { text: "3 j", tone: "soon" });
+    assert.deepEqual(expiryFlag(at(73), NOW), null);
+  });
+
+  test("un objet n'est échu que si tous ses exemplaires datés le sont ; sinon l'échéance la plus proche", () => {
+    const rows = groupByItem(select({ expired: true }), DATA.items, "total");
+    const flagOf = (key: string) => rowFlag(rows.find((row) => row.itemKey === key)!.holdings, NOW);
+    assert.deepEqual(flagOf("15210:1017"), { text: "échu", tone: "expired" });
+    assert.deepEqual(flagOf("20576"), { text: "6 h", tone: "soon" });
+    assert.equal(flagOf("2589"), null);
+  });
+
+  test("filtre « Bientôt échus » : les échéances proches, les échues avec « Échus »", () => {
+    assert.deepEqual(select({ soon: true }).map((h) => h.itemKey), ["20576"]);
+    assert.deepEqual(select({ soon: true, expired: true }).map((h) => h.itemKey), ["15210:1017", "20576"]);
+  });
+});
+
+describe("page Inventaires : valeur", () => {
+  test("valeur de marché d'un objet et de lignes, exemplaires sans prix comptés à part", () => {
+    const rows = groupByItem(select({ expired: true }), DATA.items, "value", DATA.prices);
+    assert.deepEqual(
+      rows.map((row) => [row.itemKey, row.unit, row.value]),
+      [
+        ["20576", 12_000, 36_000],
+        ["2589", 150, 72 * 150],
+        ["15210:1017", null, null],
+      ],
+    );
+    // Le courrier échu (15210:1017) s'affiche avec « Échus », mais ne compte plus dans la valeur.
+    assert.deepEqual(holdingsValue(select({ expired: true }), DATA.prices, NOW), { value: 36_000 + 72 * 150, unpriced: 0 });
+    assert.deepEqual(holdingsValue(select(), DATA.prices, NOW), { value: 36_000 + 72 * 150, unpriced: 0 });
+    assert.deepEqual(holdingsValue([{ itemKey: "15210:1017", quantity: 1, expiresAt: "2026-11-13T00:00:00Z" }], DATA.prices, NOW), { value: 0, unpriced: 1 });
+    assert.deepEqual(holdingsValue([], DATA.prices, NOW), { value: 0, unpriced: 0 });
   });
 });
 

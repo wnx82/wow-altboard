@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GlobalSearch } from "@/components/global-search";
 import { MainNav } from "@/components/main-nav";
 import { logoutAction } from "@/lib/auth/actions";
 import { requireSession } from "@/lib/auth/session";
@@ -28,6 +29,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
           </Link>
           {/* Pages groupées en listes déroulantes : l'en-tête tient sur une ligne à toutes les largeurs. */}
           <MainNav />
+          <GlobalSearch basePath={process.env.WOW_BASE_PATH ?? ""} />
           <form action={logoutAction} className="flex flex-none items-center gap-3">
             <span className="hidden text-xs text-faint lg:inline">{session.email}</span>
             <button className="button" type="submit" aria-label="Se déconnecter" title="Se déconnecter">

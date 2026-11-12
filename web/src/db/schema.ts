@@ -135,6 +135,16 @@ export const iconFiles = pgTable("icon_files", {
   updatedAt: updatedAt(),
 });
 
+// Icône de chaque objet du jeu (identifiant de fichier, voir icon_files), pour les objets
+// qu'aucun personnage n'a possédés : hôtel des ventes, recettes. Importée de la table Item de
+// wago.tools avec icon_files. Repli seulement : l'icône relevée par l'addon (items.icon) l'emporte.
+export const itemIcons = pgTable("item_icons", {
+  itemId: integer("item_id").primaryKey(),
+  fileId: integer("file_id").notNull(),
+  build: text("build").notNull(),
+  updatedAt: updatedAt(),
+});
+
 // ---------------------------------------------------------------------------
 // Personnages
 // ---------------------------------------------------------------------------

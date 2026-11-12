@@ -24,13 +24,36 @@ export function holdingNote(expiresAt: Date | string | null, now: Date): { text:
   return at.getTime() <= now.getTime() ? { text: "expiré", warn: true } : { text: `expire ${formatRelative(at, now)}`, warn: false };
 }
 
+/** En deçà, une échéance est proche : signalée sur la case, sur l'accueil, et retenue par le filtre « Bientôt échus ». */
+export const SOON_DAYS = 3;
+const SOON_MS = SOON_DAYS * 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+/** Échéance proche (dans les SOON_DAYS jours) ou déjà passée ; faux sans échéance. */
+export function isSoon(expiresAt: Date | string | null, now: Date): boolean {
+  return expiresAt !== null && new Date(expiresAt).getTime() <= now.getTime() + SOON_MS;
+}
+
+export type ExpiryFlag = { text: string; tone: "expired" | "soon" };
+
+/** Mention au coin d'une case : « échu », ou le temps restant quand l'échéance est proche (« 5 h », « 2 j »). */
+export function expiryFlag(expiresAt: Date | string | null, now: Date): ExpiryFlag | null {
+  if (expiresAt === null) return null;
+  const left = new Date(expiresAt).getTime() - now.getTime();
+  if (left <= 0) return { text: "échu", tone: "expired" };
+  if (left > SOON_MS) return null;
+  if (left < HOUR_MS) return { text: "< 1 h", tone: "soon" };
+  if (left < 48 * HOUR_MS) return { text: `${Math.floor(left / HOUR_MS)} h`, tone: "soon" };
+  return { text: `${Math.floor(left / (24 * HOUR_MS))} j`, tone: "soon" };
+}
+
 export const VIEWS = ["items", "characters"] as const;
 export type InventoryView = (typeof VIEWS)[number];
 
 /** Un personnage choisi s'affiche sac par sac, comme en jeu ; sinon les objets de tous sont regroupés. */
 export const defaultView = (character: string): InventoryView => (character === "" ? "items" : "characters");
 
-export const SORTS = ["total", "name", "quality"] as const;
+export const SORTS = ["total", "value", "name", "quality"] as const;
 export type InventorySort = (typeof SORTS)[number];
 
 export type InventoryState = {
@@ -44,6 +67,8 @@ export type InventoryState = {
   minQuality: string;
   /** Courriers et ventes dont l'échéance est passée au moment du relevé suivant. */
   expired: boolean;
+  /** Seulement les courriers et ventes dont l'échéance est proche (SOON_DAYS). */
+  soon: boolean;
   view: InventoryView;
   sort: InventorySort;
 };
@@ -55,15 +80,26 @@ export const DEFAULT_STATE: InventoryState = {
   places: [...PLACES],
   minQuality: "",
   expired: false,
+  soon: false,
   view: "items",
   sort: "total",
 };
 
 const MAX_TEXT = 80;
-const PARAMS = { query: "q", account: "compte", character: "perso", places: "lieux", minQuality: "qualite", expired: "echus", view: "vue", sort: "tri" } as const;
+const PARAMS = {
+  query: "q",
+  account: "compte",
+  character: "perso",
+  places: "lieux",
+  minQuality: "qualite",
+  expired: "echus",
+  soon: "bientot",
+  view: "vue",
+  sort: "tri",
+} as const;
 const OWNED = Object.values(PARAMS);
 const VIEW_VALUES: Record<InventoryView, string> = { items: "objets", characters: "personnages" };
-const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", name: "nom", quality: "qualite" };
+const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", value: "valeur", name: "nom", quality: "qualite" };
 const PLACE_VALUES: Record<InventoryPlace, string> = { bags: "sacs", bank: "banque", mail: "courrier", auctions: "encheres", guild: "guilde" };
 
 const isId = (value: string | null): value is string => value !== null && /^\d{1,9}$/.test(value);
@@ -82,6 +118,7 @@ export function readInventoryState(params: { get(name: string): string | null })
     places: places.length === 0 ? [...PLACES] : places,
     minQuality: quality !== null && /^[0-7]$/.test(quality) ? quality : "",
     expired: params.get(PARAMS.expired) === "1",
+    soon: params.get(PARAMS.soon) === "1",
     view: VIEWS.find((view) => VIEW_VALUES[view] === params.get(PARAMS.view)) ?? defaultView(isId(character) ? character : ""),
     sort: SORTS.find((sort) => SORT_VALUES[sort] === params.get(PARAMS.sort)) ?? DEFAULT_STATE.sort,
   };
@@ -100,6 +137,7 @@ export function writeInventoryState(state: InventoryState, current = ""): string
   }
   if (state.minQuality !== "") params.set(PARAMS.minQuality, state.minQuality);
   if (state.expired) params.set(PARAMS.expired, "1");
+  if (state.soon) params.set(PARAMS.soon, "1");
   if (state.view !== defaultView(state.character)) params.set(PARAMS.view, VIEW_VALUES[state.view]);
   if (state.sort !== DEFAULT_STATE.sort) params.set(PARAMS.sort, SORT_VALUES[state.sort]);
 
@@ -146,6 +184,7 @@ export function selectHoldings(data: InventoryData, state: InventoryState, now: 
   const keep = (holding: Holding) => {
     if (!state.places.includes(holdingPlace(holding))) return false;
     if (!state.expired && isExpired(holding, now)) return false;
+    if (state.soon && (holding.kind !== "character" || !isSoon(holding.expiresAt, now))) return false;
     const info = data.items[holding.itemKey];
     if (minQuality !== null && (info?.quality ?? -1) < minQuality) return false;
     return matchesQuery(holding.itemKey, info, needle);
@@ -172,40 +211,92 @@ export function selectHoldings(data: InventoryData, state: InventoryState, now: 
   return holdings;
 }
 
-export type ItemRow = { itemKey: string; name: string | null; quality: number | null; total: number; holdings: Holding[] };
+/** Prix d'une unité de chaque objet, en pièces de cuivre (InventoryData.prices). */
+export type Prices = Readonly<Record<string, number>>;
+
+/**
+ * unit : valeur de marché d'une unité ; value : celle de tous les exemplaires. Null sans prix connu.
+ */
+export type ItemRow = { itemKey: string; name: string | null; quality: number | null; total: number; unit: number | null; value: number | null; holdings: Holding[] };
+
+/**
+ * Valeur de marché de lignes d'inventaire, et nombre d'exemplaires sans prix connu. Un courrier ou
+ * une vente échus ne comptent pas : l'objet a été renvoyé, supprimé ou vendu.
+ */
+export function holdingsValue(
+  holdings: readonly { itemKey: string; quantity: number; expiresAt?: string | null }[],
+  prices: Prices,
+  now: Date,
+): { value: number; unpriced: number } {
+  let value = 0;
+  let unpriced = 0;
+  for (const holding of holdings) {
+    if (holding.expiresAt && new Date(holding.expiresAt).getTime() <= now.getTime()) continue;
+    const unit = prices[holding.itemKey];
+    if (unit === undefined) unpriced += holding.quantity;
+    else value += unit * holding.quantity;
+  }
+  return { value, unpriced };
+}
+
+/**
+ * Mention au coin de la case d'un objet tous détenteurs confondus : « échu » quand tous ses
+ * courriers et ventes le sont, sinon l'échéance proche la plus courte.
+ */
+export function rowFlag(holdings: readonly Holding[], now: Date): ExpiryFlag | null {
+  let expired = 0;
+  let soonest: { flag: ExpiryFlag; at: number } | null = null;
+  for (const holding of holdings) {
+    const flag = holding.kind === "character" ? expiryFlag(holding.expiresAt, now) : null;
+    if (flag?.tone === "expired") expired += 1;
+    if (flag?.tone !== "soon" || holding.kind !== "character" || holding.expiresAt === null) continue;
+    const at = new Date(holding.expiresAt).getTime();
+    if (soonest === null || at < soonest.at) soonest = { flag, at };
+  }
+  if (holdings.length > 0 && expired === holdings.length) return { text: "échu", tone: "expired" };
+  return soonest?.flag ?? null;
+}
 
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
 /** Un objet par ligne, quantités additionnées sur tous les détenteurs, du plus gros détenteur au plus petit. */
-export function groupByItem(holdings: Holding[], items: InventoryData["items"], sort: InventorySort): ItemRow[] {
+export function groupByItem(holdings: Holding[], items: InventoryData["items"], sort: InventorySort, prices: Prices = {}): ItemRow[] {
   const rows = new Map<string, ItemRow>();
   for (const holding of holdings) {
     let row = rows.get(holding.itemKey);
     if (!row) {
       const info = items[holding.itemKey];
-      row = { itemKey: holding.itemKey, name: info?.name ?? null, quality: info?.quality ?? null, total: 0, holdings: [] };
+      const unit = prices[holding.itemKey] ?? null;
+      row = { itemKey: holding.itemKey, name: info?.name ?? null, quality: info?.quality ?? null, total: 0, unit, value: null, holdings: [] };
       rows.set(holding.itemKey, row);
     }
     row.total += holding.quantity;
     row.holdings.push(holding);
   }
-  for (const row of rows.values()) row.holdings.sort((a, b) => b.quantity - a.quantity);
+  for (const row of rows.values()) {
+    row.holdings.sort((a, b) => b.quantity - a.quantity);
+    row.value = row.unit === null ? null : row.unit * row.total;
+  }
 
   const byName = (a: ItemRow, b: ItemRow) => collator.compare(a.name ?? `~${a.itemKey}`, b.name ?? `~${b.itemKey}`);
   const compare: Record<InventorySort, (a: ItemRow, b: ItemRow) => number> = {
     total: (a, b) => b.total - a.total || byName(a, b),
+    // Sans prix connu : après tous les objets valorisés.
+    value: (a, b) => (b.value ?? -1) - (a.value ?? -1) || byName(a, b),
     name: byName,
     quality: (a, b) => (b.quality ?? -1) - (a.quality ?? -1) || byName(a, b),
   };
   return [...rows.values()].sort(compare[sort]);
 }
 
-/** Lignes d'un même endroit rangées comme la grille des objets : quantité, nom ou qualité. */
-export function sortHoldings(holdings: readonly Holding[], items: InventoryData["items"], sort: InventorySort): Holding[] {
+/** Lignes d'un même endroit rangées comme la grille des objets : quantité, valeur, nom ou qualité. */
+export function sortHoldings(holdings: readonly Holding[], items: InventoryData["items"], sort: InventorySort, prices: Prices = {}): Holding[] {
   const name = (holding: Holding) => items[holding.itemKey]?.name ?? `~${holding.itemKey}`;
   const byName = (a: Holding, b: Holding) => collator.compare(name(a), name(b));
+  const value = (holding: Holding) => (prices[holding.itemKey] === undefined ? -1 : prices[holding.itemKey] * holding.quantity);
   const compare: Record<InventorySort, (a: Holding, b: Holding) => number> = {
     total: (a, b) => b.quantity - a.quantity || byName(a, b),
+    value: (a, b) => value(b) - value(a) || byName(a, b),
     name: byName,
     quality: (a, b) => (items[b.itemKey]?.quality ?? -1) - (items[a.itemKey]?.quality ?? -1) || byName(a, b),
   };
