@@ -1,12 +1,13 @@
 "use client";
 
 import { getImageProps } from "next/image";
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { slotCount, type ExpiryFlag } from "@/lib/dashboard/inventory-view";
 import { formatInteger } from "@/lib/wow/format";
 import { allowedClassesLabel, bindingLabel, type GearSpec, gearSlotLabel, gearTypeLabel } from "@/lib/wow/gear";
 import { itemIconUrl } from "@/lib/wow/icons";
+import { type TooltipLine, type TooltipSegment, wowheadItemUrl } from "@/lib/wow/wowhead-tooltip";
 import { Money } from "./ui";
 
 // Cases d'objet et bulle à la manière du jeu, partagées par la page Inventaires et la fiche d'un
@@ -231,9 +232,13 @@ export function GameTooltip({
       placeTooltip(tooltip, tip.anchor);
     };
     place();
+    // Les caractéristiques arrivent après l'ouverture : la bulle grandit, elle est replacée.
+    const observer = new ResizeObserver(place);
+    observer.observe(tooltip);
     window.addEventListener("scroll", place, { capture: true, passive: true });
     window.addEventListener("resize", place);
     return () => {
+      observer.disconnect();
       window.removeEventListener("scroll", place, { capture: true });
       window.removeEventListener("resize", place);
     };
@@ -293,6 +298,150 @@ export function TooltipGear({ gear }: { gear: GearSpec | undefined }) {
       {gear.requiredLevel !== null && gear.requiredLevel > 1 && <p>Niveau {gear.requiredLevel} requis</p>}
       {gear.itemLevel !== null && <p className="text-[0.72rem] text-[#8f9bb8]">Niveau d&apos;objet {gear.itemLevel}</p>}
     </div>
+  );
+}
+
+// Caractéristiques à la manière de Wowhead (route /api/items/tooltip), gardées pour toute la visite :
+// rouvrir une bulle les affiche aussitôt. Une lecture échouée est retentée une minute plus tard.
+type Details = { status: "ok"; lines: TooltipLine[] } | { status: "missing" } | { status: "unavailable"; retryAt: number };
+const RETRY_MS = 60_000;
+// Survol rapide d'une grille : une case simplement traversée ne demande rien.
+const HOVER_DELAY_MS = 140;
+const details = new Map<string, Details>();
+const loading = new Set<string>();
+const listeners = new Set<() => void>();
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+/** Clé dont Wowhead peut décrire l'objet : « 1234 » ou « 1234:567 » (suffixe), pas une mascotte. */
+const describable = (itemKey: string) => /^\d{1,10}(?::\d{1,7})?$/.test(itemKey);
+
+const isLines = (value: unknown): value is TooltipLine[] =>
+  Array.isArray(value) && value.every((line) => typeof line === "object" && line !== null && typeof (line as { type?: unknown }).type === "string");
+
+async function loadDetails(itemKey: string) {
+  if (loading.has(itemKey)) return;
+  loading.add(itemKey);
+  let result: Details = { status: "unavailable", retryAt: Date.now() + RETRY_MS };
+  try {
+    const response = await fetch(`${process.env.WOW_BASE_PATH ?? ""}/api/items/tooltip?key=${encodeURIComponent(itemKey)}`);
+    if (response.ok) {
+      const body = (await response.json()) as { status?: unknown; lines?: unknown };
+      if (body.status === "ok" && isLines(body.lines)) result = { status: "ok", lines: body.lines };
+      else if (body.status === "missing") result = { status: "missing" };
+    }
+  } catch {
+    // Réseau coupé : la bulle garde ses lignes d'équipement.
+  } finally {
+    loading.delete(itemKey);
+  }
+  details.set(itemKey, result);
+  for (const listener of listeners) listener();
+}
+
+/** Caractéristiques d'un objet ; demandées après un court survol, ou aussitôt pour une bulle épinglée. */
+function useItemDetails(itemKey: string, eager: boolean): Details | undefined {
+  const known = useSyncExternalStore(
+    subscribe,
+    () => details.get(itemKey),
+    () => undefined,
+  );
+  useEffect(() => {
+    if (!describable(itemKey)) return;
+    const current = details.get(itemKey);
+    if (current && (current.status !== "unavailable" || current.retryAt > Date.now())) return;
+    const timer = window.setTimeout(() => void loadDetails(itemKey), eager ? 0 : HOVER_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [itemKey, eager]);
+  return known;
+}
+
+function Segments({ segments }: { segments: readonly TooltipSegment[] }) {
+  return segments.map((segment, index) =>
+    segment.tone ? (
+      <span key={index} data-tone={segment.tone}>
+        {segment.text}
+      </span>
+    ) : (
+      segment.text
+    ),
+  );
+}
+
+/** Lignes de Wowhead : niveau d'objet, liaison, emplacement et type, dégâts, armure, caractéristiques, effets, ensemble. */
+export function TooltipLines({ lines }: { lines: readonly TooltipLine[] }) {
+  return (
+    <div className="tooltip-lines">
+      {lines.map((line, index) => {
+        if (line.type === "pair") {
+          return (
+            <p key={index} className="tooltip-pair">
+              <span>
+                <Segments segments={line.left} />
+              </span>
+              <span>
+                <Segments segments={line.right} />
+              </span>
+            </p>
+          );
+        }
+        if (line.type === "money") {
+          return (
+            <p key={index} className="tooltip-sell">
+              Prix de vente <Money copper={line.copper} />
+            </p>
+          );
+        }
+        return (
+          <p key={index} data-indent={line.indent || undefined}>
+            <Segments segments={line.segments} />
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Détail d'un objet dans une bulle : les lignes de Wowhead dès qu'elles sont connues ; en attendant,
+ * ou quand Wowhead ne connaît pas l'objet, les lignes d'équipement tirées des tables du jeu.
+ */
+export function ItemDetails({ itemKey, gear, pinned }: { itemKey: string; gear: GearSpec | undefined; pinned: boolean }) {
+  const known = useItemDetails(itemKey, pinned);
+  const match = /^(\d+)(?::(\d+))?$/.exec(itemKey);
+  if (known?.status === "ok") {
+    return (
+      <>
+        <TooltipLines lines={known.lines} />
+        {pinned && match && (
+          <p className="mt-1.5">
+            <a
+              href={wowheadItemUrl(Number(match[1]), match[2] === undefined ? null : Number(match[2]))}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[0.72rem] text-[#8f9bb8] hover:text-white hover:underline"
+            >
+              Fiche Wowhead ↗
+            </a>
+          </p>
+        )}
+      </>
+    );
+  }
+  return (
+    <>
+      <TooltipGear gear={gear} />
+      {known === undefined && describable(itemKey) && (
+        <p className="tooltip-loading" aria-hidden="true">
+          Caractéristiques…
+        </p>
+      )}
+      {known?.status === "missing" && <p className="mt-1 text-[0.7rem] text-[#8f9bb8]">Caractéristiques pas encore publiées par Wowhead.</p>}
+    </>
   );
 }
 

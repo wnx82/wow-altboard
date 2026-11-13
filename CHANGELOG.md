@@ -4,6 +4,33 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.24.0 — 2026-11-13
+
+### Ajouté
+
+- **Caractéristiques des objets dans les bulles**, comme sur Wowhead : niveau d'objet, liaison,
+  emplacement et type, dégâts, vitesse et dégâts par seconde, armure, caractéristiques,
+  résistances, durabilité, niveau requis, effets « Équipé », « Utilise » et « Chances quand vous
+  touchez », ensemble (pièces et bonus), objet créé par une recette et ses composants, prix de
+  vente. Les valeurs sont celles de WoW Forever, suffixes aléatoires compris (« de l'ours ») ;
+  les couleurs sont celles du jeu. Sur les pages Inventaires (les deux présentations), la fiche
+  d'un personnage et la page Équipement.
+  - Lues chez Wowhead (base WoW Forever, en français) à la première ouverture d'une bulle, puis
+    gardées en base 30 jours : seul le numéro de l'objet est envoyé. Une bulle épinglée mène à la
+    fiche Wowhead de l'objet.
+  - Objet que Wowhead ne décrit pas encore (les plus récents de WoW Forever) : la bulle garde les
+    lignes tirées des tables du jeu et le signale.
+- Route `GET /api/items/tooltip` et migration `0019_item_tooltips` (table `item_tooltips`, ajout
+  seul).
+
+### Modifié
+
+- La page Inventaires est **rangée par catégorie par défaut**, comme les sacs du jeu ; les autres
+  tris restent au menu « Trier par » (`?tri=quantite` pour l'ancien ordre).
+- Présentation par catégorie : une fenêtre par groupe (Équipement, Consommables, Artisanat,
+  Autres) avec son nombre d'objets et sa valeur ; chaque catégorie montre son nombre d'objets et sa
+  valeur, et se replie d'un clic. Un lien du sommaire rouvre la catégorie repliée qu'il vise.
+
 ## Site 0.23.0 — 2026-11-13
 
 ### Ajouté

@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
     WOW_BUILD_COMMIT: build.commit ?? "",
     WOW_BUILD_TIME: build.builtAt,
     WOW_AGENT_VERSION: build.agentVersion ?? "",
+    // Préfixe des appels d'API faits par le navigateur (bulles d'objets).
+    WOW_BASE_PATH: basePath ?? "",
   },
   output: "standalone",
   poweredByHeader: false,

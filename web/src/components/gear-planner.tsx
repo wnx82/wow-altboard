@@ -23,7 +23,7 @@ import { type Holding, PLACE_LABELS, PLACES, type InventoryPlace } from "@/lib/d
 import { classKey, classLabel, formatInteger } from "@/lib/wow/format";
 import { CLASSIC_CLASSES, gearLabel } from "@/lib/wow/gear";
 import { classIconUrl } from "@/lib/wow/icons";
-import { GameTooltip, ItemSlot, ItemThumb, type SlotEvents, type Tip, TooltipGear, useItemTip } from "./item-slots";
+import { GameTooltip, ItemDetails, ItemSlot, ItemThumb, type SlotEvents, type Tip, useItemTip } from "./item-slots";
 import { ClassAvatar, EmptyState, GameIcon } from "./ui";
 
 const ARMOR_NAMES: Record<number, string> = { 1: "tissu", 2: "cuir", 3: "mailles", 4: "plaques" };
@@ -247,7 +247,7 @@ export function GearPlanner({ data, now: nowIso }: { data: GearPlannerData; now:
 
       {tip && tipCandidate && (
         <GameTooltip tip={tip} title={tipCandidate.name ?? `Objet n° ${tipCandidate.itemKey}`} quality={tipCandidate.quality} onClose={close}>
-          <TooltipGear gear={tipCandidate.spec} />
+          <ItemDetails itemKey={tipCandidate.itemKey} gear={tipCandidate.spec} pinned={tip.pinned} />
           <div className="tooltip-rule" />
           <ul className="space-y-0.5">
             {tipCandidate.holdings.slice(0, TOOLTIP_HOLDERS).map((holding) => (

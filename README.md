@@ -6,7 +6,8 @@ Les prix de l'hôtel des ventes (addon **Auctionator**) et les recettes connues 
 **NaowhForever**) alimentent un moteur économique : marché, rentabilité des crafts, farm et
 opportunités ([ECONOMY-ENGINE](docs/ECONOMY-ENGINE.md)). L'addon **Baganator** ajoute le courrier,
 les ventes en cours et les banques de guilde : la page Inventaires montre tout ce que possèdent les
-personnages, et la page Équipement y cherche le meilleur équipement pour une classe à un niveau.
+personnages, rangé par catégorie, et la page Équipement y cherche le meilleur équipement pour une
+classe à un niveau. La bulle d'un objet donne ses caractéristiques comme Wowhead (WoW Forever).
 
 En production : **https://wow.ekreativ.be**
 

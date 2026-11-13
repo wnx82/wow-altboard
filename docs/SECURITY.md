@@ -104,6 +104,19 @@ force un import ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests
 | Contenu | trois colonnes lues (identifiant, nom, qualité) ; nom de 200 caractères au plus, caractères de contrôle retirés ; écrit en une transaction, tout ou rien. Affiché comme du texte par React, jamais comme du HTML |
 | Accès et débit | import automatique sans entrée extérieure ; le bouton exige une session, 3 imports par quart d'heure et par utilisateur, et rend la main après 45 s |
 
+## Bulles des objets (Wowhead)
+
+La bulle d'un objet montre ses caractéristiques telles que Wowhead les publie pour WoW Forever. Le
+serveur les lit à la première demande puis les garde en base (`item_tooltips`).
+
+| Mesure | Détail |
+|---|---|
+| Adresse | fixe, dans le code : `https://nether.wowhead.com/tooltip/item/<n°>?dataEnv=16&locale=2`, plus `&rand=<n°>` pour un suffixe aléatoire. Les deux nombres sont lus par une expression régulière ; aucune autre partie ne vient d'une saisie. Redirections refusées |
+| Données envoyées | le numéro de l'objet (et de son suffixe), rien d'autre : ni cookie, ni nom de personnage, ni compte. User-Agent générique `wow-altboard` |
+| Taille, durée, débit | réponse de 256 Ko au plus, 8 s au plus ; trois lectures simultanées au plus ; une même bulle lue une fois même demandée deux fois ; après un échec, pas de nouvel essai pour cet objet avant 5 min ; relue après 30 jours (3 pour un objet inconnu). La route exige une session et compte 600 demandes par minute et par utilisateur |
+| Contenu | le HTML de Wowhead est lu en lignes de texte et de couleurs connues (`lib/wow/wowhead-tooltip.ts`) : balises, liens, styles et scripts sont abandonnés ; 80 lignes et 600 caractères par morceau au plus. React l'affiche comme du texte, jamais comme du HTML |
+| Navigateur | n'appelle jamais Wowhead : la CSP reste à `connect-src 'self'`. Le lien « Fiche Wowhead » d'une bulle épinglée ouvre un nouvel onglet (`noopener noreferrer`) |
+
 ## Sondes vers les serveurs de jeu
 
 La page **Serveurs** fait ouvrir au serveur web des connexions TCP sortantes
@@ -143,8 +156,9 @@ pas versionné.
 Utilisateur non privilégié, système de fichiers en lecture seule, toutes capacités retirées,
 `no-new-privileges`. Le port n'est publié que sur l'adresse du réseau local de l'hôte : le tunnel
 Cloudflare, dans un autre conteneur LXC, est le seul chemin depuis Internet. Connexions sortantes
-hors base : le CDN d'icônes de Blizzard, wago.tools pour la table des noms des objets (chaque jour)
-et, si des adresses sont configurées, les sondes vers les serveurs de jeu.
+hors base : le CDN d'icônes de Blizzard, wago.tools pour la table des noms des objets (chaque jour),
+Wowhead pour les bulles des objets (à la demande, gardées en base) et, si des adresses sont
+configurées, les sondes vers les serveurs de jeu.
 
 ## Limites assumées
 

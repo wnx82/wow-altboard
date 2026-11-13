@@ -276,6 +276,24 @@ de ses mots, puis ailleurs). Les objets possédés passent d'abord et mènent à
 les autres ne sont proposés que si l'hôtel des ventes les a déjà vus, et mènent à leur fiche de
 marché. Les pages du menu sont cherchées par le navigateur, sans appel.
 
+## `GET /api/items/tooltip`
+
+Caractéristiques d'un objet pour sa bulle (dégâts, vitesse, armure, caractéristiques, effets,
+ensemble, durabilité, prix de vente), à la manière de Wowhead. Session requise (`401` sinon),
+vérifiée par la route elle-même ; 600 demandes par minute et par utilisateur (`429` au-delà).
+`?key=` : clé d'objet de l'inventaire, `1234` ou `1234:567` (suffixe aléatoire) ; `400` sinon.
+
+```json
+{"status":"ok","lines":[{"type":"text","segments":[{"text":"Niveau d'objet 80","tone":"gold"}]},
+ {"type":"pair","left":[{"text":"À une main"}],"right":[{"text":"Épée","tone":"q1"}]},
+ {"type":"money","copper":255355}]}
+```
+
+`status` : `ok`, `missing` (Wowhead ne connaît pas l'objet, `lines` vide) ou `unavailable`
+(Wowhead injoignable et rien en cache). `ok` et `missing` portent `Cache-Control: private,
+max-age=3600`, `unavailable` `private, no-store`. Les lignes viennent de la table `item_tooltips`,
+remplie à la première demande ([DATABASE](DATABASE.md), [SECURITY](SECURITY.md#bulles-des-objets-wowhead)).
+
 ## `GET /api/health`
 
 Publique. `200` si la base répond, `503` sinon, avec la construction en service :

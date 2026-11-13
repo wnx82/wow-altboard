@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { expiryFlag, fold, holdingNote, holdingsValue, PLACE_LABELS } from "@/lib/dashboard/inventory-view";
 import { itemHref } from "@/lib/economy/view";
 import { formatDateTime, formatInteger, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
-import { GameTooltip, ItemSlot, itemName, TooltipGear, TooltipPrice, useItemTip, ValueEstimate, type SlotItem } from "./item-slots";
+import { GameTooltip, ItemDetails, ItemSlot, itemName, TooltipPrice, useItemTip, ValueEstimate, type SlotItem } from "./item-slots";
 
 // Inventaire d'un personnage sur sa fiche : une fenêtre de sac comme en jeu, un endroit par section,
 // les mêmes cases et la même bulle que la page Inventaires.
@@ -148,7 +148,7 @@ export function CharacterInventory({
           <p className="text-[0.72rem] text-[#8f9bb8]">
             {items[tipItem.itemKey]?.quality == null ? "" : `${QUALITY_LABELS[items[tipItem.itemKey]!.quality!]} · `}objet n° {tipItem.itemKey.split(":")[0]}
           </p>
-          <TooltipGear gear={items[tipItem.itemKey]?.gear} />
+          <ItemDetails itemKey={tipItem.itemKey} gear={items[tipItem.itemKey]?.gear} pinned={tip.pinned} />
           <div className="tooltip-rule" />
           <p className="flex items-baseline justify-between gap-6">
             <span className="text-[#ffd100]">{PLACE_LABELS[tipped.place]}</span>

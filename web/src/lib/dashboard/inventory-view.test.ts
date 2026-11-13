@@ -8,6 +8,7 @@ import {
   groupByCharacter,
   groupByGuild,
   groupByItem,
+  groupCategorySections,
   holdingsValue,
   readInventoryState,
   rowFlag,
@@ -65,6 +66,14 @@ describe("page Inventaires : état dans l'adresse", () => {
   test("une adresse sans paramètre donne l'état par défaut, et inversement", () => {
     assert.deepEqual(read(""), DEFAULT_STATE);
     assert.equal(writeInventoryState(DEFAULT_STATE), "");
+  });
+
+  test("tri par catégorie par défaut, comme les sacs du jeu ; un autre tri s'écrit dans l'adresse", () => {
+    assert.equal(DEFAULT_STATE.sort, "category");
+    assert.equal(read("tri=categorie").sort, "category");
+    assert.equal(writeInventoryState(state({ sort: "category" })), "");
+    assert.equal(writeInventoryState(state({ sort: "total" })), "?tri=quantite");
+    assert.equal(read("tri=quantite").sort, "total");
   });
 
   test("aller-retour d'un état complet, les autres paramètres gardés", () => {
@@ -349,10 +358,24 @@ describe("page Inventaires : catégories", () => {
     );
   });
 
+  test("sections réunies par groupe, dans l'ordre du jeu", () => {
+    const rows = groupByItem(selectHoldings(CATS, state({ expired: true }), NOW), CATS.items, "category");
+    assert.deepEqual(
+      groupCategorySections(categorySections(rows, CATS.items)).map((group) => [group.group, group.sections.map((section) => section.category)]),
+      [
+        ["Équipement", ["armes", "armures"]],
+        ["Consommables", ["nourriture"]],
+        ["Artisanat", ["tissu", "cuir"]],
+        ["Autres", ["mascottes", "camelote", "inconnu"]],
+      ],
+    );
+    assert.deepEqual(groupCategorySections([]), []);
+  });
+
   test("dans l'adresse ; une catégorie inconnue est ignorée", () => {
-    const full = state({ category: "cuir", sort: "category" });
+    const full = state({ category: "cuir", sort: "value" });
     const search = writeInventoryState(full);
-    assert.equal(search, "?cat=cuir&tri=categorie");
+    assert.equal(search, "?cat=cuir&tri=valeur");
     assert.deepEqual(read(search), full);
     assert.deepEqual(read("?cat=bidon"), DEFAULT_STATE);
   });

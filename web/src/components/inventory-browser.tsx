@@ -14,6 +14,7 @@ import {
   groupByCharacter,
   groupByGuild,
   groupByItem,
+  groupCategorySections,
   holdingNote,
   holdingsValue,
   isSoon,
@@ -28,6 +29,7 @@ import {
   readInventoryState,
   rowFlag,
   selectHoldings,
+  SORTS,
   sortHoldings,
   writeInventoryState,
 } from "@/lib/dashboard/inventory-view";
@@ -36,7 +38,7 @@ import { classKey, classLabel, formatDateTime, formatInteger, formatRelative, QU
 import { ARMOR_TYPES, CLASSIC_CLASSES, GEAR_SLOTS, WEAPON_TYPES } from "@/lib/wow/gear";
 import { itemIconUrl } from "@/lib/wow/icons";
 import { CATEGORY_GROUPS, categoryIcon, ITEM_CATEGORIES } from "@/lib/wow/item-categories";
-import { GameTooltip, ItemSlot, itemName, TooltipGear, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
+import { GameTooltip, ItemDetails, ItemSlot, itemName, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
 import { SectionNav } from "./section-nav";
 import { ClassAvatar, EmptyState, GameIcon, Money } from "./ui";
 
@@ -45,7 +47,7 @@ const PAGE_SIZE = 160;
 /** Détenteurs listés dans la bulle d'un objet ; les suivants sont comptés. */
 const TOOLTIP_HOLDERS = 12;
 
-const SORT_LABELS: Record<InventorySort, string> = { total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité", level: "Niveau requis", category: "Catégorie" };
+const SORT_LABELS: Record<InventorySort, string> = { category: "Catégorie", total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité", level: "Niveau requis" };
 
 /** Niveau saisi : chiffres seulement, vide pour zéro. */
 function levelInput(value: string): string {
@@ -140,6 +142,7 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
   // section par catégorie et un sommaire pour sauter de l'une à l'autre.
   const byCategory = state.view === "items" && state.sort === "category";
   const sections = useMemo(() => (byCategory ? categorySections(rows, data.items) : []), [byCategory, rows, data.items]);
+  const groups = useMemo(() => groupCategorySections(sections), [sections]);
   const sectionLinks = useMemo(
     () =>
       sections.map((section) => ({
@@ -513,7 +516,7 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
               <label className="flex items-center gap-2 text-xs text-muted">
                 Trier par
                 <select className="field w-auto" value={state.sort} onChange={(event) => update({ sort: event.target.value as InventorySort })}>
-                  {(Object.keys(SORT_LABELS) as InventorySort[]).map((sort) => (
+                  {SORTS.map((sort) => (
                     <option key={sort} value={sort}>
                       {SORT_LABELS[sort]}
                     </option>
@@ -533,24 +536,59 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
 
       {byCategory ? (
         rows.length > 0 && (
-          <>
+          // Un lien du sommaire rouvre la catégorie repliée qu'il vise.
+          <div
+            className="space-y-4"
+            onClickCapture={(event) => {
+              const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#categorie-"]');
+              const target = link ? document.getElementById(link.hash.slice(1)) : null;
+              target?.closest("details")?.setAttribute("open", "");
+            }}
+          >
             {sections.length > 1 && <SectionNav label="Catégories" items={sectionLinks} />}
-            <section className="bag-window p-3 sm:p-4" aria-label="Objets">
-              {sections.map((section) => (
-                <div key={section.category} className="bag-section">
-                  <h2 id={`categorie-${section.category}`} className="bag-section-title">
-                    <span className="flex items-center gap-2">
-                      <GameIcon src={itemIconUrl(categoryIcon(section.category))} size={24} className="bag-section-icon" />
-                      <span>
-                        {section.label} <small>· {plural(section.rows.length, "objet")}</small>
-                      </span>
-                    </span>
-                  </h2>
-                  {itemGrid(section.rows)}
-                </div>
-              ))}
-            </section>
-          </>
+            {groups.map((group) => {
+              const groupRows = group.sections.flatMap((section) => section.rows);
+              const groupWorth = holdingsValue(groupRows.flatMap((row) => row.holdings), data.prices, now);
+              return (
+                <section key={group.group} className="bag-window category-window" aria-label={group.group}>
+                  <header className="category-window-head">
+                    <h2 className="bag-title">{group.group}</h2>
+                    <p>
+                      {plural(groupRows.length, "objet")}
+                      {data.market && (
+                        <>
+                          {" · "}
+                          <ValueEstimate copper={groupWorth.value} unpriced={groupWorth.unpriced} />
+                        </>
+                      )}
+                    </p>
+                  </header>
+                  {group.sections.map((section) => {
+                    const worth = holdingsValue(section.rows.flatMap((row) => row.holdings), data.prices, now);
+                    return (
+                      <details key={section.category} className="category-section" open>
+                        <summary id={`categorie-${section.category}`} className="category-summary">
+                          <GameIcon src={itemIconUrl(categoryIcon(section.category))} size={32} className="category-icon" />
+                          <span className="category-name">{section.label}</span>
+                          <span className="category-count">{formatInteger(section.rows.length)}</span>
+                          <span className="flex-1" />
+                          {data.market && worth.value > 0 && (
+                            <span className="hidden text-xs sm:inline">
+                              <ValueEstimate copper={worth.value} unpriced={worth.unpriced} />
+                            </span>
+                          )}
+                          <svg className="category-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </summary>
+                        {itemGrid(section.rows)}
+                      </details>
+                    );
+                  })}
+                </section>
+              );
+            })}
+          </div>
         )
       ) : state.view === "items" ? (
         rows.length > 0 && (
@@ -615,7 +653,7 @@ function ItemTooltip({
       <p className="text-[0.72rem] text-[#8f9bb8]">
         {info?.quality == null ? "" : `${QUALITY_LABELS[info.quality]} · `}objet n° {itemId}
       </p>
-      <TooltipGear gear={info?.gear} />
+      <ItemDetails itemKey={row.itemKey} gear={info?.gear} pinned={tip.pinned} />
       <div className="tooltip-rule" />
       <p className="flex items-baseline justify-between gap-6">
         <span className="text-[#ffd100]">Total</span>

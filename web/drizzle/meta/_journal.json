@@ -134,6 +134,13 @@
       "when": 1794534043846,
       "tag": "0018_item_specs_bonding",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794554166292,
+      "tag": "0019_item_tooltips",
+      "breakpoints": true
     }
   ]
 }

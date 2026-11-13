@@ -59,11 +59,14 @@ export const CATEGORY_GROUPS = [...new Set(ITEM_CATEGORIES.map((category) => cat
 const ORDER = new Map(ITEM_CATEGORIES.map((category, index) => [category.value, index]));
 const LABELS = new Map(ITEM_CATEGORIES.map((category) => [category.value, category.label]));
 const ICONS = new Map(ITEM_CATEGORIES.map((category) => [category.value, category.icon]));
+const GROUPS = new Map(ITEM_CATEGORIES.map((category) => [category.value, category.group]));
 
 export const isItemCategory = (value: string) => ORDER.has(value);
 /** Rang d'affichage d'une catégorie ; une valeur inconnue passe en dernier. */
 export const categoryRank = (value: string | undefined) => ORDER.get(value ?? "inconnu") ?? ITEM_CATEGORIES.length;
 export const categoryLabel = (value: string | undefined) => LABELS.get(value ?? "inconnu") ?? "Sans catégorie connue";
+/** Groupe d'une catégorie (« Équipement », « Artisanat »…) ; une valeur inconnue va dans « Autres ». */
+export const categoryGroup = (value: string | undefined) => GROUPS.get(value ?? "inconnu") ?? "Autres";
 /** Icône d'une catégorie ; une valeur inconnue prend le point d'interrogation du jeu. */
 export const categoryIcon = (value: string | undefined) => ICONS.get(value ?? "inconnu") ?? "inv_misc_questionmark";
 

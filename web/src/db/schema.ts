@@ -17,6 +17,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { TooltipLine } from "../lib/wow/wowhead-tooltip";
 
 // Conventions : identifiants bigint générés, dates en timestamptz, argent en pièces de cuivre.
 // Seules les colonnes alimentées par des données réellement observées dans AltBoard existent
@@ -168,6 +169,21 @@ export const itemSpecs = pgTable(
   (t) => [
     check("item_specs_level_source_check", sql`${t.levelSource} in ('wowf', 'era')`),
   ],
+);
+
+// Bulles d'objets de Wowhead pour WoW Forever (dégâts, armure, caractéristiques, effets), en lignes
+// structurées (lib/wow/wowhead-tooltip.ts), lues à la première demande puis gardées en cache.
+// item_key : identifiant de l'objet, suivi de « :<suffixe> » pour un suffixe aléatoire (« de
+// l'ours »). status : `ok`, ou `missing` quand Wowhead ne connaît pas l'objet (lines vide).
+export const itemTooltips = pgTable(
+  "item_tooltips",
+  {
+    itemKey: text("item_key").primaryKey(),
+    status: text("status").notNull(),
+    lines: jsonb("lines").$type<TooltipLine[]>().notNull(),
+    fetchedAt: ts("fetched_at").notNull(),
+  },
+  (t) => [check("item_tooltips_status_check", sql`${t.status} in ('ok', 'missing')`)],
 );
 
 // ---------------------------------------------------------------------------

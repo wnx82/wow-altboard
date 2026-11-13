@@ -1,6 +1,6 @@
 import { formatRelative } from "@/lib/wow/format";
 import { canUse, CLASSIC_CLASSES, type GearSpec, isGearSlot, isGearType, matchesGearSlot, matchesGearType } from "@/lib/wow/gear";
-import { categoryLabel, categoryRank, isItemCategory } from "@/lib/wow/item-categories";
+import { categoryGroup, categoryLabel, categoryRank, isItemCategory } from "@/lib/wow/item-categories";
 import type { InventoryData, InventoryItemInfo, InventoryLocation } from "./inventory";
 
 // Page Inventaires : filtres, regroupement par objet ou par personnage, et état porté par l'adresse
@@ -55,7 +55,8 @@ export type InventoryView = (typeof VIEWS)[number];
 /** Un personnage choisi s'affiche sac par sac, comme en jeu ; sinon les objets de tous sont regroupés. */
 export const defaultView = (character: string): InventoryView => (character === "" ? "items" : "characters");
 
-export const SORTS = ["total", "value", "name", "quality", "level", "category"] as const;
+/** Dans l'ordre du menu « Trier par » ; la catégorie, comme le rangement des sacs du jeu, par défaut. */
+export const SORTS = ["category", "total", "value", "name", "quality", "level"] as const;
 export type InventorySort = (typeof SORTS)[number];
 
 export type InventoryState = {
@@ -101,7 +102,7 @@ export const DEFAULT_STATE: InventoryState = {
   maxLevel: "",
   wearer: "",
   view: "items",
-  sort: "total",
+  sort: "category",
 };
 
 const MAX_TEXT = 80;
@@ -409,6 +410,20 @@ export function categorySections<T extends { itemKey: string }>(rows: readonly T
     else sections.push({ category, label: categoryLabel(category), rows: [row] });
   }
   return sections;
+}
+
+export type CategoryGroup<T> = { group: string; sections: CategorySection<T>[] };
+
+/** Sections de catégories réunies par groupe (Équipement, Consommables, Artisanat, Autres), dans leur ordre. */
+export function groupCategorySections<T>(sections: readonly CategorySection<T>[]): CategoryGroup<T>[] {
+  const groups: CategoryGroup<T>[] = [];
+  for (const section of sections) {
+    const group = categoryGroup(section.category);
+    const last = groups.at(-1);
+    if (last?.group === group) last.sections.push(section);
+    else groups.push({ group, sections: [section] });
+  }
+  return groups;
 }
 
 /** Lignes d'un même endroit rangées comme la grille des objets : quantité, valeur, nom, qualité, niveau ou catégorie. */
