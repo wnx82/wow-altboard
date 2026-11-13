@@ -18,6 +18,12 @@ export type GearSpec = {
   allowableClass: number | null;
 };
 
+/** Caractéristiques d'un objet quelconque de la table Item : classe, sous-classe, emplacement, niveaux. */
+export type ItemSpec = Omit<GearSpec, "itemClass"> & { itemClass: number };
+
+/** Vrai pour une armure ou une arme. */
+export const isGear = (spec: ItemSpec | undefined): spec is GearSpec => spec?.itemClass === ARMOR || spec?.itemClass === WEAPON;
+
 /** Identifiants des classes de WoW Classic (ChrClasses). */
 export const CLASS_IDS: Readonly<Record<string, number>> = {
   WARRIOR: 1,

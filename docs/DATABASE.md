@@ -11,7 +11,7 @@
 
 | Environnement | État |
 |---|---|
-| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (51 tables, 17 migrations, 2026-11-13) |
+| PostgreSQL 17 local (Docker, `127.0.0.1:35432`) | ✅ migrations appliquées et vérifiées dans la base de test (51 tables, 18 migrations, 2026-11-13) |
 | Production (PostgreSQL 17 de la pile, Proxmox) | ✅ base `wow_altboard` copiée de contabo le 2026-10-05 (22 tables), migrations jusqu'à `0004` ; `0005` et `0006` (économie) s'appliqueront au prochain déploiement de `main` |
 
 ## Isolation
@@ -107,7 +107,7 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_fa
 | `item_names` | `item_id` | Nom de repli d'un objet jamais possédé : nom, qualité, source (`wago` ou `client`), version du jeu (`build`). Un import `wago` ne remplace jamais une ligne `client` et supprime ses propres lignes d'une version précédente |
 | `icon_files` | `file_id` | Nom de fichier d'une icône du jeu (`inv_scroll_03`) sous l'identifiant que relève l'addon (`items.icon`), version du jeu (`build`). Importé de la table `ManifestInterfaceData` de wago.tools ; un import supprime les icônes d'une version précédente |
 | `item_icons` | `item_id` | Icône d'un objet (`file_id`, clé de `icon_files`), version du jeu (`build`). Importée de la table `Item` de wago.tools avec `icon_files`, dans la même transaction ; sert aux objets que l'addon n'a jamais relevés (catalogue, recettes, recherche) |
-| `item_specs` | `item_id` | Armure ou arme du jeu : catégorie (`item_class` 4 armure, 2 arme), type (`subclass`), emplacement (`inventory_type`) de la table `Item` de WoW Forever ; niveau d'objet, niveau requis et classes autorisées (`allowable_class`, null pour toutes) de sa table `ItemSparse`, sinon de celle de WoW Classic Era (`level_source` `wowf` ou `era`, null sans niveau connu). `build` : « WoW Forever/Classic Era » ; un import supprime les lignes d'une autre version |
+| `item_specs` | `item_id` | Objet du jeu (tous depuis `0017`) : classe (`item_class` : 2 arme, 4 armure, 0 consommable, 7 artisanat…), sous-classe (`subclass` : type d'armure, d'arme, de composant…), emplacement (`inventory_type`) de la table `Item` de WoW Forever ; niveau d'objet, niveau requis et classes autorisées (`allowable_class`, null pour toutes) de sa table `ItemSparse`, sinon de celle de WoW Classic Era (`level_source` `wowf` ou `era`, null sans niveau connu). `build` : « WoW Forever/Classic Era » ; un import supprime les lignes d'une autre version |
 
 ### Objectifs par personnage
 
@@ -269,6 +269,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0014_icon_files` | `icon_files` (ajout seul) |
 | `0015_item_icons` | `item_icons` (ajout seul) |
 | `0016_item_specs` | `item_specs` (ajout seul) |
+| `0017_item_specs_all_items` | contrainte `item_specs_class_check` supprimée (tous les objets, plus seulement l'équipement) ; `build` des lignes existantes vidé pour que l'import suivant reprenne tout. Aucune ligne supprimée |
 
 ## Checkpoint B
 

@@ -1,5 +1,6 @@
 import { formatRelative } from "@/lib/wow/format";
 import { canUse, CLASSIC_CLASSES, type GearSpec, isGearSlot, isGearType, matchesGearSlot, matchesGearType } from "@/lib/wow/gear";
+import { categoryLabel, categoryRank, isItemCategory } from "@/lib/wow/item-categories";
 import type { InventoryData, InventoryItemInfo, InventoryLocation } from "./inventory";
 
 // Page Inventaires : filtres, regroupement par objet ou par personnage, et état porté par l'adresse
@@ -54,7 +55,7 @@ export type InventoryView = (typeof VIEWS)[number];
 /** Un personnage choisi s'affiche sac par sac, comme en jeu ; sinon les objets de tous sont regroupés. */
 export const defaultView = (character: string): InventoryView => (character === "" ? "items" : "characters");
 
-export const SORTS = ["total", "value", "name", "quality", "level"] as const;
+export const SORTS = ["total", "value", "name", "quality", "level", "category"] as const;
 export type InventorySort = (typeof SORTS)[number];
 
 export type InventoryState = {
@@ -66,6 +67,8 @@ export type InventoryState = {
   places: InventoryPlace[];
   /** Qualité minimale (0 médiocre … 7 héritage), ou vide pour toutes. */
   minQuality: string;
+  /** Catégorie d'objets (valeur de item-categories.ts), ou vide pour toutes. */
+  category: string;
   /** Courriers et ventes dont l'échéance est passée au moment du relevé suivant. */
   expired: boolean;
   /** Seulement les courriers et ventes dont l'échéance est proche (SOON_DAYS). */
@@ -89,6 +92,7 @@ export const DEFAULT_STATE: InventoryState = {
   character: "",
   places: [...PLACES],
   minQuality: "",
+  category: "",
   expired: false,
   soon: false,
   gearType: "",
@@ -107,6 +111,7 @@ const PARAMS = {
   character: "perso",
   places: "lieux",
   minQuality: "qualite",
+  category: "cat",
   expired: "echus",
   soon: "bientot",
   gearType: "type",
@@ -119,7 +124,7 @@ const PARAMS = {
 } as const;
 const OWNED = Object.values(PARAMS);
 const VIEW_VALUES: Record<InventoryView, string> = { items: "objets", characters: "personnages" };
-const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", value: "valeur", name: "nom", quality: "qualite", level: "niveau" };
+const SORT_VALUES: Record<InventorySort, string> = { total: "quantite", value: "valeur", name: "nom", quality: "qualite", level: "niveau", category: "categorie" };
 const PLACE_VALUES: Record<InventoryPlace, string> = { bags: "sacs", bank: "banque", mail: "courrier", auctions: "encheres", guild: "guilde" };
 
 const isId = (value: string | null): value is string => value !== null && /^\d{1,9}$/.test(value);
@@ -148,6 +153,7 @@ export function readInventoryState(params: { get(name: string): string | null })
   const account = params.get(PARAMS.account);
   const character = params.get(PARAMS.character);
   const quality = params.get(PARAMS.minQuality);
+  const category = params.get(PARAMS.category);
   const placesValue = params.get(PARAMS.places);
   const gearType = params.get(PARAMS.gearType);
   const gearSlot = params.get(PARAMS.gearSlot);
@@ -160,6 +166,7 @@ export function readInventoryState(params: { get(name: string): string | null })
     character: isId(character) ? character : "",
     places: places.length === 0 ? [...PLACES] : places,
     minQuality: quality !== null && /^[0-7]$/.test(quality) ? quality : "",
+    category: category !== null && isItemCategory(category) ? category : "",
     expired: params.get(PARAMS.expired) === "1",
     soon: params.get(PARAMS.soon) === "1",
     gearType: gearType !== null && isGearType(gearType) ? gearType : "",
@@ -184,6 +191,7 @@ export function writeInventoryState(state: InventoryState, current = ""): string
     params.set(PARAMS.places, PLACES.filter((place) => state.places.includes(place)).map((place) => PLACE_VALUES[place]).join(","));
   }
   if (state.minQuality !== "") params.set(PARAMS.minQuality, state.minQuality);
+  if (state.category !== "") params.set(PARAMS.category, state.category);
   if (state.expired) params.set(PARAMS.expired, "1");
   if (state.soon) params.set(PARAMS.soon, "1");
   if (state.gearType !== "") params.set(PARAMS.gearType, state.gearType);
@@ -225,6 +233,9 @@ function matchesQuery(itemKey: string, info: InventoryItemInfo | undefined, need
   if (/^\d+$/.test(needle)) return itemKey === needle || itemKey.startsWith(`${needle}:`);
   return fold(info?.name ?? "").includes(needle);
 }
+
+/** Catégorie d'un objet ; « inconnu » quand la table du jeu ne le décrit pas. */
+export const categoryOf = (info: InventoryItemInfo | undefined) => info?.category ?? "inconnu";
 
 /** Un filtre d'équipement est actif : seules les armures et les armes connues restent. */
 export const gearFiltered = (state: InventoryState) =>
@@ -273,6 +284,7 @@ export function selectHoldings(data: InventoryData, state: InventoryState, now: 
     if (state.soon && (holding.kind !== "character" || !isSoon(holding.expiresAt, now))) return false;
     const info = data.items[holding.itemKey];
     if (minQuality !== null && (info?.quality ?? -1) < minQuality) return false;
+    if (state.category !== "" && categoryOf(info) !== state.category) return false;
     if (!gearOk(holding.itemKey)) return false;
     return matchesQuery(holding.itemKey, info, needle);
   };
@@ -347,6 +359,9 @@ export function rowFlag(holdings: readonly Holding[], now: Date): ExpiryFlag | n
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 /** Niveau requis pour le tri : 0 sans exigence, −1 pour un objet qui n'est pas de l'équipement. */
 const requiredLevel = (info: InventoryItemInfo | undefined) => (info?.gear ? (info.gear.requiredLevel ?? 0) : -1);
+/** Tri par catégorie, comme le rangement des sacs du jeu : ordre des catégories, meilleure qualité d'abord. */
+const byCategory = (a: InventoryItemInfo | undefined, b: InventoryItemInfo | undefined) =>
+  categoryRank(categoryOf(a)) - categoryRank(categoryOf(b)) || (b?.quality ?? -1) - (a?.quality ?? -1);
 
 /** Un objet par ligne, quantités additionnées sur tous les détenteurs, du plus gros détenteur au plus petit. */
 export function groupByItem(holdings: Holding[], items: InventoryData["items"], sort: InventorySort, prices: Prices = {}): ItemRow[] {
@@ -376,11 +391,26 @@ export function groupByItem(holdings: Holding[], items: InventoryData["items"], 
     quality: (a, b) => (b.quality ?? -1) - (a.quality ?? -1) || byName(a, b),
     // Niveau requis, du plus haut au plus bas ; les objets qui ne sont pas de l'équipement ensuite.
     level: (a, b) => requiredLevel(items[b.itemKey]) - requiredLevel(items[a.itemKey]) || byName(a, b),
+    category: (a, b) => byCategory(items[a.itemKey], items[b.itemKey]) || byName(a, b),
   };
   return [...rows.values()].sort(compare[sort]);
 }
 
-/** Lignes d'un même endroit rangées comme la grille des objets : quantité, valeur, nom ou qualité. */
+export type CategorySection<T> = { category: string; label: string; rows: T[] };
+
+/** Lignes triées par catégorie, coupées en sections à chaque changement de catégorie. */
+export function categorySections<T extends { itemKey: string }>(rows: readonly T[], items: InventoryData["items"]): CategorySection<T>[] {
+  const sections: CategorySection<T>[] = [];
+  for (const row of rows) {
+    const category = categoryOf(items[row.itemKey]);
+    const last = sections.at(-1);
+    if (last?.category === category) last.rows.push(row);
+    else sections.push({ category, label: categoryLabel(category), rows: [row] });
+  }
+  return sections;
+}
+
+/** Lignes d'un même endroit rangées comme la grille des objets : quantité, valeur, nom, qualité, niveau ou catégorie. */
 export function sortHoldings(holdings: readonly Holding[], items: InventoryData["items"], sort: InventorySort, prices: Prices = {}): Holding[] {
   const name = (holding: Holding) => items[holding.itemKey]?.name ?? `~${holding.itemKey}`;
   const byName = (a: Holding, b: Holding) => collator.compare(name(a), name(b));
@@ -391,6 +421,7 @@ export function sortHoldings(holdings: readonly Holding[], items: InventoryData[
     name: byName,
     quality: (a, b) => (items[b.itemKey]?.quality ?? -1) - (items[a.itemKey]?.quality ?? -1) || byName(a, b),
     level: (a, b) => requiredLevel(items[b.itemKey]) - requiredLevel(items[a.itemKey]) || byName(a, b),
+    category: (a, b) => byCategory(items[a.itemKey], items[b.itemKey]) || byName(a, b),
   };
   return [...holdings].sort(compare[sort]);
 }

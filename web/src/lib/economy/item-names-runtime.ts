@@ -88,7 +88,7 @@ export function runIconFilesImport(db: Database, options: { trigger: ImportTrigg
   return held.icons;
 }
 
-/** Import des armures et des armes, un seul à la fois ; le résultat est consigné dans le journal du serveur. */
+/** Import des caractéristiques des objets, un seul à la fois ; le résultat est consigné dans le journal du serveur. */
 export function runItemSpecsImport(db: Database, options: { trigger: ImportTrigger; onlyIfNewer: boolean; fetch?: typeof globalThis.fetch }): Promise<SpecsImportResult> {
   const held = holder();
   if (held.specs) return held.specs;

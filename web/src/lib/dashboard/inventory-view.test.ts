@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { InventoryData } from "./inventory";
 import {
+  categorySections,
   DEFAULT_STATE,
   expiryFlag,
   groupByCharacter,
@@ -280,5 +281,79 @@ describe("page Inventaires : filtres d'équipement", () => {
     assert.deepEqual(read(search), full);
     assert.equal(read("?pour=12").wearer, "12");
     assert.deepEqual(read("?type=sabre&emplacement=nez&nmin=0&nmax=abc&pour=paysan"), DEFAULT_STATE);
+  });
+});
+
+// Catégories : de l'équipement, des composants, de la nourriture, de la camelote, une mascotte
+// et un objet inconnu de la table du jeu.
+const CATS: InventoryData = {
+  ...GEAR,
+  entries: [
+    ...GEAR.entries,
+    { characterId: 1, location: "bags", itemKey: "117", quantity: 10, expiresAt: null },
+    { characterId: 1, location: "bags", itemKey: "3300", quantity: 3, expiresAt: null },
+    { characterId: 2, location: "bags", itemKey: "p:42", quantity: 1, expiresAt: null },
+    { characterId: 2, location: "bags", itemKey: "999", quantity: 1, expiresAt: null },
+  ],
+  items: {
+    ...GEAR.items,
+    "2589": { ...GEAR.items["2589"], category: "tissu" },
+    "15210:1017": { ...GEAR.items["15210:1017"], category: "armes" },
+    "20576": { ...GEAR.items["20576"], category: "cuir" },
+    "2316": { ...GEAR.items["2316"], category: "armures" },
+    "16866": { ...GEAR.items["16866"], category: "armures" },
+    "117": { name: "Viande séchée coriace", quality: 1, icon: null, category: "nourriture" },
+    "3300": { name: "Patte de lapin", quality: 0, icon: null, category: "camelote" },
+    "p:42": { name: null, quality: null, icon: null, category: "mascottes" },
+  },
+};
+const cats = (patch: Partial<InventoryState>) => [...new Set(selectHoldings(CATS, state({ expired: true, ...patch }), NOW).map((holding) => holding.itemKey))].sort();
+
+describe("page Inventaires : catégories", () => {
+  test("filtre par catégorie ; un objet que la table du jeu ne décrit pas est « sans catégorie »", () => {
+    assert.deepEqual(cats({ category: "cuir" }), ["20576"]);
+    assert.deepEqual(cats({ category: "armures" }), ["16866", "2316"]);
+    assert.deepEqual(cats({ category: "camelote" }), ["3300"]);
+    assert.deepEqual(cats({ category: "mascottes" }), ["p:42"]);
+    assert.deepEqual(cats({ category: "inconnu" }), ["999"]);
+    assert.deepEqual(cats({ category: "potions" }), []);
+  });
+
+  test("tri par catégorie, meilleure qualité d'abord, puis sections titrées", () => {
+    const rows = groupByItem(selectHoldings(CATS, state({ expired: true }), NOW), CATS.items, "category");
+    assert.deepEqual(
+      rows.map((row) => row.itemKey),
+      ["15210:1017", "16866", "2316", "117", "2589", "20576", "p:42", "3300", "999"],
+    );
+    assert.deepEqual(
+      categorySections(rows, CATS.items).map((section) => [section.label, section.rows.map((row) => row.itemKey)]),
+      [
+        ["Armes", ["15210:1017"]],
+        ["Armures", ["16866", "2316"]],
+        ["Nourriture et boissons", ["117"]],
+        ["Tissu", ["2589"]],
+        ["Cuir", ["20576"]],
+        ["Mascottes et montures", ["p:42"]],
+        ["Camelote", ["3300"]],
+        ["Sans catégorie connue", ["999"]],
+      ],
+    );
+    const bags = sortHoldings(
+      CATS.entries.filter((entry) => entry.characterId === 1 && entry.location === "bags").map((entry) => ({ kind: "character" as const, ...entry })),
+      CATS.items,
+      "category",
+    );
+    assert.deepEqual(
+      bags.map((holding) => holding.itemKey),
+      ["117", "2589", "3300"],
+    );
+  });
+
+  test("dans l'adresse ; une catégorie inconnue est ignorée", () => {
+    const full = state({ category: "cuir", sort: "category" });
+    const search = writeInventoryState(full);
+    assert.equal(search, "?cat=cuir&tri=categorie");
+    assert.deepEqual(read(search), full);
+    assert.deepEqual(read("?cat=bidon"), DEFAULT_STATE);
   });
 });

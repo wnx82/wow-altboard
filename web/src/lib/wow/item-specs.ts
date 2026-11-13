@@ -3,21 +3,22 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { catalogUrl, type Fetch, latestBuild, MAX_CATALOG_BYTES, parseCsv } from "@/lib/economy/item-names";
 import type { Parsed } from "@/lib/settings/input";
-import { ARMOR, classMask, type GearSpec, WEAPON } from "./gear";
+import { classMask, type ItemSpec } from "./gear";
 import { downloadWago, iconItemId, intArray, itemTableUrl, MAX_ITEM_TABLE_BYTES } from "./icon-files";
 
-// Caractéristiques des armures et des armes, pour les filtres d'équipement de la page Inventaires.
-// Le type et l'emplacement viennent de la table Item de WoW Forever, qui décrit tous les objets.
-// Sa table ItemSparse ne contient qu'une partie des objets (le serveur envoie les autres au
-// client) : les niveaux et les classes autorisées manquants viennent de la table ItemSparse de WoW
-// Classic Era. Le 2026-11-13, 7 848 équipements sur 19 079 viennent de WoW Forever, 9 219 de Classic
-// Era, et les deux s'accordent sur le niveau requis de 99 % des 5 720 objets qu'elles partagent.
+// Caractéristiques des objets, pour les catégories et les filtres d'équipement de la page
+// Inventaires. La classe, la sous-classe et l'emplacement viennent de la table Item de WoW Forever,
+// qui décrit tous les objets. Sa table ItemSparse ne contient qu'une partie des objets (le serveur
+// envoie les autres au client) : les niveaux et les classes autorisées manquants viennent de la
+// table ItemSparse de WoW Classic Era. Le 2026-11-13, 7 848 équipements sur 19 079 viennent de WoW
+// Forever, 9 219 de Classic Era, et les deux s'accordent sur le niveau requis de 99 % des 5 720
+// objets qu'elles partagent.
 
 export const ERA_BUILD_URL = "https://wago.tools/api/builds/wow_classic_era/latest";
 const BATCH = 2_000;
 const MAX_ITEM_ID = 2_147_483_647;
 
-export type ItemType = { itemId: number; itemClass: typeof ARMOR | typeof WEAPON; subclass: number; inventoryType: number };
+export type ItemType = { itemId: number; itemClass: number; subclass: number; inventoryType: number };
 export type ItemLevels = { itemLevel: number | null; requiredLevel: number | null; allowableClass: number | null };
 
 const smallInt = (value: string | undefined, max = 32_767): number | null => {
@@ -26,7 +27,7 @@ const smallInt = (value: string | undefined, max = 32_767): number | null => {
   return number >= 0 && number <= max ? number : null;
 };
 
-/** Armures et armes de la table Item : type (sous-classe) et emplacement. Les autres objets sont écartés. */
+/** Objets de la table Item : classe, sous-classe (type d'armure, d'arme, de composant…) et emplacement. */
 export function parseItemTypes(text: string): Parsed<ItemType[]> {
   const [header, ...rows] = parseCsv(text);
   const columns = {
@@ -41,15 +42,15 @@ export function parseItemTypes(text: string): Parsed<ItemType[]> {
   const types = new Map<number, ItemType>();
   for (const row of rows) {
     const id = row[columns.id] ?? "";
-    const itemClass = Number(row[columns.itemClass]);
-    if (!/^\d{1,10}$/.test(id) || (itemClass !== ARMOR && itemClass !== WEAPON)) continue;
+    if (!/^\d{1,10}$/.test(id)) continue;
     const itemId = Number(id);
+    const itemClass = smallInt(row[columns.itemClass], 99);
     const subclass = smallInt(row[columns.subclass], 99);
     const inventoryType = smallInt(row[columns.inventoryType], 99);
-    if (itemId < 1 || itemId > MAX_ITEM_ID || subclass === null || inventoryType === null || types.has(itemId)) continue;
+    if (itemId < 1 || itemId > MAX_ITEM_ID || itemClass === null || subclass === null || inventoryType === null || types.has(itemId)) continue;
     types.set(itemId, { itemId, itemClass, subclass, inventoryType });
   }
-  if (types.size === 0) return { ok: false, error: "Fichier vide : aucune armure ni arme lisible." };
+  if (types.size === 0) return { ok: false, error: "Fichier vide : aucun objet lisible." };
   return { ok: true, value: [...types.values()] };
 }
 
@@ -97,7 +98,7 @@ export type SpecsImportResult =
   | { ok: true; build: string; count: number; fromForever: number; fromEra: number; removed: number; unchanged?: true }
   | { ok: false; error: string };
 
-/** Équipements enregistrés : nombre, version (« WoW Forever/Classic Era ») et origine des niveaux. */
+/** Objets enregistrés : nombre, version (« WoW Forever/Classic Era ») et origine des niveaux. */
 export async function itemSpecsSummary(db: Database): Promise<{ count: number; build: string | null; fromForever: number; fromEra: number }> {
   const [row] = await db
     .select({
@@ -110,11 +111,21 @@ export async function itemSpecsSummary(db: Database): Promise<{ count: number; b
   return { count: row?.count ?? 0, build: row?.build ?? null, fromForever: row?.fromForever ?? 0, fromEra: row?.fromEra ?? 0 };
 }
 
+/** Niveaux qu'un import précédent a pris dans Classic Era. */
+async function storedEraLevels(db: Database): Promise<Map<number, ItemLevels>> {
+  const rows = await db
+    .select({ itemId: t.itemSpecs.itemId, itemLevel: t.itemSpecs.itemLevel, requiredLevel: t.itemSpecs.requiredLevel, allowableClass: t.itemSpecs.allowableClass })
+    .from(t.itemSpecs)
+    .where(sql`${t.itemSpecs.levelSource} = 'era'`);
+  return new Map(rows.map(({ itemId, ...levels }) => [itemId, levels]));
+}
+
 /**
- * Importe les armures et les armes de la dernière version de WoW Forever, complétées par Classic
- * Era. Les lignes d'une version précédente absentes de la nouvelle sont supprimées. Tout ou rien.
- * Avec onlyIfNewer, rien n'est téléchargé quand ces deux versions sont déjà importées. Un échec de
- * Classic Era laisse un import existant en place ; sans import, WoW Forever seul est importé.
+ * Importe les objets de la dernière version de WoW Forever, complétés par Classic Era. Les lignes
+ * d'une version précédente absentes de la nouvelle sont supprimées. Tout ou rien. Avec onlyIfNewer,
+ * rien n'est téléchargé quand ces deux versions sont déjà importées. Un échec de Classic Era laisse
+ * un import complet en place. Sans import, ou quand les lignes en place sont à reprendre (version
+ * vide, migration 0017), WoW Forever seul est importé, avec les niveaux déjà pris dans Classic Era.
  */
 export async function importItemSpecs(db: Database, options: { now: Date; fetch?: Fetch; onlyIfNewer?: boolean }): Promise<SpecsImportResult> {
   const fetchImpl = options.fetch ?? fetch;
@@ -122,9 +133,11 @@ export async function importItemSpecs(db: Database, options: { now: Date; fetch?
   if (!forever.ok) return forever;
   const era = await latestBuild(fetchImpl, ERA_BUILD_URL);
   const current = await itemSpecsSummary(db);
-  // Classic Era injoignable : on garde l'import complet déjà en place ; sans import, WoW Forever seul
+  // Version vide : lignes à reprendre (migration 0017), qui ne décrivent que l'équipement.
+  const complete = current.count > 0 && current.build !== "";
+  // Classic Era injoignable : on garde l'import complet déjà en place ; sinon WoW Forever seul
   // (build « <version>/ »), complété dès que Classic Era répond.
-  if (!era.ok && current.count > 0) return era;
+  if (!era.ok && complete) return era;
   const build = `${forever.value}/${era.ok ? era.value : ""}`;
 
   if (options.onlyIfNewer && current.count > 0 && current.build === build) {
@@ -136,8 +149,9 @@ export async function importItemSpecs(db: Database, options: { now: Date; fetch?
   const foreverLevels = await downloadWago(fetchImpl, catalogUrl(forever.value), MAX_CATALOG_BYTES, parseItemLevels);
   if (!foreverLevels.ok) return foreverLevels;
   const eraLevels = era.ok ? await downloadWago(fetchImpl, catalogUrl(era.value), MAX_CATALOG_BYTES, parseItemLevels) : null;
-  if (eraLevels && !eraLevels.ok && current.count > 0) return eraLevels;
-  const rows = mergeItemSpecs(types.value, foreverLevels.value, eraLevels?.ok ? eraLevels.value : new Map());
+  if (eraLevels && !eraLevels.ok && complete) return eraLevels;
+  // Sans Classic Era, les niveaux qu'il avait déjà donnés restent.
+  const rows = mergeItemSpecs(types.value, foreverLevels.value, eraLevels?.ok ? eraLevels.value : await storedEraLevels(db));
   const storedBuild = eraLevels?.ok ? build : `${forever.value}/`;
 
   const removed = await db.transaction(async (tx) => {
@@ -173,8 +187,8 @@ export async function importItemSpecs(db: Database, options: { now: Date; fetch?
   };
 }
 
-/** Caractéristiques de chaque clé d'objet qui désigne une armure ou une arme, variantes comprises. */
-export async function loadItemSpecs(db: Database, keys: Iterable<string>): Promise<Map<string, GearSpec>> {
+/** Caractéristiques de chaque clé d'objet connue de la table Item, variantes comprises. */
+export async function loadItemSpecs(db: Database, keys: Iterable<string>): Promise<Map<string, ItemSpec>> {
   const byId = new Map<number, string[]>();
   for (const key of new Set(keys)) {
     const id = iconItemId(key);
@@ -193,10 +207,9 @@ export async function loadItemSpecs(db: Database, keys: Iterable<string>): Promi
     })
     .from(t.itemSpecs)
     .where(sql`${t.itemSpecs.itemId} = any(${intArray([...byId.keys()])})`);
-  const specs = new Map<string, GearSpec>();
-  for (const { itemId, itemClass, ...spec } of rows) {
-    if (itemClass !== ARMOR && itemClass !== WEAPON) continue;
-    for (const key of byId.get(itemId) ?? []) specs.set(key, { itemClass, ...spec });
+  const specs = new Map<string, ItemSpec>();
+  for (const { itemId, ...spec } of rows) {
+    for (const key of byId.get(itemId) ?? []) specs.set(key, spec);
   }
   return specs;
 }

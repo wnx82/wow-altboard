@@ -18,6 +18,7 @@ import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboa
 import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
+import { isGear } from "@/lib/wow/gear";
 import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
 import {
@@ -91,7 +92,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       const own = itemNames.get(key);
       const id = catalogId(key);
       const base = id === null ? undefined : itemNames.get(String(id));
-      const gear = specs.get(key);
+      const spec = specs.get(key);
+      const gear = isGear(spec) ? spec : undefined;
       return [key, { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null, ...(gear ? { gear } : {}) }];
     }),
   );

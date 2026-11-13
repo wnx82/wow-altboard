@@ -4,6 +4,25 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.22.0 — 2026-11-13
+
+### Ajouté
+
+- **Catégories sur la page Inventaires**, comme le rangement des sacs du jeu : armes, armures, sacs
+  et carquois, nourriture et boissons, potions, élixirs et flacons, parchemins, bandages,
+  améliorations d'objets, flèches et balles, tissu, cuir, métal et pierre, viande et poisson,
+  herbes, élémentaire, enchantement, pièces et explosifs, recettes, réactifs, quête, clés,
+  mascottes et montures, divers et camelote (tout objet gris).
+  - Nouveau tri « Catégorie » (`?tri=categorie`). Dans « Tous les objets », la grille se découpe
+    en sections titrées, avec un sommaire pour sauter de l'une à l'autre ; dans une section, la
+    meilleure qualité d'abord. Dans « Sac par sac », les cases suivent le même ordre.
+  - Nouveau filtre « Catégorie » (`?cat=cuir`), limité aux catégories des objets détenus.
+- Le contrôle quotidien de wago.tools importe la classe et la sous-classe de tous les objets,
+  plus seulement des armures et des armes.
+- Migration `0017_item_specs_all_items` : la table `item_specs` accepte tous les objets ; ses
+  lignes sont reprises par l'import suivant, au démarrage, même avec Classic Era injoignable (les
+  niveaux déjà pris dans Classic Era restent).
+
 ## Site 0.21.0 — 2026-11-13
 
 ### Ajouté

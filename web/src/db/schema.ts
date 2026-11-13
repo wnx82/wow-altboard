@@ -145,8 +145,9 @@ export const itemIcons = pgTable("item_icons", {
   updatedAt: updatedAt(),
 });
 
-// Armures et armes du jeu : type (table Item de WoW Forever), niveaux et classes autorisées (table
-// ItemSparse de WoW Forever, sinon de WoW Classic Era). build : « <WoW Forever>/<Classic Era> ».
+// Objets du jeu : classe, sous-classe et emplacement (table Item de WoW Forever), niveaux et classes
+// autorisées (table ItemSparse de WoW Forever, sinon de WoW Classic Era). build : « <WoW
+// Forever>/<Classic Era> ».
 export const itemSpecs = pgTable(
   "item_specs",
   {
@@ -163,7 +164,6 @@ export const itemSpecs = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    check("item_specs_class_check", sql`${t.itemClass} in (2, 4)`),
     check("item_specs_level_source_check", sql`${t.levelSource} in ('wowf', 'era')`),
   ],
 );

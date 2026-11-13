@@ -3,7 +3,8 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
-import type { GearSpec } from "@/lib/wow/gear";
+import { type GearSpec, isGear } from "@/lib/wow/gear";
+import { itemCategory } from "@/lib/wow/item-categories";
 import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { accountLabel } from "./queries";
 
@@ -39,9 +40,10 @@ export type InventoryGuild = {
 
 /**
  * icon : nom de fichier de l'icône (« inv_scroll_03 »), null quand il est inconnu. gear : type,
- * emplacement et niveaux d'une armure ou d'une arme ; absent pour les autres objets.
+ * emplacement et niveaux d'une armure ou d'une arme ; absent pour les autres objets. category :
+ * catégorie de tri (item-categories.ts) ; absente, l'objet est « sans catégorie connue ».
  */
-export type InventoryItemInfo = { name: string | null; quality: number | null; icon: string | null; gear?: GearSpec };
+export type InventoryItemInfo = { name: string | null; quality: number | null; icon: string | null; gear?: GearSpec; category?: string };
 
 export type InventoryData = {
   characters: InventoryCharacter[];
@@ -162,9 +164,18 @@ export async function loadInventory(db: Database, now: Date = new Date()): Promi
     const own = names.get(key);
     const id = catalogId(key);
     const base = id === null ? undefined : names.get(String(id));
-    const gear = specs.get(key);
-    const info: InventoryItemInfo = { name: own?.name ?? base?.name ?? null, quality: own?.quality ?? base?.quality ?? null, icon: own?.icon ?? null, ...(gear ? { gear } : {}) };
-    if (info.name !== null || info.quality !== null || info.icon !== null || gear) items[key] = info;
+    const spec = specs.get(key);
+    const gear = isGear(spec) ? spec : undefined;
+    const quality = own?.quality ?? base?.quality ?? null;
+    const category = itemCategory(spec, quality, key);
+    const info: InventoryItemInfo = {
+      name: own?.name ?? base?.name ?? null,
+      quality,
+      icon: own?.icon ?? null,
+      ...(gear ? { gear } : {}),
+      ...(category === "inconnu" ? {} : { category }),
+    };
+    if (info.name !== null || info.quality !== null || info.icon !== null || gear || info.category) items[key] = info;
   }
 
   return { characters, entries, guilds, items, prices: Object.fromEntries(prices.values), market: prices.market };

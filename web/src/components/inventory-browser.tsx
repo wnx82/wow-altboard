@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { InventoryCharacter, InventoryData, InventoryGuild } from "@/lib/dashboard/inventory";
 import {
+  categoryOf,
+  categorySections,
   DEFAULT_STATE,
   defaultView,
   expiryFlag,
@@ -32,7 +34,9 @@ import {
 import { itemHref } from "@/lib/economy/view";
 import { classKey, classLabel, formatDateTime, formatInteger, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
 import { ARMOR_TYPES, CLASSIC_CLASSES, GEAR_SLOTS, WEAPON_TYPES } from "@/lib/wow/gear";
+import { CATEGORY_GROUPS, ITEM_CATEGORIES } from "@/lib/wow/item-categories";
 import { GameTooltip, ItemSlot, itemName, TooltipGear, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
+import { SectionNav } from "./section-nav";
 import { ClassAvatar, EmptyState, Money } from "./ui";
 
 /** Cases affichées d'un coup dans la grille des objets ; le bouton du bas en ajoute autant. */
@@ -40,7 +44,7 @@ const PAGE_SIZE = 160;
 /** Détenteurs listés dans la bulle d'un objet ; les suivants sont comptés. */
 const TOOLTIP_HOLDERS = 12;
 
-const SORT_LABELS: Record<InventorySort, string> = { total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité", level: "Niveau requis" };
+const SORT_LABELS: Record<InventorySort, string> = { total: "Quantité", value: "Valeur", name: "Nom", quality: "Qualité", level: "Niveau requis", category: "Catégorie" };
 
 /** Niveau saisi : chiffres seulement, vide pour zéro. */
 function levelInput(value: string): string {
@@ -121,9 +125,24 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
   // Classes de Classic seulement : les règles de port ne connaissent pas les autres.
   const wearers = useMemo(() => data.characters.filter((character) => character.class !== null && CLASSIC_CLASSES.includes(character.class)), [data.characters]);
   const lostWearer = /^\d+$/.test(state.wearer) && !wearers.some((character) => String(character.id) === state.wearer);
+  // Catégories proposées : celles des objets détenus, et celle choisie même sans objet.
+  const categories = useMemo(() => {
+    const present = new Set<string>();
+    for (const entry of data.entries) present.add(categoryOf(data.items[entry.itemKey]));
+    for (const guild of data.guilds) for (const tab of guild.tabs) for (const item of tab.items) present.add(categoryOf(data.items[item.itemKey]));
+    return ITEM_CATEGORIES.filter((category) => present.has(category.value) || category.value === state.category);
+  }, [data, state.category]);
   const holdings = useMemo(() => selectHoldings(data, state, now), [data, state, now]);
   const rows = useMemo(() => groupByItem(holdings, data.items, state.sort, data.prices), [holdings, data.items, state.sort, data.prices]);
   const rowsByKey = useMemo(() => new Map(rows.map((row) => [row.itemKey, row])), [rows]);
+  // Tri par catégorie : toutes les cases d'un coup (les icônes se chargent au défilement), une
+  // section par catégorie et un sommaire pour sauter de l'une à l'autre.
+  const byCategory = state.view === "items" && state.sort === "category";
+  const sections = useMemo(() => (byCategory ? categorySections(rows, data.items) : []), [byCategory, rows, data.items]);
+  const sectionLinks = useMemo(
+    () => sections.map((section) => ({ id: `categorie-${section.category}`, label: `${section.label} (${formatInteger(section.rows.length)})` })),
+    [sections],
+  );
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   const worth = useMemo(() => holdingsValue(holdings, data.prices, now), [holdings, data.prices, now]);
 
@@ -150,17 +169,35 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
     state.account !== "" ||
     state.character !== "" ||
     state.minQuality !== "" ||
+    state.category !== "" ||
     state.soon ||
     gearFiltered(state) ||
     available.some((place) => !state.places.includes(place));
   const activeFilters =
-    [state.account, state.character, state.minQuality].filter((value) => value !== "").length +
+    [state.account, state.character, state.minQuality, state.category].filter((value) => value !== "").length +
     (available.some((place) => !state.places.includes(place)) ? 1 : 0) +
     (state.expired ? 1 : 0) +
     (state.soon ? 1 : 0) +
     [state.gearType, state.gearSlot, state.minLevel + state.maxLevel, state.wearer].filter((value) => value !== "").length;
   const tipRow = tip ? rowsByKey.get(tip.itemKey) : undefined;
   const slot: SlotContext = { items: data.items, prices: data.prices, tip, events: slotEvents };
+  const itemGrid = (list: ItemRow[]) => (
+    <ul className="bag-grid" data-size="lg">
+      {list.map((row) => (
+        <li key={row.itemKey}>
+          <ItemSlot
+            info={data.items[row.itemKey]}
+            itemKey={row.itemKey}
+            slotId={`all:${row.itemKey}`}
+            quantity={row.total}
+            flag={rowFlag(row.holdings, now)}
+            tip={tip}
+            events={slotEvents}
+          />
+        </li>
+      ))}
+    </ul>
+  );
   const viewNav = (
     <nav className="segmented" aria-label="Présentation">
       {(["items", "characters"] as const).map((view) => (
@@ -302,6 +339,28 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
                 {label} et mieux
               </option>
             ))}
+          </select>
+          <select
+            className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+            aria-label="Catégorie"
+            value={state.category}
+            onChange={(event) => update({ category: event.target.value })}
+          >
+            <option value="">Toutes catégories</option>
+            {CATEGORY_GROUPS.map((group) => {
+              const options = categories.filter((category) => category.group === group);
+              return (
+                options.length > 0 && (
+                  <optgroup key={group} label={group}>
+                    {options.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              );
+            })}
           </select>
           <span className="hidden flex-1 sm:block" />
           <div className="hidden sm:block">{viewNav}</div>
@@ -453,24 +512,28 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
         </p>
       )}
 
-      {state.view === "items" ? (
+      {byCategory ? (
+        rows.length > 0 && (
+          <>
+            {sections.length > 1 && <SectionNav label="Catégories" items={sectionLinks} />}
+            <section className="bag-window p-3 sm:p-4" aria-label="Objets">
+              {sections.map((section) => (
+                <div key={section.category} className="bag-section">
+                  <h2 id={`categorie-${section.category}`} className="bag-section-title">
+                    <span>
+                      {section.label} <small>· {plural(section.rows.length, "objet")}</small>
+                    </span>
+                  </h2>
+                  {itemGrid(section.rows)}
+                </div>
+              ))}
+            </section>
+          </>
+        )
+      ) : state.view === "items" ? (
         rows.length > 0 && (
           <section className="bag-window p-3 sm:p-4" aria-label="Objets">
-            <ul className="bag-grid" data-size="lg">
-              {rows.slice(0, limit).map((row) => (
-                <li key={row.itemKey}>
-                  <ItemSlot
-                    info={data.items[row.itemKey]}
-                    itemKey={row.itemKey}
-                    slotId={`all:${row.itemKey}`}
-                    quantity={row.total}
-                    flag={rowFlag(row.holdings, now)}
-                    tip={tip}
-                    events={slotEvents}
-                  />
-                </li>
-              ))}
-            </ul>
+            {itemGrid(rows.slice(0, limit))}
             {rows.length > limit && (
               <div className="mt-4 text-center">
                 <button type="button" className="button" onClick={() => setLimit((current) => current + PAGE_SIZE)}>

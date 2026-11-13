@@ -195,6 +195,13 @@ objets propres à WoW Forever absents des deux (un sur huit des équipements dé
 2026-11-13) gardent leur type mais n'ont pas de niveau : un filtre de niveau les écarte. Un
 import a lieu quand l'une des deux versions change.
 
+Depuis le site 0.22.0, cet import couvre **tous les objets** de la table `Item` (32 008 en
+1.60.1). Leur classe et leur sous-classe donnent la catégorie de la page Inventaires
+(`item-categories.ts`) : armes, armures, sacs, nourriture, potions, élixirs, parchemins, tissu,
+cuir, métal, viande, herbes, enchantement, recettes, quête… Comme dans le jeu, un objet de qualité
+médiocre va dans la camelote, quelle que soit sa classe ; une mascotte relevée par Baganator
+(clé `p:`) va avec les mascottes et montures.
+
 Les filtres « Pour » suivent les règles de port de WoW Classic (`gear.ts`) : armes que chaque
 classe peut apprendre, cuir sans mage, prêtre ni démoniste, mailles pour le chasseur et le
 chaman et plaques pour le guerrier et le paladin à partir du niveau 40, boucliers pour le

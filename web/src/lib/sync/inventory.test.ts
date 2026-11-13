@@ -157,11 +157,19 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
     assert.equal((await loadInventory(database.db)).items["15210:1017"].icon, "inv_sword_04");
 
     // Caractéristiques d'équipement de l'objet de base, pour toutes ses variantes ; rien pour le reste.
+    // La catégorie vient de la même table, pour tous les objets.
     assert.equal(data.items["15210:1017"].gear, undefined);
-    await database.db.insert(t.itemSpecs).values({ itemId: 15210, itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, levelSource: "era", build: "b" });
+    assert.equal(data.items["15210:1017"].category, undefined);
+    await database.db.insert(t.itemSpecs).values([
+      { itemId: 15210, itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, levelSource: "era", build: "b" },
+      { itemId: 2318, itemClass: 7, subclass: 6, inventoryType: 0, itemLevel: 10, requiredLevel: 0, levelSource: "wowf", build: "b" },
+    ]);
     const withGear = await loadInventory(database.db);
     assert.deepEqual(withGear.items["15210:1017"].gear, { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null });
     assert.equal(Object.values(withGear.items).filter((info) => info.gear).length, 1);
+    assert.equal(withGear.items["15210:1017"].category, "armes");
+    assert.equal(withGear.items["2318"].category, "cuir");
+    assert.equal(withGear.items["2318"].gear, undefined);
 
     // Royaume sans personnage du compte : la guilde n'est plus montrée, avant même sa suppression.
     await database.db.update(t.guildBanks).set({ realm: "RoyaumeDisparu" });

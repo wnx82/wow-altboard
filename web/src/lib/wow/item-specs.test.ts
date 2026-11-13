@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { asc } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { openTestDatabase, type TestDatabase } from "@/db/testing";
 import { BUILD_URL, catalogUrl } from "@/lib/economy/item-names";
@@ -8,7 +8,8 @@ import { itemTableUrl } from "./icon-files";
 import { ERA_BUILD_URL, importItemSpecs, itemSpecsSummary, loadItemSpecs, mergeItemSpecs, parseItemLevels, parseItemTypes } from "./item-specs";
 
 const NOW = new Date("2026-11-13T10:00:00Z");
-// Une épée, un plastron de cuir, un anneau, une robe de tissu, et deux objets qui ne sont pas de l'équipement.
+// Une épée, un plastron de cuir, un anneau, des jambières de plaques, de l'étoffe de lin et un explosif ;
+// une ligne illisible.
 const ITEM_TABLE = [
   "ID,ClassID,SubclassID,Material,InventoryType,IconFileDataID",
   "15210,2,7,1,13,135321",
@@ -63,8 +64,8 @@ beforeEach(async () => {
   await database.reset();
 });
 
-describe("caractéristiques des armures et des armes", () => {
-  test("table Item : armures et armes seulement, avec type et emplacement", () => {
+describe("caractéristiques des objets", () => {
+  test("table Item : tous les objets, avec classe, sous-classe et emplacement", () => {
     const parsed = parseItemTypes(ITEM_TABLE);
     assert.equal(parsed.ok, true);
     assert.deepEqual(parsed.ok && parsed.value, [
@@ -72,6 +73,8 @@ describe("caractéristiques des armures et des armes", () => {
       { itemId: 2316, itemClass: 4, subclass: 2, inventoryType: 5 },
       { itemId: 1462, itemClass: 4, subclass: 0, inventoryType: 11 },
       { itemId: 16866, itemClass: 4, subclass: 4, inventoryType: 7 },
+      { itemId: 2589, itemClass: 7, subclass: 5, inventoryType: 0 },
+      { itemId: 4306, itemClass: 0, subclass: 0, inventoryType: 0 },
     ]);
     assert.equal(parseItemTypes("ID,IconFileDataID\n1,2").ok, false);
   });
@@ -96,6 +99,8 @@ describe("caractéristiques des armures et des armes", () => {
         [2316, 11, "wowf"],
         [1462, 25, "wowf"],
         [16866, 60, "era"],
+        [2589, 0, "wowf"],
+        [4306, null, null],
       ],
     );
   });
@@ -103,13 +108,15 @@ describe("caractéristiques des armures et des armes", () => {
   test("import, rien de téléchargé tant que les versions ne changent pas, puis remplacement", async () => {
     const first = fakeWago();
     const imported = await importItemSpecs(database.db, { now: NOW, fetch: first.fetchImpl, onlyIfNewer: true });
-    assert.deepEqual(imported, { ok: true, build: "1.60.1.70888/1.15.9.70576", count: 4, fromForever: 2, fromEra: 2, removed: 0 });
+    assert.deepEqual(imported, { ok: true, build: "1.60.1.70888/1.15.9.70576", count: 6, fromForever: 3, fromEra: 2, removed: 0 });
     const rows = await database.db.select().from(t.itemSpecs).orderBy(asc(t.itemSpecs.itemId));
     assert.deepEqual(
       rows.map((row) => [row.itemId, row.itemClass, row.subclass, row.inventoryType, row.itemLevel, row.requiredLevel, row.allowableClass, row.levelSource]),
       [
         [1462, 4, 0, 11, 30, 25, null, "wowf"],
         [2316, 4, 2, 5, 16, 11, null, "wowf"],
+        [2589, 7, 5, 0, 5, 0, null, "wowf"],
+        [4306, 0, 0, 0, null, null, null, null],
         [15210, 2, 7, 13, 16, 11, null, "era"],
         [16866, 4, 4, 7, 66, 60, 1, "era"],
       ],
@@ -131,25 +138,41 @@ describe("caractéristiques des armures et des armes", () => {
     const failed = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago({ era: "1.15.10.71000", eraStatus: 503 }).fetchImpl });
     assert.deepEqual(failed, { ok: false, error: "wago.tools a répondu 503." });
     const summary = await itemSpecsSummary(database.db);
-    assert.deepEqual([summary.count, summary.build], [4, "1.60.1.70888/1.15.9.70576"]);
+    assert.deepEqual([summary.count, summary.build], [6, "1.60.1.70888/1.15.9.70576"]);
   });
 
   test("Classic Era injoignable au premier import : WoW Forever seul, complété dès que Classic Era répond", async () => {
     const alone = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago({ eraBuildStatus: 503 }).fetchImpl, onlyIfNewer: true });
-    assert.deepEqual(alone, { ok: true, build: "1.60.1.70888/", count: 4, fromForever: 2, fromEra: 0, removed: 0 });
+    assert.deepEqual(alone, { ok: true, build: "1.60.1.70888/", count: 6, fromForever: 3, fromEra: 0, removed: 0 });
     const full = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago().fetchImpl, onlyIfNewer: true });
-    assert.deepEqual(full, { ok: true, build: "1.60.1.70888/1.15.9.70576", count: 4, fromForever: 2, fromEra: 2, removed: 0 });
+    assert.deepEqual(full, { ok: true, build: "1.60.1.70888/1.15.9.70576", count: 6, fromForever: 3, fromEra: 2, removed: 0 });
     // Une fois l'import complet en place, une panne de Classic Era ne le dégrade pas.
     const down = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago({ eraBuildStatus: 503 }).fetchImpl, onlyIfNewer: true });
     assert.equal(down.ok, false);
     assert.equal((await itemSpecsSummary(database.db)).fromEra, 2);
   });
 
-  test("lecture par clé d'objet, variantes à suffixe comprises ; un objet qui n'est pas de l'équipement est absent", async () => {
+  test("lignes à reprendre (migration 0017) et Classic Era en panne : tous les objets, niveaux de Classic Era gardés", async () => {
+    for (const outage of [{ eraBuildStatus: 503 }, { eraStatus: 503 }]) {
+      await database.reset();
+      await importItemSpecs(database.db, { now: NOW, fetch: fakeWago().fetchImpl });
+      // État laissé par la migration : l'équipement seul, version vidée.
+      await database.db.delete(t.itemSpecs).where(sql`${t.itemSpecs.itemClass} not in (2, 4)`);
+      await database.db.update(t.itemSpecs).set({ build: "" });
+
+      const resumed = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago(outage).fetchImpl, onlyIfNewer: true });
+      assert.deepEqual(resumed, { ok: true, build: "1.60.1.70888/", count: 6, fromForever: 3, fromEra: 2, removed: 0 }, JSON.stringify(outage));
+      const [legs] = await database.db.select().from(t.itemSpecs).where(eq(t.itemSpecs.itemId, 16866));
+      assert.deepEqual([legs.requiredLevel, legs.allowableClass, legs.levelSource], [60, 1, "era"]);
+    }
+  });
+
+  test("lecture par clé d'objet, variantes à suffixe comprises ; un objet inconnu de la table est absent", async () => {
     await importItemSpecs(database.db, { now: NOW, fetch: fakeWago().fetchImpl });
     const specs = await loadItemSpecs(database.db, ["15210:1017", "2316", "2589", "p:1234", "999"]);
-    assert.deepEqual([...specs.keys()].sort(), ["15210:1017", "2316"]);
+    assert.deepEqual([...specs.keys()].sort(), ["15210:1017", "2316", "2589"]);
     assert.deepEqual(specs.get("15210:1017"), { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null });
+    assert.deepEqual(specs.get("2589"), { itemClass: 7, subclass: 5, inventoryType: 0, itemLevel: 5, requiredLevel: 0, allowableClass: null });
     assert.deepEqual(await loadItemSpecs(database.db, []), new Map());
   });
 });
