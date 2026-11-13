@@ -213,6 +213,22 @@ En cas d'erreur, tout est annulé, puis l'échec est journalisé à part (`sync_
 Tous les hash sont calculés sur un JSON **canonique** (clés triées) : le client WoW réécrit ses
 tables dans un ordre différent à chaque sauvegarde.
 
+### Délais
+
+Chaque transaction qui prend le verrou des synchronisations (synchronisation, réinitialisation des
+personnages, suppression d'un compte) pose d'abord ses délais côté serveur, valables jusqu'à sa fin
+(`set_config(…, true)`, l'équivalent de `SET LOCAL`) :
+
+| Paramètre | Valeur | Dépassé |
+|---|---|---|
+| `lock_timeout` | 8 s | verrou toujours tenu : erreur `55P03`, rien n'est écrit (`503 sync_busy` pour l'agent) |
+| `statement_timeout` | 12 s | requête annulée : erreur `57014`, transaction annulée (`503 timeout`, `sync_runs` en `failed`) |
+| `idle_in_transaction_session_timeout` | 30 s | transaction ouverte sans requête : fermée par le serveur |
+
+Ces délais restent sous le `query_timeout` du pool (15 s, côté client) : c'est le serveur qui annule,
+et la connexion revient propre au pool. Avant, une attente du verrou qui dépassait `query_timeout`
+rendait la connexion au pool au milieu d'une transaction que PostgreSQL poursuivait.
+
 ## Snapshots
 
 Un snapshot est créé quand le **hash de progression** diffère de celui du dernier snapshot du
@@ -247,7 +263,8 @@ npm run db:migrate:test      # applique sur la base de test
 En production, le service `migrate` de la pile les applique à chaque déploiement, avant le
 démarrage de l'application.
 Ne jamais passer de `statement_timeout` (ni aucun autre paramètre de session) dans les options du
-pool : PgBouncer refuse les paramètres de démarrage hors de sa liste. Un test le vérifie.
+pool : PgBouncer refuse les paramètres de démarrage hors de sa liste. Un test le vérifie. Les délais
+posés dans une transaction (§ Délais) ne sont pas des paramètres de démarrage.
 Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est tenu dans
 `drizzle.__drizzle_migrations`.
 

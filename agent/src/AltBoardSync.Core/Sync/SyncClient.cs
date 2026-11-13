@@ -7,6 +7,18 @@ namespace AltBoardSync.Core.Sync;
 public sealed record SyncOutcome(HttpStatusCode? Status, SyncResponse? Response, string? Error)
 {
     public bool Succeeded => Status is >= HttpStatusCode.OK and < HttpStatusCode.MultipleChoices && Response is not null;
+
+    /// <summary>
+    /// Jeton absent, invalide, révoqué ou lié à un autre PC : un nouvel essai n'y changera rien, il faut
+    /// en saisir un autre.
+    /// </summary>
+    public bool TokenRejected => IsTokenRejection(Status, Response);
+
+    internal static bool IsTokenRejection(HttpStatusCode? status, SyncResponse? response) =>
+        status == HttpStatusCode.Unauthorized || (status == HttpStatusCode.Forbidden && response?.Code == "token_machine_mismatch");
+
+    /// <summary>Attente demandée par le serveur (en-tête Retry-After d'un 429 ou d'un 503).</summary>
+    public TimeSpan? RetryAfter { get; init; }
 }
 
 /// <summary>
@@ -55,8 +67,8 @@ public sealed class SyncClient(HttpClient http, string agentVersion)
                 // Réponse non JSON (page d'erreur d'un proxy) : seul le code HTTP est exploitable.
             }
 
-            var error = response.IsSuccessStatusCode ? null : parsed?.Error ?? $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
-            return new SyncOutcome(response.StatusCode, parsed, error);
+            var error = response.IsSuccessStatusCode ? null : Describe(response.StatusCode, response.ReasonPhrase, parsed);
+            return new SyncOutcome(response.StatusCode, parsed, error) { RetryAfter = RetryDelay(response.Headers.RetryAfter) };
         }
         catch (HttpRequestException e)
         {
@@ -72,6 +84,36 @@ public sealed class SyncClient(HttpClient http, string agentVersion)
             // l'envoi suivant le dira (un document déjà reçu ne crée aucun doublon).
             return new SyncOutcome(null, null, $"Connexion coupée pendant la réponse du serveur : {e.Message}");
         }
+    }
+
+    private const int MaxIssuesShown = 3;
+
+    /// <summary>
+    /// Le message du serveur, complété de ce qui aide à agir : champs en cause d'un document refusé,
+    /// marche à suivre pour un jeton refusé.
+    /// </summary>
+    internal static string Describe(HttpStatusCode status, string? reason, SyncResponse? response)
+    {
+        var message = response?.Error ?? $"HTTP {(int)status} {reason}".TrimEnd();
+        if (SyncOutcome.IsTokenRejection(status, response)) return $"{message.TrimEnd('.')}. Saisissez un nouveau jeton, créé dans la page Machines.";
+        if (status is not (HttpStatusCode.UnprocessableContent or HttpStatusCode.RequestEntityTooLarge)) return message;
+
+        var issues = response?.Issues ?? [];
+        var fields = issues.Count == 0
+            ? ""
+            : $" Champs en cause : {string.Join(", ", issues.Take(MaxIssuesShown).Select(issue => $"{issue.Path} ({issue.Code})"))}"
+              + (issues.Count > MaxIssuesShown ? $" et {issues.Count - MaxIssuesShown} autres." : ".");
+        // Une date en avance se corrige sur le PC ; le reste vient d'un agent plus ancien que le site.
+        var hint = response?.Code == "future_timestamp" ? "" : " Mettez l'agent à jour si le refus persiste.";
+        return $"{message.TrimEnd('.')}.{fields}{hint}";
+    }
+
+    /// <summary>Délai d'un en-tête Retry-After, en secondes ou en date ; borné à une heure.</summary>
+    internal static TimeSpan? RetryDelay(RetryConditionHeaderValue? header)
+    {
+        var delay = header?.Delta ?? (header?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+        if (delay is not { } value || value <= TimeSpan.Zero) return null;
+        return value > TimeSpan.FromHours(1) ? TimeSpan.FromHours(1) : value;
     }
 
     private static async Task<byte[]> ReadLimitedAsync(HttpContent content, CancellationToken cancellationToken)

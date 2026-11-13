@@ -4,6 +4,64 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.25.0 — 2026-11-14
+
+### Ajouté
+
+- **Dernière version de l'agent dans les réponses de `POST /api/sync`** (`latestAgentVersion`),
+  pour tout jeton valide, refus compris : l'agent 0.8.1 annonce lui-même sa mise à jour.
+- **File d'attente des envois** : un seul traité à la fois, quatre au plus en attente, 20 secondes
+  chacun. Au-delà, `503 sync_busy` avec `Retry-After: 30`, sans rien écrire.
+- Test de garde : chaque route d'API et chaque action serveur doit commencer par vérifier la
+  session, sauf une liste publique explicite (`/api/health`, `/api/sync`, le manifeste, connexion
+  et déconnexion).
+- Sonde Prometheus du chemin public de l'agent (`GET /api/sync`, attendu en `405`) : tunnel et
+  contournement Access sont désormais surveillés, sans consommer la limite d'échecs
+  d'authentification.
+
+### Modifié
+
+- **Délais côté serveur** pour toute transaction qui prend le verrou des synchronisations :
+  `lock_timeout` 8 s, `statement_timeout` 12 s, `idle_in_transaction_session_timeout` 30 s. Un
+  verrou tenu trop longtemps donne `503 sync_busy`, un traitement trop long `503 timeout` avec
+  `Retry-After: 120`, noté en échec dans le journal des synchronisations. Réinitialiser les
+  personnages ou supprimer un compte pendant une synchronisation affiche « Une synchronisation est
+  en cours : réessayez dans quelques secondes. »
+- Le journal du serveur note la taille du document reçu (`bytes`) et les envois retardés
+  (`sync.busy`, file ou verrou).
+
+### Corrigé
+
+- **Document refusé à chaque essai** pour trop d'avertissements ou des textes trop longs : au-delà
+  de 50 avertissements, le serveur garde les 49 premiers et les résume en un dernier ; un
+  avertissement de plus de 400 caractères ou un nom de machine de plus de 120 est raccourci au lieu
+  de faire refuser le document.
+
+## Agent 0.8.1 — 2026-11-14
+
+### Ajouté
+
+- **Mise à jour annoncée** : quand le site sert une version plus récente, une bulle, une ligne au
+  journal et le lien « Mise à jour X disponible » dans la fenêtre, qui ouvre la page Machines. Une
+  fois par version, même après un redémarrage.
+- **Remplacement d'une version plus ancienne** : lancé alors qu'une surveillance plus ancienne
+  tourne (y compris antérieure à 0.8.1), le nouvel exécutable l'arrête, prend sa place et réécrit
+  le démarrage avec Windows s'il désignait l'ancien. Lancer une version plus ancienne rouvre
+  seulement la fenêtre de celle qui tourne.
+- **Jeton refusé** (révoqué, inconnu ou lié à un autre PC) : la fenêtre l'affiche en rouge et ouvre
+  la saisie d'elle-même, une fois ; la bulle s'intitule « Jeton refusé ».
+
+### Modifié
+
+- Un refus du serveur dit sa cause : jusqu'à trois champs en cause pour un document refusé, et le
+  conseil de mettre l'agent à jour si le refus persiste ; un jeton refusé invite à en saisir un
+  nouveau.
+- L'agent respecte `Retry-After` (une heure au plus) avant de réessayer.
+- Avant l'envoi, au plus 50 avertissements par compte, et les textes raccourcis aux limites du
+  serveur.
+- Fonctionne avec le site 0.18.0 et suivants ; l'annonce de mise à jour demande le site 0.25.0, qui
+  sert aussi cet agent sur la page Machines.
+
 ## Site 0.24.0 — 2026-11-13
 
 ### Ajouté

@@ -229,9 +229,20 @@ public sealed record SyncResponse
     public int SnapshotsCreated { get; init; }
     public IReadOnlyList<SyncResponseError> Errors { get; init; } = [];
     public string? Error { get; init; }
+
+    /// <summary>Code d'un refus (« invalid_payload », « sync_busy »…).</summary>
+    public string? Code { get; init; }
+
+    /// <summary>Champs en cause d'un document refusé : chemin et code, jamais la valeur. Absent d'une réponse sans refus.</summary>
+    public IReadOnlyList<SyncResponseIssue>? Issues { get; init; }
+
+    /// <summary>Version de l'agent servie par le site (site 0.25.0 et suivants), rendue à un agent authentifié.</summary>
+    public string? LatestAgentVersion { get; init; }
 }
 
 public sealed record SyncResponseError(string Code, string Message);
+
+public sealed record SyncResponseIssue(string Path, string Code);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

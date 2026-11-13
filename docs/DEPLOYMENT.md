@@ -179,6 +179,7 @@ Alertmanager, comme les autres.
 | Quoi | Comment | Alerte |
 |---|---|---|
 | Site joignable | sonde `http://10.0.0.15:3016/api/health`, job `blackbox-internal` de `prometheus.yml` | `BlackboxProbeFailed`, règle générale : 5 min sans réponse |
+| Chemin public de l'agent | sonde `GET https://wow.ekreativ.be/api/sync`, job `blackbox-public-405`, module `http_public_405` de `blackbox.yml` : seul un `405` est accepté | `BlackboxProbeFailed`, idem |
 | Sauvegarde | métriques écrites par `wow-altboard-backup.sh`, lues par node_exporter (collecteur textfile) | jamais lancée, en échec, ou silencieuse depuis 48 h |
 | Copie hors de l'hôte | idem, à partir de la première copie restic réussie | aucune depuis 14 jours |
 | Synchronisations | idem : fin du dernier envoi reçu, tous PC confondus, relevée chaque nuit | aucune depuis 14 jours |
@@ -191,14 +192,26 @@ de référence de `/opt/observability/prometheus/rules/wow-altboard.yml`, et leu
 # Sur le conteneur LXC 107, une fois les deux fichiers copiés sous /opt/observability/prometheus/rules
 docker exec prometheus promtool test rules /etc/prometheus/rules/tests/wow-altboard.test.yml
 docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
-curl -X POST http://127.0.0.1:9090/-/reload
+curl -X POST http://10.0.0.25:9090/-/reload   # Prometheus n'écoute pas sur 127.0.0.1
 ```
+
+La sonde du chemin public passe par le DNS, Cloudflare, le tunnel et le contournement Access de
+`/api/sync`, comme l'agent. La route n'accepte que `POST` : un `GET` qui atteint l'application
+reçoit `405`, alors qu'Access répondrait `302` vers sa page de connexion et une entrée de tunnel
+cassée, `502` ou `530`. Elle n'envoie volontairement pas de `POST` sans jeton : chaque refus compte
+comme un échec d'authentification pour l'adresse d'origine, celle de la maison vue par Cloudflare,
+et dix en un quart d'heure bloqueraient les agents des PC de la maison. Le module et le job ne sont
+pas dans le dépôt : ils vivent dans `/opt/observability/blackbox/blackbox.yml` et
+`prometheus/prometheus.yml` du conteneur LXC 107 (copies `.bak-wowagent-20261114` d'avant l'ajout).
+Après une modification du module : `docker exec blackbox blackbox_exporter
+--config.file=/etc/blackbox/blackbox.yml --config.check`, puis `POST /-/reload` sur le port 9115.
 
 Ce que la surveillance ne voit pas :
 
-- **Le chemin public de l'agent.** La sonde vise l'origine. Une entrée de tunnel ou un contournement
-  Access de `/api/sync` cassés n'apparaissent que dans la fenêtre de l'agent, puis, quatorze jours
-  plus tard, dans l'alerte de synchronisation.
+- **L'acceptation d'un envoi.** La sonde du chemin public prouve que `/api/sync` répond, pas qu'un
+  document y est accepté : un refus du contenu (`422`) ou de la base n'apparaît que dans la fenêtre
+  de l'agent, sur la page **Machines**, puis, quatorze jours plus tard, dans l'alerte de
+  synchronisation.
 - **Un PC parmi d'autres.** L'alerte de synchronisation regarde l'envoi le plus récent, tous PC
   confondus : la page **Machines** donne le détail par PC. Après une pause de jeu, elle se déclenche
   sans qu'il y ait de panne.

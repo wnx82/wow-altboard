@@ -32,7 +32,11 @@ public abstract record WatchEvent
     public sealed record Synced(SyncResponse Response, string Summary, IReadOnlyList<CharacterChange> Changes) : WatchEvent;
 
     /// <summary>La lecture ou l'envoi a échoué ; un nouvel essai suivra.</summary>
-    public sealed record Failed(string Error, TimeSpan RetryIn) : WatchEvent;
+    /// <param name="TokenRejected">Le serveur refuse le jeton : il faut en saisir un autre.</param>
+    public sealed record Failed(string Error, TimeSpan RetryIn, bool TokenRejected = false) : WatchEvent;
+
+    /// <summary>Le serveur sert une version de l'agent plus récente que celle-ci ; signalé une fois par version.</summary>
+    public sealed record UpdateAvailable(string Version) : WatchEvent;
 
     /// <summary>Une synchronisation demandée n'a trouvé aucun compte à envoyer.</summary>
     public sealed record NothingToSend(string Reason) : WatchEvent;
@@ -69,6 +73,12 @@ internal sealed class WatchLoop(
     private readonly Dictionary<string, FileSystemWatcher> _watchers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _readErrors = new();
 
+    /// <summary>Échec d'un cycle : le message, l'attente demandée par le serveur, un jeton refusé.</summary>
+    private sealed record Failure(string Message, TimeSpan? RetryAfter = null, bool TokenRejected = false)
+    {
+        public static implicit operator Failure(string message) => new(message);
+    }
+
     /// <summary>Ne rend la main que par annulation.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -85,35 +95,38 @@ internal sealed class WatchLoop(
             while (true)
             {
                 // Un seul cycle à la fois : ce qui arrive pendant un envoi attend dans la file.
-                string? error;
+                Failure? failure;
                 try
                 {
-                    error = await CycleAsync(client, state, force, cancellationToken).ConfigureAwait(false);
+                    failure = await CycleAsync(client, state, force, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     // Filet de dernier recours : une erreur imprévue (fichier verrouillé un instant par un
                     // antivirus…) est un échec comme un autre. La surveillance ne s'arrête que sur demande.
                     log.Error($"cycle de synchronisation interrompu : {e}");
-                    error = $"erreur inattendue ({e.GetType().Name}) : {e.Message}";
+                    failure = $"erreur inattendue ({e.GetType().Name}) : {e.Message}";
                 }
-                if (error is null)
+                if (failure is null)
                 {
                     retry = TimeSpan.Zero;
                     journaledError = null;
                 }
                 else
                 {
+                    var error = failure.Message;
                     retry = retry == TimeSpan.Zero ? _options.FirstRetryDelay : TimeSpan.FromTicks(Math.Min(retry.Ticks * 2, _options.MaxRetryDelay.Ticks));
+                    // Le serveur occupé ou limité dit quand revenir : pas avant.
+                    if (failure.RetryAfter is { } asked && asked > retry) retry = asked;
                     log.Error($"synchronisation automatique en échec : {error}");
                     // Une entrée par panne, pas une à chaque nouvel essai.
                     if (error != journaledError) journal.Failed(error);
                     journaledError = error;
                     Say($"Échec : {error.TrimEnd('.')}. Nouvel essai dans {Describe(retry)}.");
-                    env.OnWatchEvent?.Invoke(new WatchEvent.Failed(error, retry));
+                    env.OnWatchEvent?.Invoke(new WatchEvent.Failed(error, retry, failure.TokenRejected));
                 }
 
-                var signal = await NextSignalAsync(error is null ? _options.CheckInterval : retry, cancellationToken).ConfigureAwait(false);
+                var signal = await NextSignalAsync(failure is null ? _options.CheckInterval : retry, cancellationToken).ConfigureAwait(false);
                 force = signal == Signal.Requested
                     || (signal == Signal.FileChanged && await SettleAsync(cancellationToken).ConfigureAwait(false));
             }
@@ -125,8 +138,8 @@ internal sealed class WatchLoop(
         }
     }
 
-    /// <returns>L'erreur rencontrée, ou null : rien à envoyer, ou envoi accepté.</returns>
-    private async Task<string?> CycleAsync(SyncClient client, WatchState state, bool force, CancellationToken cancellationToken)
+    /// <returns>L'échec rencontré, ou null : rien à envoyer, ou envoi accepté.</returns>
+    private async Task<Failure?> CycleAsync(SyncClient client, WatchState state, bool force, CancellationToken cancellationToken)
     {
         IReadOnlyList<AccountSource> sources;
         try
@@ -197,7 +210,9 @@ internal sealed class WatchLoop(
             env.Now(),
             itemNames.Where(read => read.Payload is not null).Select(read => read.Payload!).ToList());
         var outcome = await client.SendAsync(endpoint, token, document, cancellationToken).ConfigureAwait(false);
-        if (!outcome.Succeeded) return outcome.Error ?? "réponse inattendue du serveur";
+        // Un document refusé dit aussi la version servie : c'est souvent la mise à jour qui manque.
+        NoteLatestVersion(state, outcome.Response?.LatestAgentVersion);
+        if (!outcome.Succeeded) return new Failure(outcome.Error ?? "réponse inattendue du serveur", outcome.RetryAfter, outcome.TokenRejected);
 
         foreach (var result in readable) state.Fingerprints[StateKey(result)] = result.Fingerprint!;
         foreach (var read in itemNames.Where(read => read.FileHash is not null)) state.ItemNameHashes[read.Flavor] = read.FileHash!;
@@ -221,6 +236,33 @@ internal sealed class WatchLoop(
         foreach (var change in changes) Say($"  {DescribeChange(change)}");
         env.OnWatchEvent?.Invoke(new WatchEvent.Synced(response, summary, changes));
         return null;
+    }
+
+    /// <summary>
+    /// Retient la version annoncée par le serveur et la signale une fois, si elle suit celle-ci. L'état
+    /// n'est réécrit que s'il change.
+    /// </summary>
+    private void NoteLatestVersion(WatchState state, string? latest)
+    {
+        if (latest is null) return;
+        var announce = AgentVersions.IsNewer(latest, version) && state.NotifiedAgentVersion != latest;
+        if (latest == state.LatestAgentVersion && !announce) return;
+        state.LatestAgentVersion = latest;
+        if (announce) state.NotifiedAgentVersion = latest;
+        try
+        {
+            _stateStore.Save(state);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log.Warn($"état de la surveillance non enregistré : {e.Message}");
+        }
+
+        if (!announce) return;
+        log.Info($"version {latest} de l'agent disponible (celle-ci : {version})");
+        journal.Info($"AltBoard Sync {latest} est disponible : téléchargez-le depuis la page Machines du tableau de bord, puis lancez-le.");
+        Say($"Mise à jour disponible : AltBoard Sync {latest}.");
+        env.OnWatchEvent?.Invoke(new WatchEvent.UpdateAvailable(latest));
     }
 
     private void WatchAccountRoots()

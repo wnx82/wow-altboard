@@ -53,6 +53,22 @@ Voir [Synchronisation automatique](#synchronisation-automatique).
 Le jeu n'écrit `AltBoard.lua` qu'à la déconnexion du personnage ou sur `/reload` : synchroniser
 avant ne voit pas les derniers changements.
 
+## Mettre à jour
+
+Chaque réponse du serveur à un jeton valide donne la version de l'agent livrée avec le site
+(`latestAgentVersion`, voir [API](API.md)). Plus récente que la sienne, l'agent 0.8.1 l'annonce une
+fois par version : une bulle « Mise à jour disponible », une ligne au journal, et dans la fenêtre le
+lien **Mise à jour X disponible**, à côté de la version, qui ouvre la page Machines.
+
+Il suffit de télécharger le nouvel `AltBoardSync.exe` et de le lancer, d'où l'on veut. Si une
+version plus ancienne tourne dans la session, il lui demande de s'arrêter, attend 15 secondes au
+plus, puis prend sa place, fenêtre ouverte ; le journal le note. Si l'inscription **Démarrage avec
+Windows** désigne un autre exécutable, elle est réécrite pour lancer le nouveau. Une version
+antérieure à 0.8.1 ne dit pas sa version : elle est remplacée de la même façon. Lancer une version
+plus ancienne que celle qui tourne rouvre seulement la fenêtre de celle-ci.
+
+Le remplacement ne supprime pas l'ancien exécutable : il peut être effacé une fois le nouveau lancé.
+
 ## Commandes
 
 | Commande | Effet |
@@ -113,7 +129,7 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 |---|---|
 | `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl` — aucun secret |
 | `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant |
-| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; ni contenu ni nom réel de dossier de compte |
+| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; dernière version de l'agent annoncée par le serveur, et celle déjà signalée ; ni contenu ni nom réel de dossier de compte |
 | `journal.jsonl` | journal affiché par la fenêtre : une entrée par envoi, panne ou événement, avec ce qui a changé par personnage ; les 200 dernières sont gardées |
 | `characters.json` | ce que l'agent retient de chaque personnage envoyé (niveau, or, métiers, empreintes) pour dire ce qui change à l'envoi suivant |
 | `logs\altboardsync.log` | journal technique ; ni jeton ni nom réel de dossier de compte ; rotation à 1 Mo |
@@ -242,10 +258,18 @@ parser → document → POST /api/sync (idempotent)
 - **Échecs** : nouvel essai après 1 minute, puis une attente doublée à chaque échec, jusqu'à
   30 minutes ; jamais plus d'un envoi à la fois. Un jeton absent ou illisible, un dossier du jeu
   introuvable, une erreur imprévue (journalisée avec son type) suivent la même règle : la
-  surveillance attend qu'on les corrige, elle ne s'arrête pas (agent 0.5.1).
+  surveillance attend qu'on les corrige, elle ne s'arrête pas (agent 0.5.1). Un serveur occupé ou
+  qui limite les envois dit quand revenir (`Retry-After`) : l'agent attend au moins ce délai, une
+  heure au plus (agent 0.8.1).
+- **Refus** : le message dit la cause. Un document refusé (`422`) nomme jusqu'à trois champs en
+  cause ; refusé ou trop volumineux (`413`), il conseille de mettre l'agent à jour si le refus
+  persiste, sauf pour une horloge en avance, qui se corrige sur le PC. Un jeton refusé (`401`, ou
+  `403` pour un jeton lié à un autre PC) invite à en saisir un nouveau. Avant l'envoi, l'agent garde au plus 50 avertissements par
+  compte et raccourcit les textes trop longs, aux mêmes limites que le serveur.
 - **Délai** : 60 s pour tout l'échange avec le serveur, corps de la réponse compris. Une réponse
   muette ou coupée compte comme un échec.
-- **Une seule surveillance** par session Windows : une seconde refuse de démarrer.
+- **Une seule surveillance** par session Windows : une seconde refuse de démarrer, sauf un
+  exécutable plus récent lancé à la main, qui prend la place (voir [Mettre à jour](#mettre-à-jour)).
 
 ### Fenêtre
 
@@ -267,6 +291,10 @@ d'être enregistré. Le jeton est chiffré comme par `token set` (voir
 [Fichiers locaux](#fichiers-locaux)) et remplace celui qui existait ; une synchronisation part
 aussitôt, et son résultat s'inscrit au journal : un jeton refusé par le serveur s'y lit tout de
 suite.
+
+Si le serveur refuse le jeton enregistré (révoqué, ou lié à un autre PC), la ligne du jeton
+l'indique en rouge et la saisie s'ouvre d'elle-même, une fois, avec la marche à suivre ; un
+nouveau jeton enregistré, ou un envoi accepté, efface l'alerte.
 
 La fermer ne quitte pas l'agent : il reste dans la zone de notification, et **Quitter** l'arrête.
 Une seule surveillance tourne par session Windows : un second double-clic rouvre la fenêtre de
@@ -296,7 +324,8 @@ premiers personnages, dans la bulle de notification.
 ### Zone de notification
 
 Pendant `watch`, une icône indique l'état en infobulle et affiche une bulle à chaque
-synchronisation et à chaque nouvelle panne. Clic gauche : la fenêtre. Clic droit : **Ouvrir
+synchronisation, à chaque nouvelle panne (« Jeton refusé » quand c'est le jeton) et pour une
+nouvelle version de l'agent. Clic gauche : la fenêtre. Clic droit : **Ouvrir
 AltBoard Sync**, **Synchroniser maintenant**, **Ouvrir le tableau de bord**, **Ouvrir le fichier
 journal**, **Quitter**.
 

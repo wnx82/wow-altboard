@@ -20,6 +20,7 @@ internal sealed class MainWindow
     private enum Zone
     {
         None,
+        Update,
         Autostart,
         SyncNow,
         Token,
@@ -55,7 +56,8 @@ internal sealed class MainWindow
     private const float ClientWidth = 780, ClientHeight = 720, MinClientWidth = 640, MinClientHeight = 560;
     private const string ClassName = "AltBoardSyncWindow";
 
-    private static readonly Zone[] FocusOrder = [Zone.Autostart, Zone.SyncNow, Zone.Token, Zone.Dashboard, Zone.LogFile, Zone.Quit];
+    // Une zone absente de l'affichage (lien de mise à jour sans mise à jour) est sautée.
+    private static readonly Zone[] FocusOrder = [Zone.Update, Zone.Autostart, Zone.SyncNow, Zone.Token, Zone.Dashboard, Zone.LogFile, Zone.Quit];
     // Dans le panneau du jeton, après le champ, qui ouvre la boucle.
     private static readonly Zone[] TokenFocusOrder = [Zone.TokenPaste, Zone.TokenMachines, Zone.TokenCancel, Zone.TokenSave];
     private static readonly string[] Days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -87,6 +89,10 @@ internal sealed class MainWindow
     private bool? _failing;
     private DateTimeOffset? _retryAt;
     private bool _syncRequested;
+    // Version plus récente servie par le site, à proposer ; null s'il n'y en a pas.
+    private string? _update;
+    // Le serveur a refusé le jeton enregistré : la saisie s'ouvre une fois, jusqu'au prochain jeton.
+    private bool _tokenRejected, _tokenRejectedAsked;
 
     private Zone _hover, _pressed, _focus;
     private bool _focusVisible, _trackingMouse;
@@ -127,6 +133,7 @@ internal sealed class MainWindow
             OpenTokenPanel();
         }
 
+        AskRejectedToken();
         Invalidate();
     });
 
@@ -138,19 +145,49 @@ internal sealed class MainWindow
             case WatchEvent.Synced:
                 _failing = false;
                 _retryAt = null;
+                _tokenRejected = false;
                 break;
             case WatchEvent.Failed failed:
                 _failing = true;
                 _retryAt = DateTimeOffset.UtcNow + failed.RetryIn;
+                if (failed.TokenRejected) _tokenRejected = true;
                 break;
+            case WatchEvent.UpdateAvailable update:
+                _update = update.Version;
+                // Une version annoncée ne relance pas de synchronisation : le bouton reste tel quel.
+                if (_window != 0 && IsWindowVisible(_window)) Invalidate();
+                return;
         }
 
         _syncRequested = false;
         if (_window == 0 || !IsWindowVisible(_window)) return;
         KillTimer(_window, SyncTimeoutTimer);
         Reload();
+        AskRejectedToken();
         Invalidate();
     });
+
+    /// <summary>Note dans le journal qu'un exécutable plus récent a pris la place de la surveillance en cours.</summary>
+    /// <param name="previous">Version remplacée ; null pour une version antérieure à 0.8.1, qui ne la disait pas.</param>
+    /// <param name="autostartCommand">Nouvelle commande du démarrage avec Windows, si elle a été réécrite.</param>
+    public void ReportReplaced(string? previous, string? autostartCommand) => _post(() =>
+    {
+        _journal.Info(previous is null
+            ? $"AltBoard Sync {AgentApp.Version} a remplacé la version précédente."
+            : $"AltBoard Sync {AgentApp.Version} a remplacé la version {previous}.");
+        if (autostartCommand is not null) _journal.Info($"Démarrage avec Windows : lance désormais {Environment.ProcessPath}.");
+        if (_window == 0 || !IsWindowVisible(_window)) return;
+        Reload();
+        Invalidate();
+    });
+
+    /// <summary>Jeton refusé par le serveur : la saisie s'ouvre d'elle-même, une fois.</summary>
+    private void AskRejectedToken()
+    {
+        if (!_tokenRejected || _tokenRejectedAsked || _tokenOpen || _window == 0 || !IsWindowVisible(_window)) return;
+        _tokenRejectedAsked = true;
+        OpenTokenPanel();
+    }
 
     // ---------------------------------------------------------------------------
     // Création et données
@@ -243,6 +280,9 @@ internal sealed class MainWindow
         {
             _server = "configuration illisible";
         }
+
+        var latest = new WatchStateStore(_homeDirectory).Load().LatestAgentVersion;
+        _update = AgentVersions.IsNewer(latest, AgentApp.Version) ? latest : null;
 
         try
         {
@@ -456,8 +496,10 @@ internal sealed class MainWindow
         {
             case VkTab:
                 var step = GetKeyState(VkShift) < 0 ? -1 : 1;
-                var index = Array.IndexOf(FocusOrder, _focus);
-                _focus = FocusOrder[index < 0 ? (step > 0 ? 0 : FocusOrder.Length - 1) : (index + step + FocusOrder.Length) % FocusOrder.Length];
+                var order = FocusOrder.Where(zone => _zones.Exists(entry => entry.Zone == zone)).ToArray();
+                if (order.Length == 0) break;
+                var index = Array.IndexOf(order, _focus);
+                _focus = order[index < 0 ? (step > 0 ? 0 : order.Length - 1) : (index + step + order.Length) % order.Length];
                 _focusVisible = true;
                 Invalidate();
                 break;
@@ -527,6 +569,10 @@ internal sealed class MainWindow
     {
         switch (zone)
         {
+            case Zone.Update:
+                // La page Machines propose le téléchargement ; lancé, le nouvel exécutable prend la place.
+                Task.Run(_commands.OpenMachines);
+                break;
             case Zone.Autostart:
                 ToggleAutostart();
                 break;
@@ -652,7 +698,7 @@ internal sealed class MainWindow
         var pillWidth = PaintStatus(canvas, fonts, right, S(28));
         var titleWidth = contentWidth - S(56) - pillWidth - S(16);
         canvas.Text("AltBoard Sync", fonts.Title, Bright, new RectF(left + S(56), S(18), titleWidth, S(28)), TextLayout.Middle | TextLayout.Ellipsis);
-        canvas.Text($"Version {AgentApp.Version}  ·  {_machine}", fonts.Small, Muted, new RectF(left + S(56), S(46), titleWidth, S(18)), TextLayout.Middle | TextLayout.Ellipsis);
+        PaintSubtitle(canvas, fonts, new RectF(left + S(56), S(46), titleWidth, S(18)));
 
         PaintAutostart(canvas, fonts, new RectF(left, S(88), contentWidth, S(78)));
         PaintTiles(canvas, fonts, new RectF(left, S(178), contentWidth, S(86)));
@@ -674,6 +720,28 @@ internal sealed class MainWindow
             new RectF(left, height - S(42), contentWidth - quitWidth - S(12), S(30)), TextLayout.Middle | TextLayout.Ellipsis);
 
         if (_tokenOpen) PaintTokenPanel(canvas, fonts, width, height);
+    }
+
+    /// <summary>Version et nom du PC ; s'il y a lieu, le lien vers la version plus récente.</summary>
+    private void PaintSubtitle(Canvas canvas, Fonts fonts, RectF area)
+    {
+        var subtitle = $"Version {AgentApp.Version}  ·  {_machine}";
+        if (_update is null)
+        {
+            canvas.Text(subtitle, fonts.Small, Muted, area, TextLayout.Middle | TextLayout.Ellipsis);
+            return;
+        }
+
+        var link = $"Mise à jour {_update} disponible";
+        var linkWidth = Math.Min(canvas.Measure(link, fonts.SmallBold).Width, area.Width);
+        var textWidth = Math.Max(0, area.Width - linkWidth - S(14));
+        canvas.Text(subtitle, fonts.Small, Muted, area with { Width = textWidth }, TextLayout.Middle | TextLayout.Ellipsis);
+        var x = area.X + Math.Min(canvas.Measure(subtitle, fonts.Small).Width, textWidth) + S(14);
+        var bounds = new RectF(x - S(6), area.Y - S(3), linkWidth + S(12), area.Height + S(6));
+        _zones.Add((Zone.Update, bounds));
+        if (_hover == Zone.Update) canvas.FillRound(bounds, S(6), WithAlpha(Gold, 0x1F));
+        canvas.Text(link, fonts.SmallBold, _hover == Zone.Update ? GoldHover : Gold, area with { X = x, Width = linkWidth }, TextLayout.Middle | TextLayout.Ellipsis);
+        PaintFocus(canvas, Zone.Update, bounds, S(6));
     }
 
     /// <returns>Largeur de la pastille, pour que le titre s'arrête avant.</returns>
@@ -747,6 +815,7 @@ internal sealed class MainWindow
 
         var (tokenLabel, tokenColor) = _token switch
         {
+            TokenState.Present when _tokenRejected => ("jeton refusé", Danger),
             TokenState.Present => ("jeton enregistré", Ok),
             TokenState.Absent => ("jeton absent", Danger),
             _ => ("jeton illisible", Danger),
@@ -837,8 +906,10 @@ internal sealed class MainWindow
         float left = card.X + S(24), inner = card.Width - S(48), right = left + inner;
         canvas.Text("Jeton d'agent", fonts.Heading, Bright, new RectF(left, card.Y + S(22), inner, S(24)), TextLayout.Middle);
         // Espace insécable : le deux-points ne passe pas seul à la ligne.
-        var description = "Créez un jeton sur la page Machines du tableau de bord, puis collez-le ici. Un jeton par PC : il se lie au premier qui l'utilise.";
-        if (_token == TokenState.Present) description += " Celui qui est enregistré sera remplacé.";
+        var description = _tokenRejected
+            ? "Le serveur refuse le jeton enregistré : révoqué, ou lié à un autre PC. Créez-en un nouveau sur la page Machines du tableau de bord, puis collez-le ici."
+            : "Créez un jeton sur la page Machines du tableau de bord, puis collez-le ici. Un jeton par PC : il se lie au premier qui l'utilise.";
+        if (_token == TokenState.Present && !_tokenRejected) description += " Celui qui est enregistré sera remplacé.";
         canvas.Text(description, fonts.Small, Muted, new RectF(left, card.Y + S(54), inner, S(38)), TextLayout.Wrap);
 
         canvas.FillRound(field, S(10), Ink);
@@ -935,6 +1006,7 @@ internal sealed class MainWindow
 
         _log.Info("jeton d'agent enregistré depuis la fenêtre");
         _journal.Info("Jeton d'agent enregistré.");
+        _tokenRejected = _tokenRejectedAsked = false;
         CloseTokenPanel();
         Reload();
         // Le jeton vient d'arriver : la surveillance n'attend pas son prochain essai.

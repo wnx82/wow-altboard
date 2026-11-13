@@ -1,7 +1,7 @@
 import { eq, lt, max, min, notExists, sql } from "drizzle-orm";
 import type { Database, DatabaseOrTransaction } from "@/db/client";
 import { characters, realms } from "@/db/schema";
-import { SYNC_LOCK_KEY } from "@/lib/sync/process";
+import { takeSyncLock } from "@/lib/sync/process";
 import { writeSettings } from "./store";
 
 // Réinitialisation des personnages, prévue pour la sortie officielle du jeu : ceux de la bêta
@@ -18,7 +18,7 @@ export type ResetResult = { deleted: number; kept: number };
 export async function resetCharacters(db: Database, cutoff: Date, now: Date): Promise<ResetResult> {
   return db.transaction(async (tx) => {
     // Verrou des synchronisations : aucune ne s'intercale entre la suppression et la date limite.
-    await tx.execute(sql`select pg_advisory_xact_lock(${SYNC_LOCK_KEY})`);
+    await takeSyncLock(tx);
     const deleted = await tx.delete(characters).where(lt(characters.sourceLastSeenAt, cutoff)).returning({ id: characters.id });
     await deleteEmptyRealms(tx);
     const [remaining] = await tx.select({ count: sql<number>`count(*)::int` }).from(characters);

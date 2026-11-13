@@ -12,9 +12,11 @@ export function createPool(connectionString: string): Pool {
     connectionString,
     max: 5,
     connectionTimeoutMillis: 5_000,
-    // Délai côté client. Surtout pas statement_timeout : node-postgres l'envoie comme paramètre de
-    // démarrage, que PgBouncer refuse (« unsupported startup parameter »). Le serveur applique
-    // déjà son propre statement_timeout.
+    // Délai côté client, dernier recours. Surtout pas statement_timeout ici : node-postgres l'envoie
+    // comme paramètre de démarrage, que PgBouncer refuse (« unsupported startup parameter ») ; la
+    // première mise en production, derrière PgBouncer, a échoué ainsi. La pile Proxmox n'en a pas,
+    // l'hôte de référence de deploy/ si. Les transactions qui prennent le verrou des
+    // synchronisations posent leurs délais serveur elles-mêmes, plus courts (takeSyncLock).
     query_timeout: 15_000,
   });
 }

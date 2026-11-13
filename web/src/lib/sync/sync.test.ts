@@ -7,9 +7,11 @@ import * as t from "@/db/schema";
 import { countRows, openTestDatabase, type TestDatabase } from "@/db/testing";
 import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
 import { RateLimiter } from "@/lib/rate-limit";
+import { deleteAccount } from "@/lib/dashboard/delete-account";
+import { SyncGate } from "./gate";
 import { handleSyncRequest } from "./handler";
-import { processSync } from "./process";
-import { accountKeyOf, type CharacterPayload, type SyncPayload } from "./schema";
+import { isSyncBusy, processSync, SYNC_LOCK_KEY } from "./process";
+import { accountKeyOf, type CharacterPayload, MAX_WARNINGS, type SyncPayload } from "./schema";
 
 // Document produit par l'agent réel à partir des fixtures AltBoard.lua anonymisées.
 const BASE: SyncPayload = JSON.parse(
@@ -28,7 +30,18 @@ const mageOf = (payload: SyncPayload): CharacterPayload => payload.accounts[0].c
 const onlyAccount = (index: number): SyncPayload => ({ ...clone(), accounts: [clone().accounts[index]] });
 const fromMachine = (payload: SyncPayload, uuid: string, hostname: string): SyncPayload => ({ ...payload, machine: { uuid, hostname } });
 
-type SendOptions = { token?: string | null; contentType?: string; raw?: string; maxBodyBytes?: number; limiter?: RateLimiter; headers?: Record<string, string>; now?: Date };
+type SendOptions = {
+  token?: string | null;
+  contentType?: string;
+  raw?: string;
+  maxBodyBytes?: number;
+  limiter?: RateLimiter;
+  headers?: Record<string, string>;
+  now?: Date;
+  gate?: SyncGate;
+  latestAgentVersion?: string;
+  lockTimeoutMs?: number;
+};
 /** Envoi fait `seconds` secondes après NOW : un relevé plus récent arrive plus tard. */
 const later = (seconds: number): SendOptions => ({ now: new Date(NOW.getTime() + seconds * 1000) });
 
@@ -50,6 +63,9 @@ async function send(body: unknown, options: SendOptions = {}): Promise<{ status:
       now: () => options.now ?? NOW,
       log: (event) => logs.push(event),
       maxBodyBytes: options.maxBodyBytes,
+      gate: options.gate,
+      latestAgentVersion: options.latestAgentVersion,
+      lockTimeoutMs: options.lockTimeoutMs,
     },
   );
   return { status: response.status, json: (await response.json()) as Record<string, unknown>, response };
@@ -1023,5 +1039,113 @@ describe("transactions et contraintes", () => {
 
     const [run] = await database.db.select().from(t.syncRuns);
     assert.deepEqual([result.status, run.status, run.errorsCount], ["success", "success", 0]);
+  });
+
+  test("trop d'avertissements ou trop longs : raccourcis, le document reste accepté", async () => {
+    const payload = clone();
+    payload.accounts[0].warnings = Array.from({ length: 61 }, (_, index) => `avertissement ${index + 1}`);
+    payload.accounts[1].warnings = [`${"é".repeat(399)}😀 fin coupée`];
+    payload.machine.displayName = "PC ".repeat(60);
+
+    const result = await ok(payload);
+
+    const rows = await database.db.select().from(t.syncErrors).orderBy(asc(t.syncErrors.id));
+    assert.equal(result.status, "partial");
+    assert.equal(rows.length, MAX_WARNINGS + 1);
+    assert.equal(rows[MAX_WARNINGS - 2].message, "avertissement 49");
+    assert.equal(rows[MAX_WARNINGS - 1].message, "12 autres avertissements non transmis");
+    assert.equal(rows[MAX_WARNINGS].message.length, 400);
+    assert.ok(rows[MAX_WARNINGS].message.endsWith("é…"), "le dernier caractère gardé n'est pas coupé en deux");
+    const [machine] = await database.db.select().from(t.machines);
+    assert.equal(machine.displayName?.length, 120);
+  });
+});
+
+describe("envois simultanés", () => {
+  /** Tient le verrou des synchronisations depuis une autre connexion, le temps de `during`. */
+  async function whileLocked<T>(during: () => Promise<T>): Promise<T> {
+    const holder = await database.pool.connect();
+    try {
+      await holder.query("begin");
+      await holder.query("select pg_advisory_xact_lock($1)", [SYNC_LOCK_KEY]);
+      return await during();
+    } finally {
+      await holder.query("rollback");
+      holder.release();
+    }
+  }
+
+  test("verrou tenu au-delà du délai : 503 avec Retry-After, rien n'est écrit, aucun échec enregistré", async () => {
+    const { status, json, response } = await whileLocked(() => send(clone(), { lockTimeoutMs: 200 }));
+
+    assert.equal(status, 503);
+    assert.equal(json.code, "sync_busy");
+    assert.equal(response.headers.get("retry-after"), "30");
+    assert.equal(await count(t.characters), 0);
+    assert.equal(await count(t.syncRuns), 0);
+    assert.ok(logs.some((event) => event.event === "sync.busy" && event.stage === "lock"));
+    // La connexion revient propre au pool : l'envoi suivant passe.
+    await ok(clone());
+  });
+
+  test("verrou libéré dans le délai : l'envoi attend puis passe", async () => {
+    const holder = await database.pool.connect();
+    await holder.query("begin");
+    await holder.query("select pg_advisory_xact_lock($1)", [SYNC_LOCK_KEY]);
+    const pending = send(clone(), { lockTimeoutMs: 5_000 });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await holder.query("rollback");
+    holder.release();
+
+    assert.equal((await pending).status, 200);
+  });
+
+  test("suppression d'un compte pendant une synchronisation : refus signalé comme « occupé »", async () => {
+    await ok(clone());
+    const [account] = await database.db.select({ id: t.wowAccounts.id }).from(t.wowAccounts);
+
+    await assert.rejects(
+      whileLocked(() => deleteAccount(database.db, account.id, { lockTimeoutMs: 200 })),
+      (error: unknown) => isSyncBusy(error),
+    );
+    assert.ok((await count(t.wowAccounts)) > 0);
+  });
+
+  test("file d'attente : un envoi à la fois, dans l'ordre ; file pleine : 503 tout de suite", async () => {
+    const gate = new SyncGate({ maxWaiting: 1, waitMs: 10_000 });
+    const first = send(clone(), { gate });
+    const second = send(clone(), { gate });
+    const third = await send(clone(), { gate });
+
+    assert.equal(third.status, 503);
+    assert.equal(third.json.code, "sync_busy");
+    assert.deepEqual([(await first).status, (await second).status], [200, 200]);
+    assert.equal(gate.waiting, 0);
+    // La place est rendue même après un refus.
+    assert.equal((await send({ ...clone(), admin: true }, { gate })).status, 422);
+    assert.equal((await send(clone(), { gate })).status, 200);
+  });
+
+  test("attente trop longue dans la file : 503", async () => {
+    const gate = new SyncGate({ maxWaiting: 4, waitMs: 50 });
+    const release = await gate.acquire();
+    const { status, json } = await send(clone(), { gate });
+    release?.();
+
+    assert.equal(status, 503);
+    assert.equal(json.code, "sync_busy");
+    assert.ok(logs.some((event) => event.event === "sync.busy" && event.stage === "queue"));
+  });
+});
+
+describe("version de l'agent servie par le site", () => {
+  test("rendue à un agent authentifié, jamais sans jeton valide", async () => {
+    assert.equal((await ok(clone(), { latestAgentVersion: "0.8.1" })).latestAgentVersion, "0.8.1");
+    const refused = await send({ ...clone(), admin: true }, { latestAgentVersion: "0.8.1" });
+    assert.deepEqual([refused.status, refused.json.latestAgentVersion], [422, "0.8.1"]);
+
+    const anonymous = await send(clone(), { token: null, latestAgentVersion: "0.8.1" });
+    assert.deepEqual([anonymous.status, anonymous.json.latestAgentVersion], [401, undefined]);
+    assert.equal((await ok(clone())).latestAgentVersion, undefined);
   });
 });

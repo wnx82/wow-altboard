@@ -60,7 +60,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 new SourceFilePayload(fileHash, snapshot.ModifiedAt, snapshot.Content.LongLength),
                 characters,
                 MergeItems(document.Items, baganatorItems),
-                [.. document.Warnings, .. ledgerWarnings, .. economyWarnings.Take(MaxEconomyWarnings)])
+                PayloadLimits.Warnings([.. document.Warnings, .. ledgerWarnings, .. economyWarnings.Take(MaxEconomyWarnings)]))
             {
                 FolderName = AccountKey.FullName(source.AccountFolder),
                 Auctionator = auctionator,
@@ -110,7 +110,10 @@ public sealed class PayloadBuilder(StableFileReader reader)
         }
     }
 
-    /// <summary>Avertissements Auctionator et NaowhForever retenus par compte : le serveur en accepte 50 au total.</summary>
+    /// <summary>
+    /// Avertissements Auctionator, NaowhForever et Baganator retenus par compte, pour laisser de la place à
+    /// ceux d'AltBoard ; le total reste borné par <see cref="PayloadLimits.Warnings"/>.
+    /// </summary>
     private const int MaxEconomyWarnings = 10;
 
     /// <summary>
@@ -253,5 +256,8 @@ public sealed class PayloadBuilder(StableFileReader reader)
 
     public static SyncPayload Build(
         MachinePayload machine, IEnumerable<AccountPayload> accounts, string agentVersion, DateTimeOffset now, IReadOnlyList<ItemNamesPayload>? itemNames = null) =>
-        new(SyncPayload.CurrentSchemaVersion, agentVersion, now, machine, accounts.ToList()) { ItemNames = itemNames is { Count: > 0 } ? itemNames : null };
+        new(SyncPayload.CurrentSchemaVersion, agentVersion, now, machine with { DisplayName = PayloadLimits.DisplayName(machine.DisplayName) }, accounts.ToList())
+        {
+            ItemNames = itemNames is { Count: > 0 } ? itemNames : null,
+        };
 }

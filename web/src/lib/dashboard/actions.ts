@@ -9,6 +9,7 @@ import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
 import { confirmPassword } from "@/lib/auth/confirm-password";
 import { requireSession } from "@/lib/auth/session";
 import { describeError } from "@/lib/errors";
+import { isSyncBusy, SYNC_BUSY_MESSAGE } from "@/lib/sync/process";
 import { deleteAccount } from "./delete-account";
 import { setAccountFavorite } from "./favorite-account";
 
@@ -81,7 +82,13 @@ export async function deleteAccountAction(_previous: DeleteAccountState, formDat
   const refused = await confirmPassword(db, session, typeof password === "string" ? password : "", "account.delete");
   if (refused) return { error: refused };
 
-  const deleted = await deleteAccount(db, parsed.data);
+  let deleted;
+  try {
+    deleted = await deleteAccount(db, parsed.data);
+  } catch (error) {
+    if (isSyncBusy(error)) return { error: SYNC_BUSY_MESSAGE };
+    throw error;
+  }
   if (!deleted) return { error: "Ce compte n'existe plus." };
   console.log(JSON.stringify({ event: "account.deleted", userId: session.userId, accountId: parsed.data, ...deleted }));
   revalidatePath("/", "layout");

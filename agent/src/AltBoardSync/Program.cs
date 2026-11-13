@@ -19,16 +19,33 @@ if (!detached)
 // La fenêtre : un double-clic sur l'exécutable, ou la commande « ui ».
 var wantsWindow = OperatingSystem.IsWindows()
     && ((args.Length == 0 && detached) || args is [var first] && first.Equals("ui", StringComparison.OrdinalIgnoreCase));
+// Une surveillance plus ancienne tourne (la mise à jour vient d'être téléchargée) : celle-ci prend sa place.
+var replacing = false;
+string? replacedVersion = null;
 if (wantsWindow && OperatingSystem.IsWindows())
 {
-    // Une surveillance tourne déjà dans cette session : la fenêtre est la sienne.
-    if (WatchHost.ShowRunning()) return AgentApp.ExitOk;
+    var olderRunning = WatchHost.RunningIsOlder(AgentApp.Version, out replacedVersion);
+    // Une surveillance de cette version, ou plus récente, tourne déjà : la fenêtre est la sienne.
+    if (!olderRunning && WatchHost.ShowRunning()) return AgentApp.ExitOk;
     if (!detached)
     {
         // Depuis un terminal : il est rendu tout de suite, la fenêtre vit dans son propre processus.
         if (!StartInBackground("ui")) return AgentApp.ExitFailed;
         Console.WriteLine("AltBoard Sync est ouvert : sa fenêtre s'affiche, son icône est dans la zone de notification.");
         return AgentApp.ExitOk;
+    }
+
+    if (olderRunning)
+    {
+        if (!WatchHost.StopRunningAndWait(TimeSpan.FromSeconds(15)))
+        {
+            Win32.MessageBoxW(
+                0, "Une version plus ancienne d'AltBoard Sync tourne et ne s'arrête pas.\n\nQuittez-la par son icône de la zone de notification, puis relancez celle-ci.",
+                "AltBoard Sync", Win32.MbIconError);
+            return AgentApp.ExitFailed;
+        }
+
+        replacing = true;
     }
 
     args = ["watch"];
@@ -113,6 +130,21 @@ if (watching && OperatingSystem.IsWindows())
     }
 
     environment = environment with { WatchControl = host.Control, OnWatchEvent = host.OnEvent };
+    // La version remplacée était peut-être celle que lance le démarrage avec Windows.
+    if (replacing)
+    {
+        string? autostartCommand = null;
+        try
+        {
+            autostartCommand = autostart!.PointHere();
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or IOException or System.Security.SecurityException)
+        {
+            // Inscription inchangée : l'interrupteur de la fenêtre permet de la refaire.
+        }
+
+        host.ReportReplaced(replacedVersion, autostartCommand);
+    }
 }
 
 int exitCode;

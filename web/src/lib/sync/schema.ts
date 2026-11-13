@@ -18,6 +18,22 @@ const count = z.int().min(0).max(2_147_483_647);
 const unixSeconds = z.int().min(1).max(32_503_680_000); // jusqu'à l'an 3000
 const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 const itemKey = z.string().regex(/^\d{1,9}(:-?\d{1,9})?$/);
+
+// Textes informatifs (avertissements de l'agent, nom donné au PC) : trop longs ou trop nombreux,
+// ils sont raccourcis plutôt que de faire refuser tout le document, qui emporterait les données
+// de tous les comptes du PC. Les autres limites restent strictes.
+export const MAX_WARNINGS = 50;
+const WARNING_LENGTH = 400;
+/** Ramène un texte à `max` unités (la mesure de zod), « … » en dernier, sans couper un caractère en deux. */
+const shorten = (max: number) => (value: unknown) => {
+  if (typeof value !== "string" || value.length <= max) return value;
+  const kept = value.slice(0, max - 1);
+  return `${/[\uD800-\uDBFF]$/.test(kept) ? kept.slice(0, -1) : kept}…`;
+};
+const warnings = z.preprocess((value) => {
+  if (!Array.isArray(value) || value.length <= MAX_WARNINGS) return value;
+  return [...value.slice(0, MAX_WARNINGS - 1), `${value.length - MAX_WARNINGS + 1} autres avertissements non transmis`];
+}, z.array(z.preprocess(shorten(WARNING_LENGTH), text(WARNING_LENGTH))).max(MAX_WARNINGS));
 const finite = z.number();
 const instant = z.iso.datetime({ offset: true });
 
@@ -287,7 +303,7 @@ const account = z
     file: sourceFile,
     characters: z.array(character).max(200),
     items: z.array(item).max(50_000),
-    warnings: z.array(text(400)).max(50),
+    warnings,
     // Facultatifs : un agent antérieur à 0.5.0 ne les envoie pas.
     auctionator: auctionator.optional(),
     recipes: recipes.optional(),
@@ -306,7 +322,7 @@ export const syncPayloadSchema = z.strictObject({
   machine: z.strictObject({
     uuid: z.uuid(),
     hostname: text(120),
-    displayName: text(120).optional(),
+    displayName: z.preprocess(shorten(120), text(120)).optional(),
   }),
   accounts: z.array(account).max(50),
   // Noms d'objets du cache local d'un client (DBCache.bin), envoyés depuis l'agent 0.7.0 quand ce

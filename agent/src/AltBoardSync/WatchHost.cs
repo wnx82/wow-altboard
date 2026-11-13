@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Runtime.Versioning;
 using AltBoardSync.Core.App;
 using AltBoardSync.Core.Config;
@@ -15,10 +17,15 @@ internal sealed class WatchHost : IDisposable
     private const string RunningName = @"Local\AltBoardSync.Watch";
     private const string StopName = @"Local\AltBoardSync.Watch.Stop";
     private const string ShowName = @"Local\AltBoardSync.Watch.Show";
+    // Version de la surveillance en cours, lue par un exécutable lancé ensuite (agent 0.8.1 et
+    // suivants) : plus récent, il la remplace. Absente, la surveillance est d'une version antérieure.
+    private const string InfoName = @"Local\AltBoardSync.Watch.Info";
+    private const int InfoSize = 1024;
 
     private readonly Mutex _running;
     private readonly EventWaitHandle _stop, _show;
     private readonly RegisteredWaitHandle _stopWait, _showWait;
+    private readonly MemoryMappedFile? _info;
     private readonly TrayIcon _tray;
     private readonly MainWindow _window;
     private string? _lastError;
@@ -30,6 +37,8 @@ internal sealed class WatchHost : IDisposable
     {
         _running = running;
         _stop = new EventWaitHandle(false, EventResetMode.ManualReset, StopName);
+        // Après le remplacement d'une surveillance, l'événement d'arrêt qu'elle a reçu peut subsister.
+        _stop.Reset();
         _stopWait = ThreadPool.RegisterWaitForSingleObject(_stop, (_, _) => Cancel(cancellation), null, Timeout.Infinite, executeOnlyOnce: true);
 
         void OpenLog() => Open(Path.Combine(homeDirectory, "logs", "altboardsync.log"));
@@ -52,7 +61,76 @@ internal sealed class WatchHost : IDisposable
 
         _show = new EventWaitHandle(false, EventResetMode.AutoReset, ShowName);
         _showWait = ThreadPool.RegisterWaitForSingleObject(_show, (_, _) => _window.Show(), null, Timeout.Infinite, executeOnlyOnce: false);
+        _info = PublishInfo();
         if (showWindow) _window.Show();
+    }
+
+    /// <summary>
+    /// Vrai si une surveillance tourne dans cette session et précède <paramref name="version"/> : d'une
+    /// version plus ancienne, ou antérieure à 0.8.1 (elle ne dit pas sa version).
+    /// </summary>
+    /// <param name="running">Sa version, null si elle ne la dit pas.</param>
+    public static bool RunningIsOlder(string version, out string? running)
+    {
+        running = null;
+        if (!IsRunning()) return false;
+        running = ReadRunningVersion();
+        return running is null || AgentVersions.IsNewer(version, running);
+    }
+
+    /// <summary>Demande l'arrêt de la surveillance en cours et attend qu'elle ait quitté.</summary>
+    /// <returns>Faux si elle tourne encore à l'échéance.</returns>
+    public static bool StopRunningAndWait(TimeSpan timeout)
+    {
+        StopRunning();
+        var deadline = Stopwatch.StartNew();
+        while (IsRunning())
+        {
+            if (deadline.Elapsed > timeout) return false;
+            Thread.Sleep(200);
+        }
+
+        return true;
+    }
+
+    /// <summary>Dit dans la fenêtre que cette version a pris la place d'une plus ancienne.</summary>
+    public void ReportReplaced(string? previous, string? autostartCommand) => _window.ReportReplaced(previous, autostartCommand);
+
+    private static MemoryMappedFile? PublishInfo()
+    {
+        try
+        {
+            var map = MemoryMappedFile.CreateOrOpen(InfoName, InfoSize, MemoryMappedFileAccess.ReadWrite);
+            var text = Encoding.UTF8.GetBytes($"{AgentApp.Version}\n{Environment.ProcessId}\n{Environment.ProcessPath}\n");
+            using var view = map.CreateViewAccessor(0, InfoSize);
+            view.WriteArray(0, new byte[InfoSize], 0, InfoSize);
+            view.WriteArray(0, text, 0, Math.Min(text.Length, InfoSize - 1));
+            return map;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Sans cette information, un exécutable plus récent prendra quand même la place.
+            return null;
+        }
+    }
+
+    private static string? ReadRunningVersion()
+    {
+        try
+        {
+            using var map = MemoryMappedFile.OpenExisting(InfoName, MemoryMappedFileRights.Read);
+            using var view = map.CreateViewAccessor(0, InfoSize, MemoryMappedFileAccess.Read);
+            var bytes = new byte[InfoSize];
+            view.ReadArray(0, bytes, 0, InfoSize);
+            var end = Array.IndexOf(bytes, (byte)0);
+            var text = Encoding.UTF8.GetString(bytes, 0, end < 0 ? InfoSize : end);
+            var version = text.Split('\n')[0].Trim();
+            return version.Length == 0 ? null : version;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FileNotFoundException)
+        {
+            return null;
+        }
     }
 
     /// <param name="showWindow">Ouvre la fenêtre tout de suite ; sinon elle attend un clic sur l'icône.</param>
@@ -123,8 +201,14 @@ internal sealed class WatchHost : IDisposable
             case WatchEvent.Failed failed:
                 _tray.SetTooltip("AltBoard Sync — dernière synchronisation en échec");
                 // Une bulle par panne, pas une à chaque nouvel essai.
-                if (failed.Error != _lastError) _tray.Notify("Échec de la synchronisation", failed.Error, error: true);
+                if (failed.Error != _lastError) _tray.Notify(failed.TokenRejected ? "Jeton refusé" : "Échec de la synchronisation", failed.Error, error: true);
                 _lastError = failed.Error;
+                break;
+            case WatchEvent.UpdateAvailable update:
+                _tray.Notify(
+                    "Mise à jour disponible",
+                    $"AltBoard Sync {update.Version} est disponible. Téléchargez-le depuis la page Machines, puis lancez-le : il remplace cette version.",
+                    error: false);
                 break;
         }
     }
@@ -135,6 +219,7 @@ internal sealed class WatchHost : IDisposable
         _showWait.Unregister(null);
         _stop.Dispose();
         _show.Dispose();
+        _info?.Dispose();
         _tray.Dispose();
         _running.Dispose();
     }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DrizzleQueryError } from "drizzle-orm/errors";
-import { describeError } from "./errors";
+import { describeError, sqlState } from "./errors";
 
 const pgError = (message: string, fields: Record<string, unknown>) => Object.assign(new Error(message), fields);
 
@@ -36,4 +36,13 @@ test("un code ou une contrainte qui ne ressemblent à rien de connu sont ignoré
   assert.equal(describeError(pgError("x", { code: "23505", constraint: "Robert'); drop table" })), "Error 23505");
   assert.equal(describeError("texte levé"), "erreur inconnue");
   assert.equal(describeError(undefined), "erreur inconnue");
+});
+
+test("code SQLSTATE d'une erreur ou de ses causes, null sinon", () => {
+  const busy = new DrizzleQueryError("select pg_advisory_xact_lock($1)", [1], pgError("canceling statement due to lock timeout", { code: "55P03" }));
+  assert.equal(sqlState(busy), "55P03");
+  assert.equal(sqlState(pgError("x", { code: "57014" })), "57014");
+  assert.equal(sqlState(pgError("x", { code: "ECONNREFUSED" })), null);
+  assert.equal(sqlState(new Error("sans code")), null);
+  assert.equal(sqlState("texte levé"), null);
 });

@@ -33,6 +33,22 @@ internal sealed class RegistryAutostart : IAutostart
         key.SetValue(ValueName, command);
     }
 
+    /// <summary>
+    /// Démarrage activé vers un autre exécutable que celui-ci (une version plus ancienne, ailleurs sur
+    /// le PC) : le fait pointer sur celui-ci.
+    /// </summary>
+    /// <returns>La nouvelle commande, ou null si rien n'a changé.</returns>
+    public string? PointHere()
+    {
+        string? command;
+        using (var key = Registry.CurrentUser.OpenSubKey(RunKey)) command = key?.GetValue(ValueName) as string;
+        var executable = Environment.ProcessPath;
+        if (command is null || executable is null || command.Contains($"\"{executable}\"", StringComparison.OrdinalIgnoreCase)) return null;
+        Enable();
+        using var updated = Registry.CurrentUser.OpenSubKey(RunKey);
+        return updated?.GetValue(ValueName) as string;
+    }
+
     public void Disable()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);

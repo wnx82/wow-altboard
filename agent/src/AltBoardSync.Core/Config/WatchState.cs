@@ -9,6 +9,12 @@ public sealed record WatchState
 
     /// <summary>Empreinte du cache de noms d'objets envoyé, par client : un cache inchangé n'est pas renvoyé.</summary>
     public Dictionary<string, string> ItemNameHashes { get; init; } = new();
+
+    /// <summary>Dernière version de l'agent annoncée par le serveur ; la fenêtre la propose tant qu'elle suit celle en service.</summary>
+    public string? LatestAgentVersion { get; set; }
+
+    /// <summary>Version déjà signalée par une notification : une seule bulle par version.</summary>
+    public string? NotifiedAgentVersion { get; set; }
 }
 
 /// <summary>

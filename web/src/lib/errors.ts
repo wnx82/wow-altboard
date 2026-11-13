@@ -9,6 +9,17 @@ const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 
 type Codes = { code?: unknown; constraint?: unknown; errors?: unknown };
 
+/** Code SQLSTATE de PostgreSQL trouvé dans l'erreur ou ses causes (Drizzle enveloppe l'erreur de pg) ; null sinon. */
+export function sqlState(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    const { code } = current as Codes;
+    if (typeof code === "string" && SQLSTATE.test(code)) return code;
+    current = current.cause;
+  }
+  return null;
+}
+
 /** Type de l'erreur, puis le code SQLSTATE ou réseau trouvé dans ses causes, et la contrainte violée. */
 export function describeError(error: unknown): string {
   if (!(error instanceof Error)) return "erreur inconnue";

@@ -149,7 +149,9 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
 
 - [ ] **P2 · L** — Mise à jour automatique : la release GitHub publie déjà `AltBoardSync.exe` et
   son empreinte SHA-256 (`.github/workflows/release-agent.yml:34`). Reste à interroger la dernière
-  release, télécharger, vérifier l'empreinte, remplacer l'exécutable et redémarrer.
+  release, télécharger, vérifier l'empreinte, remplacer l'exécutable et redémarrer. Fait en partie
+  le 2026-11-14 (agent 0.8.1) : l'agent annonce la version servie par le site, et le nouvel
+  exécutable lancé à la main remplace l'ancien. Restent le téléchargement et la vérification.
 
 ## 2. Sécurité du site
 
@@ -163,7 +165,9 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
   `153d601`, base de test, sur les neuf pages : contenu renvoyé avec un cookie invalide, et même
   sans aucun cookie quand la requête porte l'en-tête `purpose: prefetch`, que le proxy laisse
   passer. Corrigé le 2026-10-11 : chaque page, et `generateMetadata` de la fiche, commence par
-  `requireSession()` ; `web/src/lib/auth/pages.test.ts` refuse une page qui ne le fait pas. Les
+  `requireSession()` ; `web/src/lib/auth/pages.test.ts` refuse une page qui ne le fait pas
+  (étendu le 2026-11-14, site 0.25.0 : `web/src/lib/auth/guards.test.ts` fait de même pour les
+  routes d'API et les actions serveur, hors liste publique explicite). Les
   mêmes 54 requêtes sur la construction corrigée ne renvoient plus aucun contenu. Constaté aussi en
   production le 2026-10-11, par l'origine du réseau local : 45 réponses sur 54 avec contenu sous
   `fcf3750`, aucune sous `5f0098e`.
@@ -187,11 +191,15 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
   accepte un chemin contenant une tabulation ou un saut de ligne, que l'analyse d'URL ramène à une
   adresse hors du site. Résoudre la valeur par rapport à l'origine et exiger la même origine.
   Résolution vérifiée dans Node, parcours non rejoué dans un navigateur.
-- [ ] **P2 · M** — Aucun délai côté serveur sur les requêtes ni sur le verrou consultatif.
+- [x] **P2 · M** — Aucun délai côté serveur sur les requêtes ni sur le verrou consultatif.
   `query_timeout` (`web/src/db/client.ts:18`) n'agit que dans le client ; le commentaire voisin
   cite PgBouncer et un `statement_timeout` du serveur, qui n'existent plus dans la pile Proxmox.
   Poser `lock_timeout` et `statement_timeout` en début de transaction, répondre 503 quand le
-  verrou est pris. Effet déduit du code, non reproduit.
+  verrou est pris. Effet déduit du code, non reproduit. Fait le 2026-11-14 (site 0.25.0) :
+  `takeSyncLock` pose `lock_timeout` 8 s, `statement_timeout` 12 s et
+  `idle_in_transaction_session_timeout` 30 s ; `503 sync_busy` ou `503 timeout` avec
+  `Retry-After`, file d'attente en mémoire de quatre envois. Un test vérifie que `lock_timeout`
+  borne bien l'attente du verrou consultatif ([DATABASE § Délais](DATABASE.md)).
 - [ ] **P2 · S** — Limitation de débit : la clé est l'adresse entière, donc une IPv6 différente à
   chaque requête n'est jamais limitée, et la table se vide d'un coup une fois pleine
   (`web/src/lib/rate-limit.ts:40`). À la connexion, les compteurs sont consommés avant la
@@ -340,10 +348,14 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   (`App/WatchLoop.cs:192`) : Windows refuse de renommer `WTF` ou de déplacer le dossier du jeu tant
   que l'agent tourne, sans le désigner. Un surveillant mort n'est jamais recréé (`:191`, `:203`).
   Remplacer par un relevé périodique de la taille et de la date des fichiers connus.
-- [ ] **P2 · S** — Trois champs dépassent les bornes du serveur, qui refuse alors tout le document
+- [x] **P2 · S** — Trois champs dépassent les bornes du serveur, qui refuse alors tout le document
   en 422 à chaque essai : 51 avertissements possibles contre 50
   (`web/src/lib/sync/schema.ts:170`), `flavor` non borné contre 40, nom de machine non borné
-  contre 120. Borner côté agent et journaliser le code et les champs refusés.
+  contre 120. Borner côté agent et journaliser le code et les champs refusés. Fait le 2026-11-14
+  (site 0.25.0, agent 0.8.1) : le serveur raccourcit avertissements et `displayName` au lieu de
+  refuser, l'agent applique les mêmes limites, et un refus nomme jusqu'à trois champs en cause.
+  `flavor` (nom d'un dossier `_…_` du jeu) et `hostname` (nom NetBIOS, 15 caractères au plus)
+  restent bornés côté serveur seulement.
 - [ ] **P3 · S** — `characters.json` illisible n'est jamais réparé (`App/SyncJournal.cs:60`,
   `:67`) : plus aucun « ce qui a changé » dans le journal, sans message. Repartir d'une base vide.
 - [ ] **P3 · S** — `token set` accepte n'importe quel texte, la fenêtre exige le format du jeton
@@ -356,14 +368,19 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
 
 ### Installation et mise à jour
 
-- [ ] **P2 · M** — Rien ne signale un agent périmé : l'agent envoie sa version, la réponse de
+- [x] **P2 · M** — Rien ne signale un agent périmé : l'agent envoie sa version, la réponse de
   `/api/sync` n'en propose aucune. Ajouter la dernière version à la réponse (le site la connaît),
   l'afficher dans la fenêtre, et marquer les PC en retard (voir § 1.2). Les PC en retard sont
-  marqués sur **Machines** depuis le 2026-11-08 ; reste la fenêtre de l'agent.
+  marqués sur **Machines** depuis le 2026-11-08 ; reste la fenêtre de l'agent. Fait le 2026-11-14
+  (site 0.25.0, agent 0.8.1) : `latestAgentVersion` dans la réponse, bulle et lien
+  « Mise à jour X disponible » dans la fenêtre, une fois par version.
 - [ ] **P2 · M** — Mise à jour à la main piégeuse : lancer le nouvel exécutable ne fait que
   rouvrir la fenêtre de l'ancienne instance (`agent/src/AltBoardSync/Program.cs:25`), et le
   démarrage avec Windows garde l'ancien chemin en se disant « activé »
   (`RegistryAutostart.cs:20`). Comparer version et chemin au lancement, proposer le remplacement.
+  Fait le 2026-11-14 (agent 0.8.1) : un exécutable plus récent arrête l'ancien, prend sa place et
+  réécrit le démarrage avec Windows. Une instance antérieure à 0.8.1, qui ne dit pas sa version,
+  est remplacée de même.
 - [ ] **P2 · M** — Dossier du jeu fixé sur la bêta (`Discovery/AccountScanner.cs:16`,
   `…\World of Warcraft\_classic_beta_`), sans choix dans la fenêtre : à la sortie officielle du
   4 novembre 2026, l'agent ne trouvera plus rien sans `config set wowPath`. Prendre par défaut la

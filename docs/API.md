@@ -202,14 +202,24 @@ Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miro
   "charactersStale": 0,
   "snapshotsCreated": 1,
   "errors": [],
+  "latestAgentVersion": "0.8.1",
   "requestId": "c6ed9755-d086-4437-a6f1-66dcc97bfe0c"
 }
 ```
 
 `status` vaut `partial` quand l'agent a signalé des avertissements (`warnings` d'un compte) : ils
 sont conservés dans `sync_errors`, comptés dans `errors_count` et affichés sous la ligne du journal
-de la page **Machines**. Les données sont enregistrées de la même façon. L'agent ne lit que le code
-HTTP.
+de la page **Machines**. Les données sont enregistrées de la même façon.
+
+Au-delà de 50 avertissements pour un compte, le serveur garde les 49 premiers et les remplace par un
+dernier, « N autres avertissements non transmis » ; un avertissement de plus de 400 caractères, ou
+un `displayName` de plus de 120, est raccourci et finit par « … ». Ces textes ne font donc plus
+refuser le document. L'agent 0.8.1 applique les mêmes limites avant l'envoi.
+
+`latestAgentVersion` : version de l'agent livrée avec le site (`agent/Directory.Build.props` lu à la
+construction). Elle accompagne toutes les réponses faites à un jeton valide, refus compris ; elle
+est absente si le jeton est refusé ou si la construction ne la connaissait pas. L'agent 0.8.1 la
+retient et annonce une version plus récente que la sienne une fois.
 
 `charactersStale` : personnages dont ce PC détient un fichier plus ancien que l'état déjà connu,
 et personnages inconnus du serveur, non vus en jeu depuis la date limite de la dernière
@@ -231,9 +241,22 @@ pas recréés.
 | 429 | `rate_limited` | plus de 60 requêtes en 5 minutes, ou 10 échecs d'authentification en 15 minutes |
 | 500 | `internal_error` | erreur de traitement : la synchronisation entière est annulée ; `sync_errors` et le journal n'en gardent que le type et le code PostgreSQL ou réseau |
 | 503 | `service_unavailable` | base injoignable : réessayer plus tard |
+| 503 | `sync_busy` | quatre envois attendent déjà leur tour, une attente de plus de 20 secondes, ou le verrou de synchronisation tenu plus de 8 secondes par une autre écriture (réinitialisation, suppression d'un compte) : rien n'est écrit |
+| 503 | `timeout` | une requête du traitement a dépassé 12 secondes : la synchronisation entière est annulée et notée en échec dans `sync_runs` |
 
 Toutes les réponses portent `requestId`, `X-Request-ID` et `Cache-Control: no-store`.
 Une synchronisation est **tout ou rien** et **idempotente** : la renvoyer ne change rien.
+
+Les refus `429` et `503` portent `Retry-After`, en secondes : 300 pour `rate_limited`, 60 pour
+`service_unavailable`, 30 pour `sync_busy`, 120 pour `timeout`. L'agent 0.8.1 n'essaie pas avant ce
+délai.
+
+**File d'attente.** Le serveur traite un envoi à la fois. Un envoi dont le jeton est valide attend son
+tour en mémoire avant que son corps soit lu : quatre au plus, 20 secondes au plus chacun. Les
+écritures qui prennent le même verrou (synchronisation, réinitialisation des personnages,
+suppression d'un compte) l'attendent 8 secondes au plus. Au-delà, la synchronisation reçoit
+`sync_busy` ; la réinitialisation ou la suppression affiche « Une synchronisation est en cours :
+réessayez dans quelques secondes. » Voir [DATABASE § Délais](DATABASE.md).
 
 ## `GET /api/export/xlsx`
 
@@ -311,8 +334,9 @@ un déploiement sans session. Aucun autre détail.
 Une ligne JSON par requête de synchronisation, sans jamais de jeton ni de contenu du document :
 
 ```json
-{"event":"sync.received","requestId":"…","machine":"<uuid>","agentVersion":"0.1.0","accounts":2,"characters":6,"durationMs":84,"result":{"status":"success","charactersUpdated":1}}
+{"event":"sync.received","requestId":"…","machine":"<uuid>","agentVersion":"0.1.0","accounts":2,"characters":6,"bytes":91234,"durationMs":84,"result":{"status":"success","charactersUpdated":1}}
 ```
 
-Autres événements : `sync.rejected` (statut, code), `sync.failed`, `sync.unavailable`,
+Autres événements : `sync.rejected` (statut, code), `sync.failed`, `sync.unavailable`, `sync.busy`
+(`stage` : `queue` pour la file pleine ou l'attente dépassée, `lock` pour le verrou),
 `auth.login.succeeded`, `auth.login.failed`, `agent_token.created`, `agent_token.revoked`, `export.xlsx`.

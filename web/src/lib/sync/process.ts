@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import type { Database } from "@/db/client";
+import type { Database, DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 import { storeClientNames } from "@/lib/economy/item-names";
 import { recordAchievements } from "@/lib/goals/store";
+import { sqlState } from "@/lib/errors";
 import { canonicalHash } from "@/lib/hash";
 import { readSettings } from "@/lib/settings/store";
 import { applyAuctionator, applyRecipes, emptyEconomyCounters, type EconomyCounters } from "./economy";
@@ -23,7 +24,7 @@ export type SyncResult = {
   errors: { code: string; message: string }[];
 } & EconomyCounters;
 
-export type SyncContext = { tokenId: number; requestId: string; now: Date };
+export type SyncContext = { tokenId: number; requestId: string; now: Date } & SyncLockOptions;
 
 /** Le jeton présenté est déjà lié à une autre machine. */
 export class TokenMachineMismatchError extends Error {
@@ -35,10 +36,46 @@ export class TokenMachineMismatchError extends Error {
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // Les synchronisations sont sérialisées : deux PC envoyant le même personnage au même instant
-// ne peuvent pas se marcher dessus. Verrou de transaction, compatible PgBouncer. La
-// réinitialisation des personnages prend le même.
+// ne peuvent pas se marcher dessus. Verrou de transaction ; la réinitialisation des personnages
+// et la suppression d'un compte prennent le même.
 export const SYNC_LOCK_KEY = 7_230_415_901;
 const BATCH = 1_000;
+
+// Délais appliqués par le serveur PostgreSQL à la transaction qui prend le verrou, tous sous le
+// délai du client (query_timeout, 15 s, db/client.ts). Sans eux, le client abandonnait seul une
+// attente trop longue : la requête continuait côté serveur, le ROLLBACK restait derrière elle et la
+// connexion revenait au pool au milieu d'une transaction qui finissait par obtenir le verrou.
+// Annulée par le serveur, la requête échoue proprement (55P03 pour le verrou, 57014 au-delà du
+// délai) et la transaction est annulée.
+export const SYNC_LOCK_TIMEOUT_MS = 8_000;
+const STATEMENT_TIMEOUT_MS = 12_000;
+// Filet : une transaction restée ouverte sans requête est fermée par le serveur.
+const IDLE_IN_TRANSACTION_TIMEOUT_MS = 30_000;
+
+const LOCK_NOT_AVAILABLE = "55P03";
+const QUERY_CANCELED = "57014";
+
+export type SyncLockOptions = { lockTimeoutMs?: number };
+
+/**
+ * Pose les délais de la transaction puis prend le verrou des synchronisations. Verrou occupé
+ * au-delà du délai : l'erreur PostgreSQL 55P03 (lock_not_available), voir `isSyncBusy`.
+ */
+export async function takeSyncLock(tx: DatabaseOrTransaction, options: SyncLockOptions = {}): Promise<void> {
+  // set_config(…, true) vaut SET LOCAL, avec des paramètres liés : jusqu'à la fin de la transaction.
+  await tx.execute(sql`select
+    set_config('lock_timeout', ${`${options.lockTimeoutMs ?? SYNC_LOCK_TIMEOUT_MS}ms`}, true),
+    set_config('statement_timeout', ${`${STATEMENT_TIMEOUT_MS}ms`}, true),
+    set_config('idle_in_transaction_session_timeout', ${`${IDLE_IN_TRANSACTION_TIMEOUT_MS}ms`}, true)`);
+  await tx.execute(sql`select pg_advisory_xact_lock(${SYNC_LOCK_KEY})`);
+}
+
+/** Le verrou des synchronisations n'a pas été obtenu dans le délai : une autre écriture est en cours. */
+export const isSyncBusy = (error: unknown) => sqlState(error) === LOCK_NOT_AVAILABLE;
+/** Ce que voit l'administrateur quand une synchronisation garde le verrou trop longtemps. */
+export const SYNC_BUSY_MESSAGE = "Une synchronisation est en cours : réessayez dans quelques secondes.";
+/** Une requête a dépassé le délai du serveur : la transaction a été annulée. */
+export const isSyncTimeout = (error: unknown) => sqlState(error) === QUERY_CANCELED;
 
 const fromUnix = (seconds: number) => new Date(seconds * 1000);
 
@@ -102,7 +139,7 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
   const started = Date.now();
 
   return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(${SYNC_LOCK_KEY})`);
+    await takeSyncLock(tx, context);
 
     const [machine] = await tx
       .insert(t.machines)

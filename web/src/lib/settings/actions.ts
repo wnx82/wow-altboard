@@ -6,6 +6,7 @@ import { confirmPassword } from "@/lib/auth/confirm-password";
 import { requireSession } from "@/lib/auth/session";
 import { syncStatusRuntime } from "@/lib/status/runtime";
 import { pruneChecks } from "@/lib/status/store";
+import { isSyncBusy, SYNC_BUSY_MESSAGE } from "@/lib/sync/process";
 import { parseCutoffInput, parseLabelInput, parseTargetsInput } from "./input";
 import { resetCharacters } from "./reset";
 import { writeSettings } from "./store";
@@ -84,7 +85,13 @@ export async function resetCharactersAction(_previous: ResetState, formData: For
   const refused = await confirmPassword(db, session, field(formData, "password"), "settings.characters.reset");
   if (refused) return { error: refused };
 
-  const result = await resetCharacters(db, cutoff.value, now);
+  let result;
+  try {
+    result = await resetCharacters(db, cutoff.value, now);
+  } catch (error) {
+    if (isSyncBusy(error)) return { error: SYNC_BUSY_MESSAGE };
+    throw error;
+  }
   console.log(JSON.stringify({ event: "settings.characters.reset", userId: session.userId, deleted: result.deleted, kept: result.kept }));
   revalidatePath("/", "layout");
   return result;

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using AltBoardSync.Core.App;
@@ -454,5 +455,130 @@ public class WatchTests
         h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
 
         await Eventually(() => server.Calls == 1, "l'envoi du compte apparu");
+    }
+
+    /// <summary>Faux serveur à réponses écrites (statut, corps, Retry-After en secondes), la dernière répétée.</summary>
+    private sealed class ScriptedServer(params (HttpStatusCode Status, string Body, int? RetryAfterSeconds)[] replies) : HttpMessageHandler
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var (status, body, retryAfter) = replies[Math.Min(Interlocked.Increment(ref _calls), replies.Length) - 1];
+            var response = new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+            if (retryAfter is { } seconds) response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(seconds));
+            return Task.FromResult(response);
+        }
+    }
+
+    private static string Serving(string version) => SuccessBody.Replace("\"errors\":[]", $"\"errors\":[],\"latestAgentVersion\":\"{version}\"");
+
+    /// <summary>Demande un envoi jusqu'à ce que le serveur l'ait reçu : la demande est sans effet avant le démarrage de la surveillance.</summary>
+    private static async Task RequestUntil(Harness h, Func<bool> condition, string expectation)
+    {
+        var elapsed = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (elapsed.Elapsed > TimeSpan.FromSeconds(15)) Assert.Fail($"Jamais observé : {expectation}");
+            h.Control.RequestSync();
+            await Task.Delay(200);
+        }
+    }
+
+    [Fact]
+    public async Task A_newer_agent_served_by_the_site_is_announced_once_even_after_a_restart()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ScriptedServer((HttpStatusCode.OK, Serving("99.0.0"), null));
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Synced>().Any(), "un envoi accepté");
+        await RequestUntil(h, () => h.Events.OfType<WatchEvent.Synced>().Count() >= 2, "un second envoi accepté");
+        await h.StopAsync();
+        h.Start(server);
+        var calls = server.Calls;
+        await RequestUntil(h, () => server.Calls > calls && h.Events.OfType<WatchEvent.Synced>().Count() >= 3, "un envoi après le redémarrage");
+        await h.StopAsync();
+
+        var update = Assert.Single(h.Events.OfType<WatchEvent.UpdateAvailable>());
+        Assert.Equal("99.0.0", update.Version);
+        var state = new WatchStateStore(h.Home).Load();
+        Assert.Equal(("99.0.0", "99.0.0"), (state.LatestAgentVersion, state.NotifiedAgentVersion));
+        Assert.Single(h.Journal, entry => entry.Kind == JournalEntry.Info && entry.Message.Contains("AltBoard Sync 99.0.0 est disponible"));
+        Assert.Contains("Mise à jour disponible : AltBoard Sync 99.0.0.", h.Output);
+    }
+
+    [Fact]
+    public async Task The_same_or_an_older_version_from_the_site_is_not_announced()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ScriptedServer((HttpStatusCode.OK, Serving("0.0.1"), null));
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Synced>().Any(), "un envoi accepté");
+        await h.StopAsync();
+
+        Assert.Empty(h.Events.OfType<WatchEvent.UpdateAvailable>());
+        Assert.Equal("0.0.1", new WatchStateStore(h.Home).Load().LatestAgentVersion);
+    }
+
+    [Fact]
+    public async Task A_rejected_token_is_reported_as_such()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ScriptedServer((HttpStatusCode.Unauthorized, """{"error":"Jeton d'agent absent, invalide ou révoqué.","code":"unauthorized"}""", null));
+
+        h.Start(server);
+        await Eventually(() => !h.Events.IsEmpty, "un échec");
+
+        var failed = Assert.IsType<WatchEvent.Failed>(h.Events.First());
+        Assert.True(failed.TokenRejected);
+        Assert.Equal("Jeton d'agent absent, invalide ou révoqué. Saisissez un nouveau jeton, créé dans la page Machines.", failed.Error);
+    }
+
+    [Fact]
+    public async Task A_busy_server_is_retried_no_sooner_than_it_asks()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ScriptedServer(
+            (HttpStatusCode.ServiceUnavailable, """{"error":"Une autre synchronisation est en cours, nouvel essai dans un instant.","code":"sync_busy"}""", 2),
+            (HttpStatusCode.OK, SuccessBody, null));
+        var elapsed = Stopwatch.StartNew();
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Synced>().Any(), "l'envoi accepté après l'attente");
+
+        var failed = Assert.IsType<WatchEvent.Failed>(h.Events.First());
+        Assert.False(failed.TokenRejected);
+        // Le harnais plafonne l'attente à 200 ms : seul le serveur peut l'avoir portée à 2 s.
+        Assert.Equal(TimeSpan.FromSeconds(2), failed.RetryIn);
+        Assert.True(elapsed.Elapsed >= TimeSpan.FromSeconds(1.9), $"renvoyé après {elapsed.Elapsed}");
+        Assert.Equal(2, server.Calls);
+    }
+
+    [Fact]
+    public async Task A_refused_document_names_the_fields_in_cause_and_announces_the_update()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new ScriptedServer((HttpStatusCode.UnprocessableContent,
+            """{"error":"Document de synchronisation invalide.","code":"invalid_payload","issues":[{"path":"accounts.0.baganator.mail","code":"unrecognized_keys"}],"latestAgentVersion":"99.0.0"}""",
+            null));
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Failed>().Any(), "un refus");
+        await h.StopAsync();
+
+        var failed = h.Events.OfType<WatchEvent.Failed>().First();
+        Assert.Equal(
+            "Document de synchronisation invalide. Champs en cause : accounts.0.baganator.mail (unrecognized_keys). Mettez l'agent à jour si le refus persiste.",
+            failed.Error);
+        Assert.Equal("99.0.0", Assert.Single(h.Events.OfType<WatchEvent.UpdateAvailable>()).Version);
     }
 }
