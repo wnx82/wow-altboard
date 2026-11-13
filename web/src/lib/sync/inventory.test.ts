@@ -165,7 +165,7 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
       { itemId: 2318, itemClass: 7, subclass: 6, inventoryType: 0, itemLevel: 10, requiredLevel: 0, levelSource: "wowf", build: "b" },
     ]);
     const withGear = await loadInventory(database.db);
-    assert.deepEqual(withGear.items["15210:1017"].gear, { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null });
+    assert.deepEqual(withGear.items["15210:1017"].gear, { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null, bonding: null });
     assert.equal(Object.values(withGear.items).filter((info) => info.gear).length, 1);
     assert.equal(withGear.items["15210:1017"].category, "armes");
     assert.equal(withGear.items["2318"].category, "cuir");

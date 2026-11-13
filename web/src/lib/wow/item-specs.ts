@@ -19,7 +19,7 @@ const BATCH = 2_000;
 const MAX_ITEM_ID = 2_147_483_647;
 
 export type ItemType = { itemId: number; itemClass: number; subclass: number; inventoryType: number };
-export type ItemLevels = { itemLevel: number | null; requiredLevel: number | null; allowableClass: number | null };
+export type ItemLevels = { itemLevel: number | null; requiredLevel: number | null; allowableClass: number | null; bonding: number | null };
 
 const smallInt = (value: string | undefined, max = 32_767): number | null => {
   if (value === undefined || !/^-?\d{1,6}$/.test(value)) return null;
@@ -54,7 +54,7 @@ export function parseItemTypes(text: string): Parsed<ItemType[]> {
   return { ok: true, value: [...types.values()] };
 }
 
-/** Niveaux et classes autorisées de chaque objet d'une table ItemSparse (WoW Forever ou Classic Era). */
+/** Niveaux, classes autorisées et liaison de chaque objet d'une table ItemSparse (WoW Forever ou Classic Era). */
 export function parseItemLevels(text: string): Parsed<Map<number, ItemLevels>> {
   const [header, ...rows] = parseCsv(text);
   const columns = {
@@ -62,9 +62,10 @@ export function parseItemLevels(text: string): Parsed<Map<number, ItemLevels>> {
     itemLevel: header?.indexOf("ItemLevel") ?? -1,
     requiredLevel: header?.indexOf("RequiredLevel") ?? -1,
     allowableClass: header?.indexOf("AllowableClass") ?? -1,
+    bonding: header?.indexOf("Bonding") ?? -1,
   };
   if (Object.values(columns).some((index) => index < 0)) {
-    return { ok: false, error: "Fichier inattendu : les colonnes ID, ItemLevel, RequiredLevel et AllowableClass sont absentes." };
+    return { ok: false, error: "Fichier inattendu : les colonnes ID, ItemLevel, RequiredLevel, AllowableClass et Bonding sont absentes." };
   }
   const levels = new Map<number, ItemLevels>();
   for (const row of rows) {
@@ -75,6 +76,7 @@ export function parseItemLevels(text: string): Parsed<Map<number, ItemLevels>> {
       itemLevel: smallInt(row[columns.itemLevel], 1_000),
       requiredLevel: smallInt(row[columns.requiredLevel], 1_000),
       allowableClass: /^-?\d{1,11}$/.test(allowable) ? classMask(Number(allowable)) : null,
+      bonding: smallInt(row[columns.bonding], 99),
     });
   }
   if (levels.size === 0) return { ok: false, error: "Fichier vide : aucun objet lisible." };
@@ -90,7 +92,7 @@ export function mergeItemSpecs(types: readonly ItemType[], forever: ReadonlyMap<
     if (own) return { ...type, ...own, levelSource: "wowf" };
     const fallback = era.get(type.itemId);
     if (fallback) return { ...type, ...fallback, levelSource: "era" };
-    return { ...type, itemLevel: null, requiredLevel: null, allowableClass: null, levelSource: null };
+    return { ...type, itemLevel: null, requiredLevel: null, allowableClass: null, bonding: null, levelSource: null };
   });
 }
 
@@ -114,7 +116,13 @@ export async function itemSpecsSummary(db: Database): Promise<{ count: number; b
 /** Niveaux qu'un import précédent a pris dans Classic Era. */
 async function storedEraLevels(db: Database): Promise<Map<number, ItemLevels>> {
   const rows = await db
-    .select({ itemId: t.itemSpecs.itemId, itemLevel: t.itemSpecs.itemLevel, requiredLevel: t.itemSpecs.requiredLevel, allowableClass: t.itemSpecs.allowableClass })
+    .select({
+      itemId: t.itemSpecs.itemId,
+      itemLevel: t.itemSpecs.itemLevel,
+      requiredLevel: t.itemSpecs.requiredLevel,
+      allowableClass: t.itemSpecs.allowableClass,
+      bonding: t.itemSpecs.bonding,
+    })
     .from(t.itemSpecs)
     .where(sql`${t.itemSpecs.levelSource} = 'era'`);
   return new Map(rows.map(({ itemId, ...levels }) => [itemId, levels]));
@@ -168,6 +176,7 @@ export async function importItemSpecs(db: Database, options: { now: Date; fetch?
             itemLevel: sql`excluded.item_level`,
             requiredLevel: sql`excluded.required_level`,
             allowableClass: sql`excluded.allowable_class`,
+            bonding: sql`excluded.bonding`,
             levelSource: sql`excluded.level_source`,
             build: sql`excluded.build`,
             updatedAt: sql`excluded.updated_at`,
@@ -204,6 +213,7 @@ export async function loadItemSpecs(db: Database, keys: Iterable<string>): Promi
       itemLevel: t.itemSpecs.itemLevel,
       requiredLevel: t.itemSpecs.requiredLevel,
       allowableClass: t.itemSpecs.allowableClass,
+      bonding: t.itemSpecs.bonding,
     })
     .from(t.itemSpecs)
     .where(sql`${t.itemSpecs.itemId} = any(${intArray([...byId.keys()])})`);

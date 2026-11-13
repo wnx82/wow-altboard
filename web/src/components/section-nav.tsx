@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GameIcon } from "./ui";
 
-export type SectionLink = { id: string; label: string };
+/** `icon` : adresse d'une icône du jeu, posée devant le libellé. */
+export type SectionLink = { id: string; label: string; icon?: string };
 
 /** Hauteur de l'en-tête et du sommaire : un titre passé sous cette ligne est en cours de lecture. */
 const READING_LINE = 140;
@@ -44,6 +46,7 @@ export function SectionNav({ label, items }: { label: string; items: SectionLink
         {items.map((item) => (
           <li key={item.id}>
             <a href={`#${item.id}`} className="section-link" aria-current={current === item.id ? "true" : undefined}>
+              {item.icon && <GameIcon src={item.icon} size={20} className="section-link-icon" />}
               {item.label}
             </a>
           </li>

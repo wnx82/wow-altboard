@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { allowedClassesLabel, ALL_CLASSIC_CLASSES, ARMOR, canUse, classMask, gearLabel, type GearSpec, matchesGearSlot, matchesGearType, WEAPON } from "./gear";
+import {
+  allowedClassesLabel,
+  ALL_CLASSIC_CLASSES,
+  ARMOR,
+  bindingLabel,
+  boundToHolder,
+  canUse,
+  classMask,
+  gearLabel,
+  type GearSpec,
+  matchesGearSlot,
+  matchesGearType,
+  WEAPON,
+} from "./gear";
 
 const armor = (subclass: number, inventoryType: number, patch: Partial<GearSpec> = {}): GearSpec => ({
   itemClass: ARMOR,
@@ -9,6 +22,7 @@ const armor = (subclass: number, inventoryType: number, patch: Partial<GearSpec>
   itemLevel: 30,
   requiredLevel: 25,
   allowableClass: null,
+  bonding: null,
   ...patch,
 });
 const weapon = (subclass: number, inventoryType: number, patch: Partial<GearSpec> = {}): GearSpec => ({ ...armor(0, 0), itemClass: WEAPON, subclass, inventoryType, ...patch });
@@ -75,5 +89,14 @@ describe("équipement : libellés, types et règles de port de Classic", () => {
     assert.equal(canUse(armor(1, 5, { requiredLevel: 25 }), "MAGE", 24), false);
     assert.equal(canUse(armor(1, 5, { requiredLevel: null }), "MAGE", 1), true);
     assert.equal(canUse(armor(1, 5), "DEMONHUNTER"), false);
+  });
+
+  test("liaison : libellé de la bulle, objet qui reste à son détenteur", () => {
+    assert.equal(bindingLabel({ bonding: 1 }), "Lié quand ramassé");
+    assert.equal(bindingLabel({ bonding: 2 }), "Lié quand équipé");
+    assert.equal(bindingLabel({ bonding: 4 }), "Objet de quête");
+    assert.equal(bindingLabel({ bonding: 0 }), null);
+    assert.equal(bindingLabel({ bonding: null }), null);
+    assert.deepEqual([0, 1, 2, 3, 4, 5, null].map((bonding) => boundToHolder({ bonding })), [false, true, false, false, true, true, false]);
   });
 });

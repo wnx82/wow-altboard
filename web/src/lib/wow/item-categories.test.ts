@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { categoryLabel, categoryRank, CATEGORY_GROUPS, isItemCategory, ITEM_CATEGORIES, itemCategory } from "./item-categories";
+import { categoryIcon, categoryLabel, categoryRank, CATEGORY_GROUPS, isItemCategory, ITEM_CATEGORIES, itemCategory } from "./item-categories";
 
 const spec = (itemClass: number, subclass = 0) => ({ itemClass, subclass });
 
@@ -55,6 +55,11 @@ describe("catégories d'objets", () => {
     assert.equal(categoryRank(undefined), ITEM_CATEGORIES.length - 1);
     assert.equal(categoryLabel("elixirs"), "Élixirs et flacons");
     assert.equal(categoryLabel(undefined), "Sans catégorie connue");
+    // Une icône du jeu par catégorie, sous un nom de fichier que itemIconUrl accepte.
+    for (const category of ITEM_CATEGORIES) assert.match(category.icon, /^[a-z0-9_]+$/, category.value);
+    assert.equal(categoryIcon("cuir"), "inv_misc_leatherscrap_03");
+    assert.equal(categoryIcon("bidon"), "inv_misc_questionmark");
+    assert.equal(categoryIcon(undefined), "inv_misc_questionmark");
     assert.equal(isItemCategory("cuir"), true);
     assert.equal(isItemCategory("bidon"), false);
     assert.deepEqual(CATEGORY_GROUPS, ["Équipement", "Consommables", "Artisanat", "Autres"]);

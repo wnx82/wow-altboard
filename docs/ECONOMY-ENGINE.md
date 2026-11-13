@@ -209,6 +209,24 @@ guerrier, le paladin et le chaman, reliques pour leur classe, puis les classes a
 l'objet. Pour une classe, tout ce qu'elle pourra porter ; pour un personnage, ce qu'il peut
 porter à son niveau (niveau requis et niveau 40 compris).
 
+Depuis le site 0.23.0, l'import retient aussi la **liaison** de l'objet (colonne `Bonding` de
+`ItemSparse` ; 2 499 objets sans ligne dans les deux tables restent sans liaison connue). La
+page Équipement (`gear-planner.ts`) s'en sert avec les mêmes règles de port : pour une classe ou
+un personnage et un niveau, elle cherche dans les sacs, banques, courriers et banques de guilde
+de tous les personnages le meilleur objet de chaque emplacement de la fiche du jeu. Un objet lié
+quand ramassé ou de quête ne compte que chez son détenteur (pour une classe : un personnage de
+cette classe) ; les courriers et ventes échus sont écartés. Le classement suit le niveau d'objet,
+moins dix par rang d'armure plus légère que celle de la classe à ce niveau (`ARMOR_TIER_COST`) ;
+les objets au niveau inconnu passent en dernier. Une arme en main gauche, de main gauche ou à une
+main, demande l'ambidextrie (voleur 10, guerrier et chasseur 20) ; un objet n'est proposé qu'autant
+de fois qu'il est détenu (deux anneaux identiques, mais pas la même épée dans les deux mains).
+Pour un personnage, l'écart se mesure avec le même score sur ce qu'il porte (`character_equipment`,
+type d'armure tiré de `item_specs`), un emplacement vide comptant pour 0 ; face à un objet porté
+au niveau inconnu, « Améliorations seulement » n'écarte rien. Les caractéristiques (force,
+intelligence…) ne sont pas comparées : les suffixes aléatoires (« du gorille ») ne sont connus que
+par le nom de l'objet. Un objet lié quand équipé déjà porté reste lié à son détenteur sans que le
+relevé le dise.
+
 L'agent 0.7.0 complète ces noms avec ceux du cache local du client (`DBCache.bin`), envoyés à la
 synchronisation quand ce cache change (`storeClientNames`). Ce sont les enregistrements que le
 serveur du jeu a transmis au client, correctifs compris : plus récents que la table de wago.tools,

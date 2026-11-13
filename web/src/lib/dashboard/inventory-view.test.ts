@@ -233,9 +233,9 @@ const GEAR: InventoryData = {
   ],
   items: {
     ...DATA.items,
-    "15210:1017": { ...DATA.items["15210:1017"], gear: { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null } },
-    "2316": { name: "Gilet en cuir", quality: 1, icon: null, gear: { itemClass: 4, subclass: 2, inventoryType: 5, itemLevel: 16, requiredLevel: 11, allowableClass: null } },
-    "16866": { name: "Jambières de puissance", quality: 4, icon: null, gear: { itemClass: 4, subclass: 4, inventoryType: 7, itemLevel: 66, requiredLevel: 60, allowableClass: 1 } },
+    "15210:1017": { ...DATA.items["15210:1017"], gear: { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null, bonding: 2 } },
+    "2316": { name: "Gilet en cuir", quality: 1, icon: null, gear: { itemClass: 4, subclass: 2, inventoryType: 5, itemLevel: 16, requiredLevel: 11, allowableClass: null, bonding: 2 } },
+    "16866": { name: "Jambières de puissance", quality: 4, icon: null, gear: { itemClass: 4, subclass: 4, inventoryType: 7, itemLevel: 66, requiredLevel: 60, allowableClass: 1, bonding: 1 } },
   },
 };
 const gear = (patch: Partial<InventoryState>) => [...new Set(selectHoldings(GEAR, state({ expired: true, ...patch }), NOW).map((holding) => holding.itemKey))].sort();

@@ -21,16 +21,16 @@ const ITEM_TABLE = [
   "4306,0,0,0,0,1",
 ].join("\n");
 const FOREVER_SPARSE = [
-  "ID,Display_lang,ItemLevel,AllowableClass,RequiredLevel,InventoryType",
-  '2316,"Gilet en cuir, renforcé",16,-1,11,5',
-  "1462,Anneau,30,32767,25,11",
-  "2589,Étoffe de lin,5,32767,0,0",
+  "ID,Display_lang,ItemLevel,AllowableClass,RequiredLevel,InventoryType,Bonding",
+  '2316,"Gilet en cuir, renforcé",16,-1,11,5,2',
+  "1462,Anneau,30,32767,25,11,0",
+  "2589,Étoffe de lin,5,32767,0,0,0",
 ].join("\n");
 const ERA_SPARSE = [
-  "ID,Display_lang,AllowableClass,ItemLevel,RequiredLevel,InventoryType",
-  "15210,Épée courte d'écumeur,-1,16,11,13",
-  "2316,Gilet en cuir,-1,99,99,5",
-  "16866,Jambières de puissance,1,66,60,7",
+  "ID,Display_lang,AllowableClass,Bonding,ItemLevel,RequiredLevel,InventoryType",
+  "15210,Épée courte d'écumeur,-1,2,16,11,13",
+  "2316,Gilet en cuir,-1,1,99,99,5",
+  "16866,Jambières de puissance,1,1,66,60,7",
 ].join("\n");
 
 function fakeWago(options: { forever?: string; era?: string; eraStatus?: number; eraBuildStatus?: number } = {}) {
@@ -84,9 +84,10 @@ describe("caractéristiques des objets", () => {
     const era = parseItemLevels(ERA_SPARSE);
     assert.equal(forever.ok && era.ok, true);
     if (!forever.ok || !era.ok) return;
-    assert.deepEqual(forever.value.get(2316), { itemLevel: 16, requiredLevel: 11, allowableClass: null });
-    assert.deepEqual(forever.value.get(1462), { itemLevel: 30, requiredLevel: 25, allowableClass: null });
-    assert.deepEqual(era.value.get(16866), { itemLevel: 66, requiredLevel: 60, allowableClass: 1 });
+    assert.deepEqual(forever.value.get(2316), { itemLevel: 16, requiredLevel: 11, allowableClass: null, bonding: 2 });
+    assert.deepEqual(forever.value.get(1462), { itemLevel: 30, requiredLevel: 25, allowableClass: null, bonding: 0 });
+    assert.deepEqual(era.value.get(16866), { itemLevel: 66, requiredLevel: 60, allowableClass: 1, bonding: 1 });
+    assert.equal(parseItemLevels("ID,ItemLevel,RequiredLevel,AllowableClass\n1,2,3,4").ok, false, "sans colonne Bonding");
 
     // WoW Forever d'abord, Classic Era pour les objets qu'il ne publie pas.
     const types = parseItemTypes(ITEM_TABLE);
@@ -163,7 +164,7 @@ describe("caractéristiques des objets", () => {
       const resumed = await importItemSpecs(database.db, { now: NOW, fetch: fakeWago(outage).fetchImpl, onlyIfNewer: true });
       assert.deepEqual(resumed, { ok: true, build: "1.60.1.70888/", count: 6, fromForever: 3, fromEra: 2, removed: 0 }, JSON.stringify(outage));
       const [legs] = await database.db.select().from(t.itemSpecs).where(eq(t.itemSpecs.itemId, 16866));
-      assert.deepEqual([legs.requiredLevel, legs.allowableClass, legs.levelSource], [60, 1, "era"]);
+      assert.deepEqual([legs.requiredLevel, legs.allowableClass, legs.bonding, legs.levelSource], [60, 1, 1, "era"]);
     }
   });
 
@@ -171,8 +172,8 @@ describe("caractéristiques des objets", () => {
     await importItemSpecs(database.db, { now: NOW, fetch: fakeWago().fetchImpl });
     const specs = await loadItemSpecs(database.db, ["15210:1017", "2316", "2589", "p:1234", "999"]);
     assert.deepEqual([...specs.keys()].sort(), ["15210:1017", "2316", "2589"]);
-    assert.deepEqual(specs.get("15210:1017"), { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null });
-    assert.deepEqual(specs.get("2589"), { itemClass: 7, subclass: 5, inventoryType: 0, itemLevel: 5, requiredLevel: 0, allowableClass: null });
+    assert.deepEqual(specs.get("15210:1017"), { itemClass: 2, subclass: 7, inventoryType: 13, itemLevel: 16, requiredLevel: 11, allowableClass: null, bonding: 2 });
+    assert.deepEqual(specs.get("2589"), { itemClass: 7, subclass: 5, inventoryType: 0, itemLevel: 5, requiredLevel: 0, allowableClass: null, bonding: 0 });
     assert.deepEqual(await loadItemSpecs(database.db, []), new Map());
   });
 });

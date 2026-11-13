@@ -158,7 +158,9 @@ export const itemSpecs = pgTable(
     itemLevel: smallint("item_level"),
     requiredLevel: smallint("required_level"),
     allowableClass: integer("allowable_class"),
-    /** Table d'où viennent les niveaux : `wowf` (WoW Forever) ou `era` (Classic Era). */
+    /** Liaison (Bonding) : 1 quand ramassé, 2 quand équipé, 3 quand utilisé, 4 et 5 objet de quête. */
+    bonding: smallint("bonding"),
+    /** Table d'où viennent les niveaux et la liaison : `wowf` (WoW Forever) ou `era` (Classic Era). */
     levelSource: text("level_source"),
     build: text("build").notNull(),
     updatedAt: updatedAt(),

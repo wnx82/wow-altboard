@@ -143,7 +143,8 @@ export const CLASS_SLUGS: Readonly<Record<string, string>> = {
   DRUID: "druide",
 };
 
-function readWearer(value: string | null): string {
+/** Classe (« chasseur » dans l'adresse) ou identifiant de personnage ; vide pour une valeur illisible. */
+export function readWearer(value: string | null): string {
   if (isId(value)) return value;
   return CLASSIC_CLASSES.find((token) => CLASS_SLUGS[token] === value) ?? "";
 }

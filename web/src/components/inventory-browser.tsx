@@ -34,10 +34,11 @@ import {
 import { itemHref } from "@/lib/economy/view";
 import { classKey, classLabel, formatDateTime, formatInteger, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
 import { ARMOR_TYPES, CLASSIC_CLASSES, GEAR_SLOTS, WEAPON_TYPES } from "@/lib/wow/gear";
-import { CATEGORY_GROUPS, ITEM_CATEGORIES } from "@/lib/wow/item-categories";
+import { itemIconUrl } from "@/lib/wow/icons";
+import { CATEGORY_GROUPS, categoryIcon, ITEM_CATEGORIES } from "@/lib/wow/item-categories";
 import { GameTooltip, ItemSlot, itemName, TooltipGear, TooltipPrice, useItemTip, ValueEstimate, type SlotEvents, type Tip } from "./item-slots";
 import { SectionNav } from "./section-nav";
-import { ClassAvatar, EmptyState, Money } from "./ui";
+import { ClassAvatar, EmptyState, GameIcon, Money } from "./ui";
 
 /** Cases affichées d'un coup dans la grille des objets ; le bouton du bas en ajoute autant. */
 const PAGE_SIZE = 160;
@@ -140,7 +141,12 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
   const byCategory = state.view === "items" && state.sort === "category";
   const sections = useMemo(() => (byCategory ? categorySections(rows, data.items) : []), [byCategory, rows, data.items]);
   const sectionLinks = useMemo(
-    () => sections.map((section) => ({ id: `categorie-${section.category}`, label: `${section.label} (${formatInteger(section.rows.length)})` })),
+    () =>
+      sections.map((section) => ({
+        id: `categorie-${section.category}`,
+        label: `${section.label} (${formatInteger(section.rows.length)})`,
+        icon: itemIconUrl(categoryIcon(section.category)),
+      })),
     [sections],
   );
   const total = rows.reduce((sum, row) => sum + row.total, 0);
@@ -291,218 +297,231 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
         {viewNav}
       </div>
 
-      <div id="inventory-filters" className={`space-y-3 ${filtersOpen ? "" : "hidden sm:block"}`}>
-        <div className="flex flex-wrap items-center gap-2">
-          {accounts.length > 1 && (
-            <select
-              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-              aria-label="Filtrer par compte"
-              value={state.account}
-              onChange={(event) => {
-                const account = event.target.value;
-                const keep = state.character !== "" && account !== "" && String(characters.get(Number(state.character))?.account.id) === account;
-                const character = keep || account === "" ? state.character : "";
-                update({ account, character, view: character === state.character ? state.view : defaultView(character) });
-              }}
-            >
-              <option value="">Tous les comptes</option>
-              {accounts.map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          )}
-          <select
-            className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-            aria-label="Filtrer par personnage"
-            value={state.character}
-            onChange={(event) => update({ character: event.target.value, view: defaultView(event.target.value) })}
-          >
-            <option value="">Tous les personnages</option>
-            {characterOptions.map((character) => (
-              <option key={character.id} value={character.id}>
-                {character.name} ({character.realm}
-                {state.account === "" && accounts.length > 1 ? `, ${character.account.label}` : ""})
-              </option>
-            ))}
-          </select>
-          <select
-            className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-            aria-label="Qualité minimale"
-            value={state.minQuality}
-            onChange={(event) => update({ minQuality: event.target.value })}
-          >
-            <option value="">Toutes qualités</option>
-            {QUALITY_LABELS.slice(1, 6).map((label, index) => (
-              <option key={label} value={index + 1}>
-                {label} et mieux
-              </option>
-            ))}
-          </select>
-          <select
-            className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-            aria-label="Catégorie"
-            value={state.category}
-            onChange={(event) => update({ category: event.target.value })}
-          >
-            <option value="">Toutes catégories</option>
-            {CATEGORY_GROUPS.map((group) => {
-              const options = categories.filter((category) => category.group === group);
-              return (
-                options.length > 0 && (
-                  <optgroup key={group} label={group}>
-                    {options.map((category) => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                )
-              );
-            })}
-          </select>
-          <span className="hidden flex-1 sm:block" />
-          <div className="hidden sm:block">{viewNav}</div>
-        </div>
-
-        {(hasGear || gearFiltered(state)) && (
-          <fieldset className="flex flex-wrap items-center gap-2">
-            <legend className="sr-only">Équipement</legend>
-            <span aria-hidden="true" className="w-full text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted sm:w-auto">
-              Équipement
-            </span>
-            <select
-              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-              aria-label="Type d'armure ou d'arme"
-              value={state.gearType}
-              onChange={(event) => update({ gearType: event.target.value })}
-            >
-              <option value="">Armures et armes</option>
-              <optgroup label="Armures">
-                {ARMOR_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Armes">
-                {WEAPON_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            <select
-              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-              aria-label="Emplacement"
-              value={state.gearSlot}
-              onChange={(event) => update({ gearSlot: event.target.value })}
-            >
-              <option value="">Tous les emplacements</option>
-              {GEAR_SLOTS.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-            <span className="flex items-center gap-1.5 text-xs text-muted">
-              Niveau requis
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={999}
-                className="field w-[4.5rem]"
-                aria-label="Niveau requis minimal"
-                placeholder="de"
-                value={state.minLevel}
-                onChange={(event) => update({ minLevel: levelInput(event.target.value) })}
-              />
-              à
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={999}
-                className="field w-[4.5rem]"
-                aria-label="Niveau requis maximal"
-                placeholder="à"
-                value={state.maxLevel}
-                onChange={(event) => update({ maxLevel: levelInput(event.target.value) })}
-              />
-            </span>
-            <select
-              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
-              aria-label="Équipement portable par"
-              title="Une classe : tout ce qu'elle peut apprendre à porter. Un personnage : ce qu'il peut porter à son niveau."
-              value={state.wearer}
-              onChange={(event) => update({ wearer: event.target.value })}
-            >
-              <option value="">Pour toutes les classes</option>
-              {/* Lien vers un personnage supprimé ou d'une autre classe : visible, pour pouvoir changer. */}
-              {lostWearer && <option value={state.wearer}>Personnage introuvable</option>}
-              <optgroup label="Classe">
-                {CLASSIC_CLASSES.map((token) => (
-                  <option key={token} value={token}>
-                    {classLabel(token)}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Personnage, à son niveau">
-                {wearers.map((character) => (
-                  <option key={character.id} value={character.id}>
-                    {character.name} · {classLabel(character.class)}
-                    {character.level === null ? "" : ` ${character.level}`}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </fieldset>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          {available.map((place) => (
-            <button key={place} type="button" className="button" aria-pressed={state.places.includes(place)} onClick={() => togglePlace(place)}>
-              {PLACE_LABELS[place]}
-            </button>
-          ))}
-          {(hasSoon || state.soon) && (
-            <button
-              type="button"
-              className="button"
-              aria-pressed={state.soon}
-              title="Seulement les courriers et les ventes qui expirent dans les trois jours"
-              onClick={() => update({ soon: !state.soon })}
-            >
-              Bientôt échus
-            </button>
-          )}
-          {hasExpired && (
-            <button
-              type="button"
-              className="button"
-              aria-pressed={state.expired}
-              title="Inclure les courriers et les ventes dont l'échéance est passée depuis le relevé"
-              onClick={() => update({ expired: !state.expired })}
-            >
-              Échus
-            </button>
-          )}
-          <span className="flex-1" />
-          {rows.length > 1 && (
-            <label className="flex items-center gap-2 text-xs text-muted">
-              Trier par
-              <select className="field w-auto" value={state.sort} onChange={(event) => update({ sort: event.target.value as InventorySort })}>
-                {(Object.keys(SORT_LABELS) as InventorySort[]).map((sort) => (
-                  <option key={sort} value={sort}>
-                    {SORT_LABELS[sort]}
+      {/* Filtres en fenêtre du jeu : une rangée étiquetée par question (quoi, quel équipement, où). */}
+      <div id="inventory-filters" className={`filter-window ${filtersOpen ? "" : "hidden sm:grid"}`}>
+        <div className="filter-row" role="group" aria-labelledby="inventory-filters-show">
+          <span id="inventory-filters-show" className="filter-label">
+            Afficher
+          </span>
+          <div className="filter-controls">
+            {accounts.length > 1 && (
+              <select
+                className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+                aria-label="Filtrer par compte"
+                value={state.account}
+                onChange={(event) => {
+                  const account = event.target.value;
+                  const keep = state.character !== "" && account !== "" && String(characters.get(Number(state.character))?.account.id) === account;
+                  const character = keep || account === "" ? state.character : "";
+                  update({ account, character, view: character === state.character ? state.view : defaultView(character) });
+                }}
+              >
+                <option value="">Tous les comptes</option>
+                {accounts.map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
                   </option>
                 ))}
               </select>
-            </label>
-          )}
+            )}
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Filtrer par personnage"
+              value={state.character}
+              onChange={(event) => update({ character: event.target.value, view: defaultView(event.target.value) })}
+            >
+              <option value="">Tous les personnages</option>
+              {characterOptions.map((character) => (
+                <option key={character.id} value={character.id}>
+                  {character.name} ({character.realm}
+                  {state.account === "" && accounts.length > 1 ? `, ${character.account.label}` : ""})
+                </option>
+              ))}
+            </select>
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Qualité minimale"
+              value={state.minQuality}
+              onChange={(event) => update({ minQuality: event.target.value })}
+            >
+              <option value="">Toutes qualités</option>
+              {QUALITY_LABELS.slice(1, 6).map((label, index) => (
+                <option key={label} value={index + 1}>
+                  {label} et mieux
+                </option>
+              ))}
+            </select>
+            <select
+              className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+              aria-label="Catégorie"
+              value={state.category}
+              onChange={(event) => update({ category: event.target.value })}
+            >
+              <option value="">Toutes catégories</option>
+              {CATEGORY_GROUPS.map((group) => {
+                const options = categories.filter((category) => category.group === group);
+                return (
+                  options.length > 0 && (
+                    <optgroup key={group} label={group}>
+                      {options.map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                );
+              })}
+            </select>
+            <span className="hidden flex-1 sm:block" />
+            <div className="hidden sm:block">{viewNav}</div>
+          </div>
+        </div>
+
+        {(hasGear || gearFiltered(state)) && (
+          <fieldset className="filter-row">
+            <legend className="sr-only">Équipement</legend>
+            <span aria-hidden="true" className="filter-label">
+              Équipement
+            </span>
+            <div className="filter-controls">
+              <select
+                className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+                aria-label="Type d'armure ou d'arme"
+                value={state.gearType}
+                onChange={(event) => update({ gearType: event.target.value })}
+              >
+                <option value="">Armures et armes</option>
+                <optgroup label="Armures">
+                  {ARMOR_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Armes">
+                  {WEAPON_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <select
+                className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+                aria-label="Emplacement"
+                value={state.gearSlot}
+                onChange={(event) => update({ gearSlot: event.target.value })}
+              >
+                <option value="">Tous les emplacements</option>
+                {GEAR_SLOTS.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </select>
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                Niveau requis
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={999}
+                  className="field w-[4.5rem]"
+                  aria-label="Niveau requis minimal"
+                  placeholder="de"
+                  value={state.minLevel}
+                  onChange={(event) => update({ minLevel: levelInput(event.target.value) })}
+                />
+                à
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={999}
+                  className="field w-[4.5rem]"
+                  aria-label="Niveau requis maximal"
+                  placeholder="à"
+                  value={state.maxLevel}
+                  onChange={(event) => update({ maxLevel: levelInput(event.target.value) })}
+                />
+              </span>
+              <select
+                className="field min-w-36 flex-1 sm:flex-none sm:w-auto"
+                aria-label="Équipement portable par"
+                title="Une classe : tout ce qu'elle peut apprendre à porter. Un personnage : ce qu'il peut porter à son niveau."
+                value={state.wearer}
+                onChange={(event) => update({ wearer: event.target.value })}
+              >
+                <option value="">Pour toutes les classes</option>
+                {/* Lien vers un personnage supprimé ou d'une autre classe : visible, pour pouvoir changer. */}
+                {lostWearer && <option value={state.wearer}>Personnage introuvable</option>}
+                <optgroup label="Classe">
+                  {CLASSIC_CLASSES.map((token) => (
+                    <option key={token} value={token}>
+                      {classLabel(token)}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Personnage, à son niveau">
+                  {wearers.map((character) => (
+                    <option key={character.id} value={character.id}>
+                      {character.name} · {classLabel(character.class)}
+                      {character.level === null ? "" : ` ${character.level}`}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </fieldset>
+        )}
+
+        <div className="filter-row" role="group" aria-labelledby="inventory-filters-places">
+          <span id="inventory-filters-places" className="filter-label">
+            Chercher dans
+          </span>
+          <div className="filter-controls">
+            {available.map((place) => (
+              <button key={place} type="button" className="button" aria-pressed={state.places.includes(place)} onClick={() => togglePlace(place)}>
+                {PLACE_LABELS[place]}
+              </button>
+            ))}
+            {(hasSoon || state.soon) && (
+              <button
+                type="button"
+                className="button"
+                aria-pressed={state.soon}
+                title="Seulement les courriers et les ventes qui expirent dans les trois jours"
+                onClick={() => update({ soon: !state.soon })}
+              >
+                Bientôt échus
+              </button>
+            )}
+            {hasExpired && (
+              <button
+                type="button"
+                className="button"
+                aria-pressed={state.expired}
+                title="Inclure les courriers et les ventes dont l'échéance est passée depuis le relevé"
+                onClick={() => update({ expired: !state.expired })}
+              >
+                Échus
+              </button>
+            )}
+            <span className="flex-1" />
+            {rows.length > 1 && (
+              <label className="flex items-center gap-2 text-xs text-muted">
+                Trier par
+                <select className="field w-auto" value={state.sort} onChange={(event) => update({ sort: event.target.value as InventorySort })}>
+                  {(Object.keys(SORT_LABELS) as InventorySort[]).map((sort) => (
+                    <option key={sort} value={sort}>
+                      {SORT_LABELS[sort]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
         </div>
       </div>
 
@@ -520,8 +539,11 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
               {sections.map((section) => (
                 <div key={section.category} className="bag-section">
                   <h2 id={`categorie-${section.category}`} className="bag-section-title">
-                    <span>
-                      {section.label} <small>· {plural(section.rows.length, "objet")}</small>
+                    <span className="flex items-center gap-2">
+                      <GameIcon src={itemIconUrl(categoryIcon(section.category))} size={24} className="bag-section-icon" />
+                      <span>
+                        {section.label} <small>· {plural(section.rows.length, "objet")}</small>
+                      </span>
                     </span>
                   </h2>
                   {itemGrid(section.rows)}

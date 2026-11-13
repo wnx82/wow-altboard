@@ -5,7 +5,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 import { createPortal } from "react-dom";
 import { slotCount, type ExpiryFlag } from "@/lib/dashboard/inventory-view";
 import { formatInteger } from "@/lib/wow/format";
-import { allowedClassesLabel, type GearSpec, gearSlotLabel, gearTypeLabel } from "@/lib/wow/gear";
+import { allowedClassesLabel, bindingLabel, type GearSpec, gearSlotLabel, gearTypeLabel } from "@/lib/wow/gear";
 import { itemIconUrl } from "@/lib/wow/icons";
 import { Money } from "./ui";
 
@@ -273,14 +273,16 @@ export function GameTooltip({
   );
 }
 
-/** Lignes d'équipement d'une bulle, comme en jeu : emplacement et type, niveaux, classes autorisées. */
+/** Lignes d'équipement d'une bulle, comme en jeu : liaison, emplacement et type, niveaux, classes autorisées. */
 export function TooltipGear({ gear }: { gear: GearSpec | undefined }) {
   if (!gear) return null;
   const slot = gearSlotLabel(gear);
   const type = gearTypeLabel(gear);
   const classes = allowedClassesLabel(gear);
+  const binding = bindingLabel(gear);
   return (
     <div className="mt-1 space-y-0.5">
+      {binding && <p>{binding}</p>}
       {(slot || type) && (
         <p className="flex items-baseline justify-between gap-6">
           <span>{slot}</span>

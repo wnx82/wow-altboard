@@ -16,7 +16,17 @@ export type GearSpec = {
   requiredLevel: number | null;
   /** Masque des classes autorisées (bit de l'identifiant de classe − 1) ; null pour toutes. */
   allowableClass: number | null;
+  /** Liaison (Bonding du jeu) : 1 quand ramassé, 2 quand équipé, 3 quand utilisé, 4 et 5 objet de quête ; 0 ou null : aucune. */
+  bonding: number | null;
 };
+
+const BINDING_LABELS: Readonly<Record<number, string>> = { 1: "Lié quand ramassé", 2: "Lié quand équipé", 3: "Lié quand utilisé", 4: "Objet de quête", 5: "Objet de quête" };
+
+/** Ligne de liaison de la bulle du jeu (« Lié quand ramassé »), ou null. */
+export const bindingLabel = (spec: { bonding: number | null }) => (spec.bonding === null ? null : (BINDING_LABELS[spec.bonding] ?? null));
+
+/** Lié à son détenteur dès qu'il le possède : ni échange, ni courrier, ni banque de guilde. */
+export const boundToHolder = (spec: { bonding: number | null }) => spec.bonding === 1 || spec.bonding === 4 || spec.bonding === 5;
 
 /** Caractéristiques d'un objet quelconque de la table Item : classe, sous-classe, emplacement, niveaux. */
 export type ItemSpec = Omit<GearSpec, "itemClass"> & { itemClass: number };

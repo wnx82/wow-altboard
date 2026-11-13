@@ -1,7 +1,8 @@
 // Catégories d'objets, à la manière du tri des sacs du jeu : classe et sous-classe de la table Item
 // (ClassID, SubclassID), puis la qualité pour la camelote (objets gris), rangée à la fin.
 
-export type ItemCategory = { value: string; label: string; group: string };
+/** `icon` : nom de fichier d'une icône du jeu, présente sur le CDN de Blizzard. */
+export type ItemCategory = { value: string; label: string; group: string; icon: string };
 
 /** Classe et sous-classe d'un objet, telles que la table Item du jeu les donne. */
 export type ItemClassification = { itemClass: number; subclass: number };
@@ -22,34 +23,34 @@ const MISCELLANEOUS = 15;
 
 /** Dans l'ordre d'affichage. */
 export const ITEM_CATEGORIES: readonly ItemCategory[] = [
-  { value: "armes", label: "Armes", group: "Équipement" },
-  { value: "armures", label: "Armures", group: "Équipement" },
-  { value: "sacs", label: "Sacs et carquois", group: "Équipement" },
-  { value: "nourriture", label: "Nourriture et boissons", group: "Consommables" },
-  { value: "potions", label: "Potions", group: "Consommables" },
-  { value: "elixirs", label: "Élixirs et flacons", group: "Consommables" },
-  { value: "parchemins", label: "Parchemins", group: "Consommables" },
-  { value: "bandages", label: "Bandages", group: "Consommables" },
-  { value: "ameliorations", label: "Améliorations d'objets", group: "Consommables" },
-  { value: "consommables", label: "Autres consommables", group: "Consommables" },
-  { value: "munitions", label: "Flèches et balles", group: "Consommables" },
-  { value: "tissu", label: "Tissu", group: "Artisanat" },
-  { value: "cuir", label: "Cuir", group: "Artisanat" },
-  { value: "metal", label: "Métal et pierre", group: "Artisanat" },
-  { value: "viande", label: "Viande et poisson", group: "Artisanat" },
-  { value: "herbes", label: "Herbes", group: "Artisanat" },
-  { value: "elementaire", label: "Élémentaire", group: "Artisanat" },
-  { value: "enchantement", label: "Enchantement", group: "Artisanat" },
-  { value: "ingenierie", label: "Pièces et explosifs", group: "Artisanat" },
-  { value: "artisanat", label: "Autres composants", group: "Artisanat" },
-  { value: "recettes", label: "Recettes et livres", group: "Artisanat" },
-  { value: "reactifs", label: "Réactifs", group: "Autres" },
-  { value: "quete", label: "Quête", group: "Autres" },
-  { value: "cles", label: "Clés", group: "Autres" },
-  { value: "mascottes", label: "Mascottes et montures", group: "Autres" },
-  { value: "divers", label: "Divers", group: "Autres" },
-  { value: "camelote", label: "Camelote", group: "Autres" },
-  { value: "inconnu", label: "Sans catégorie connue", group: "Autres" },
+  { value: "armes", label: "Armes", group: "Équipement", icon: "inv_sword_04" },
+  { value: "armures", label: "Armures", group: "Équipement", icon: "inv_chest_chain" },
+  { value: "sacs", label: "Sacs et carquois", group: "Équipement", icon: "inv_misc_bag_08" },
+  { value: "nourriture", label: "Nourriture et boissons", group: "Consommables", icon: "inv_misc_food_15" },
+  { value: "potions", label: "Potions", group: "Consommables", icon: "inv_potion_51" },
+  { value: "elixirs", label: "Élixirs et flacons", group: "Consommables", icon: "inv_potion_61" },
+  { value: "parchemins", label: "Parchemins", group: "Consommables", icon: "inv_scroll_03" },
+  { value: "bandages", label: "Bandages", group: "Consommables", icon: "inv_misc_bandage_15" },
+  { value: "ameliorations", label: "Améliorations d'objets", group: "Consommables", icon: "inv_misc_armorkit_17" },
+  { value: "consommables", label: "Autres consommables", group: "Consommables", icon: "inv_misc_orb_01" },
+  { value: "munitions", label: "Flèches et balles", group: "Consommables", icon: "inv_ammo_arrow_01" },
+  { value: "tissu", label: "Tissu", group: "Artisanat", icon: "inv_fabric_linen_01" },
+  { value: "cuir", label: "Cuir", group: "Artisanat", icon: "inv_misc_leatherscrap_03" },
+  { value: "metal", label: "Métal et pierre", group: "Artisanat", icon: "inv_ore_copper_01" },
+  { value: "viande", label: "Viande et poisson", group: "Artisanat", icon: "inv_misc_food_14" },
+  { value: "herbes", label: "Herbes", group: "Artisanat", icon: "inv_misc_herb_07" },
+  { value: "elementaire", label: "Élémentaire", group: "Artisanat", icon: "spell_fire_fire" },
+  { value: "enchantement", label: "Enchantement", group: "Artisanat", icon: "inv_enchant_dustvision" },
+  { value: "ingenierie", label: "Pièces et explosifs", group: "Artisanat", icon: "inv_misc_gear_01" },
+  { value: "artisanat", label: "Autres composants", group: "Artisanat", icon: "inv_misc_birdbeck_01" },
+  { value: "recettes", label: "Recettes et livres", group: "Artisanat", icon: "inv_misc_book_09" },
+  { value: "reactifs", label: "Réactifs", group: "Autres", icon: "inv_misc_rune_05" },
+  { value: "quete", label: "Quête", group: "Autres", icon: "inv_misc_note_01" },
+  { value: "cles", label: "Clés", group: "Autres", icon: "inv_misc_key_03" },
+  { value: "mascottes", label: "Mascottes et montures", group: "Autres", icon: "inv_box_petcarrier_01" },
+  { value: "divers", label: "Divers", group: "Autres", icon: "inv_misc_coin_02" },
+  { value: "camelote", label: "Camelote", group: "Autres", icon: "inv_misc_bone_humanskull_01" },
+  { value: "inconnu", label: "Sans catégorie connue", group: "Autres", icon: "inv_misc_questionmark" },
 ];
 
 /** Groupes de catégories, dans l'ordre d'affichage. */
@@ -57,11 +58,14 @@ export const CATEGORY_GROUPS = [...new Set(ITEM_CATEGORIES.map((category) => cat
 
 const ORDER = new Map(ITEM_CATEGORIES.map((category, index) => [category.value, index]));
 const LABELS = new Map(ITEM_CATEGORIES.map((category) => [category.value, category.label]));
+const ICONS = new Map(ITEM_CATEGORIES.map((category) => [category.value, category.icon]));
 
 export const isItemCategory = (value: string) => ORDER.has(value);
 /** Rang d'affichage d'une catégorie ; une valeur inconnue passe en dernier. */
 export const categoryRank = (value: string | undefined) => ORDER.get(value ?? "inconnu") ?? ITEM_CATEGORIES.length;
 export const categoryLabel = (value: string | undefined) => LABELS.get(value ?? "inconnu") ?? "Sans catégorie connue";
+/** Icône d'une catégorie ; une valeur inconnue prend le point d'interrogation du jeu. */
+export const categoryIcon = (value: string | undefined) => ICONS.get(value ?? "inconnu") ?? "inv_misc_questionmark";
 
 const CONSUMABLES: Readonly<Record<number, string>> = { 1: "potions", 2: "elixirs", 3: "elixirs", 4: "parchemins", 5: "nourriture", 6: "ameliorations", 7: "bandages" };
 const TRADE: Readonly<Record<number, string>> = {

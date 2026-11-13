@@ -4,6 +4,39 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.23.0 — 2026-11-13
+
+### Ajouté
+
+- **Page Équipement** (`/gear`, menu Personnages) : pour une classe ou un personnage et un niveau
+  de 1 à 60, le meilleur équipement en réserve chez tous les personnages, emplacement par
+  emplacement, comme sur la fiche du jeu.
+  - Choix par médaillons de classe ou par personnage (son niveau par défaut), curseur de niveau,
+    lieux fouillés (sacs, banque, courrier, banques de guilde ; enchères en option). L'adresse
+    garde le choix (`?pour=guerrier&niveau=45`).
+  - Chaque emplacement montre le meilleur objet (deux pour les doigts et les bijoux, le même
+    s'il est détenu en deux exemplaires), son détenteur et l'endroit, puis quatre autres choix
+    repliés. La bulle du jeu donne le détail.
+  - Seul ce que la classe porte à ce niveau compte : niveau requis, mailles et plaques au
+    niveau 40, armes apprises, boucliers, ambidextrie (voleur 10, guerrier et chasseur 20 ; une
+    arme à une main peut alors aller en main gauche, sans être proposée deux fois), reliques. Un
+    objet lié quand ramassé ne compte que chez son détenteur.
+  - Classement par niveau d'objet ; une armure plus légère que celle de la classe perd dix
+    niveaux par rang (un guerrier de niveau 45 préfère des plaques 33 à des mailles 40). Option
+    « Armure en plaques seulement ».
+  - Pour un personnage : ce qu'il porte, l'écart avec l'objet porté (+8, mesuré comme le
+    classement) et l'option « Améliorations seulement ».
+- La bulle d'un objet indique sa liaison : lié quand ramassé, quand équipé, quand utilisé, objet
+  de quête.
+- Migration `0018_item_specs_bonding` : colonne `bonding` de `item_specs`, tirée de la table
+  `ItemSparse` ; les lignes existantes sont reprises par l'import suivant, au démarrage.
+
+### Modifié
+
+- Page Inventaires plus proche du jeu : les filtres forment une fenêtre en rangées titrées
+  (Afficher, Équipement, Chercher dans) ; le sommaire et les titres des catégories portent une
+  icône du jeu.
+
 ## Site 0.22.0 — 2026-11-13
 
 ### Ajouté
