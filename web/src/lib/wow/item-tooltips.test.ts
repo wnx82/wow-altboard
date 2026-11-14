@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, test } from "node:test";
 import { eq } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { openTestDatabase, type TestDatabase } from "@/db/testing";
-import { equippedItemKey, fetchWowheadTooltip, getEnchantText, getItemTooltip, resetTooltipFailures, tooltipKey, tooltipUrl } from "./item-tooltips";
+import { equippedItemKey, fetchWowheadTooltip, getEnchantText, getItemTooltip, isKnownItem, resetTooltipFailures, tooltipKey, tooltipUrl } from "./item-tooltips";
 
 const NOW = new Date("2026-11-13T10:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -161,5 +161,21 @@ describe("bulles d'objets : cache en base", () => {
     const wowhead = fakeWowhead({});
     assert.deepEqual(await getItemTooltip(database.db, "p:42", { now: NOW, fetch: wowhead.fetchImpl }), { status: "unavailable" });
     assert.equal(wowhead.calls.length, 0);
+  });
+
+  test("route publique : un objet que le site ne connaît pas n'est pas demandé à Wowhead", async () => {
+    const wowhead = fakeWowhead({ [tooltipUrl(15210, null)]: ok(SWORD), [tooltipUrl(2589, null)]: ok(SWORD) });
+    assert.equal(await isKnownItem(database.db, 15210), false);
+    const unknown = await getItemTooltip(database.db, "15210", { now: NOW, fetch: wowhead.fetchImpl, knownOnly: true });
+    assert.equal(unknown.status, "missing");
+    assert.equal(wowhead.calls.length, 0);
+    assert.equal((await database.db.select().from(t.itemTooltips)).length, 0, "rien d'enregistré : l'objet pourra être relevé plus tard");
+
+    // Relevé par l'addon, ou présent dans la table des objets du jeu : demandé.
+    await database.db.insert(t.items).values({ itemKey: "15210", itemId: 15210, name: "Épée" });
+    await database.db.insert(t.itemNames).values({ itemId: 2589, name: "Étoffe de lin", source: "wago", build: "1.0" });
+    assert.equal((await getItemTooltip(database.db, "15210", { now: NOW, fetch: wowhead.fetchImpl, knownOnly: true })).status, "ok");
+    assert.equal((await getItemTooltip(database.db, "2589", { now: NOW, fetch: wowhead.fetchImpl, knownOnly: true })).status, "ok");
+    assert.equal(wowhead.calls.length, 2);
   });
 });

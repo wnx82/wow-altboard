@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { type Fetch, latestBuild, networkError, parseCsv, readLimited, wagoGet } from "@/lib/economy/item-names";
+import { invalidateEconomyCache } from "@/lib/economy/cache";
 import type { ItemName } from "@/lib/economy/load";
 import type { Parsed } from "@/lib/settings/input";
 
@@ -135,6 +136,8 @@ export async function importIconFiles(db: Database, options: { now: Date; fetch?
     await tx.delete(t.itemIcons).where(sql`${t.itemIcons.build} <> ${build.value}`);
     return gone.length;
   });
+  // Les icônes des pages de l'économie viennent du contexte gardé en mémoire.
+  invalidateEconomyCache();
   return { ok: true, build: build.value, count: manifest.value.length, items: itemTable.value.length, removed };
 }
 

@@ -267,26 +267,29 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
 À ce volume (une douzaine de personnages), rien n'est lent. Ces lignes comptent quand
 l'historique grossit.
 
-- [ ] **P2 · S** — `character_snapshots` n'a que l'index unique `(character_id, captured_at)`
+- [x] **P2 · S** — `character_snapshots` n'a que l'index unique `(character_id, captured_at)`
   (`web/src/db/schema.ts:406`). **Activité** et **Niveaux** filtrent sur `captured_at` tous
   personnages confondus (`web/src/lib/dashboard/queries.ts:267`, `:300`). Ajouter un index sur
-  `captured_at`, après un `EXPLAIN` sur la base réelle.
-- [ ] **P2 · S** — La fiche lit 200 relevés entiers, document `data` compris (`queries.ts:194`),
+  `captured_at`, après un `EXPLAIN` sur la base réelle. Fait le 2026-11-14 (site 0.27.0) : index `captured_at` (migration
+  `0020`), sans `EXPLAIN` concluant à 195 relevés.
+- [x] **P2 · S** — La fiche lit 200 relevés entiers, document `data` compris (`queries.ts:194`),
   pour en afficher 30 changements et deux courbes. Ne lire que les colonnes utiles et les trois
-  clés du document dont l'historique se sert (guilde, métiers, réputations).
-- [ ] **P2 · S** — État des serveurs : `latestChecks` et `lastAnswers` parcourent toute la table
+  clés du document dont l'historique se sert (guilde, métiers, réputations). Fait le 2026-11-14 (site 0.27.0).
+- [x] **P2 · S** — État des serveurs : `latestChecks` et `lastAnswers` parcourent toute la table
   par `DISTINCT ON` pour rendre deux lignes (`web/src/lib/status/store.ts:43`, `:51`), à chaque
   ouverture de l'accueil. Une lecture `ORDER BY checked_at DESC LIMIT 1` par service, servie par
-  l'index existant.
-- [ ] **P3 · S** — `listCharacters` attend sa première requête pour lancer les deux suivantes,
+  l'index existant. Fait le 2026-11-14 (site 0.27.0).
+- [x] **P3 · S** — `listCharacters` attend sa première requête pour lancer les deux suivantes,
   filtrées par une liste qui contient tous les personnages (`queries.ts:81`, `:92`) : les lancer
-  ensemble, sans filtre.
-- [ ] **P3 · S** — `sync_runs` est trié par `started_at` seul (`queries.ts:140`, `:403`), son index
+  ensemble, sans filtre. Fait le 2026-11-14 (site 0.27.0).
+- [x] **P3 · S** — `sync_runs` est trié par `started_at` seul (`queries.ts:140`, `:403`), son index
   commence par `machine_id` (`schema.ts:364`). Ni `sync_runs` ni `sync_errors` ne sont purgés :
-  ajouter l'index, puis une durée de conservation.
-- [ ] **P3 · M** — **Niveaux**, période « Tout » : tous les relevés sont lus puis réduits en
+  ajouter l'index, puis une durée de conservation. Fait le 2026-11-14 (site 0.27.0) : index `started_at`, purge
+  quotidienne à 180 jours (la dernière synchronisation de chaque PC reste), voir
+  `docs/DATABASE.md`.
+- [x] **P3 · M** — **Niveaux**, période « Tout » : tous les relevés sont lus puis réduits en
   JavaScript (`queries.ts:300`, `web/src/lib/dashboard/levels.ts:133`). Agréger en SQL (dernier
-  relevé par personnage et par jour).
+  relevé par personnage et par jour). Fait le 2026-11-14 (site 0.27.0).
 
 ### Tests
 

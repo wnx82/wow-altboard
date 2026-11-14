@@ -21,7 +21,8 @@ export async function GET(request: Request): Promise<Response> {
   if (!limiter.consume(`tooltip:${session.userId}`, LIMIT)) return Response.json({ error: "Trop de demandes." }, { status: 429, headers: NO_STORE });
   const key = new URL(request.url).searchParams.get("key") ?? "";
   if (!/^[\w:]{1,40}$/.test(key)) return Response.json({ error: "Clé d'objet illisible." }, { status: 400, headers: NO_STORE });
-  const tooltip = await getItemTooltip(getDatabase(), key, { now: new Date() });
+  // knownOnly : un identifiant inventé ne déclenche aucun appel à Wowhead.
+  const tooltip = await getItemTooltip(getDatabase(), key, { now: new Date(), knownOnly: true });
   if (tooltip.status === "unavailable") return Response.json({ status: "unavailable" }, { headers: NO_STORE });
   return Response.json({ status: tooltip.status, lines: tooltip.lines }, { headers: CACHED });
 }

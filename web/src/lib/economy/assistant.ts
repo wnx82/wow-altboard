@@ -20,8 +20,12 @@ export type AssistantConfig = {
   reasoningEffort: ReasoningEffort | null;
 };
 
-/** Un modèle local de 14 milliards de paramètres, chargé à froid, a mis 51 s à répondre (Ollama, 2026-11-06). */
-const TIMEOUT_MS = 120_000;
+/**
+ * Délai total d'une réponse, reprise comprise. Cloudflare coupe une requête au bout de 100 s : au-delà,
+ * la page recevait une erreur 524 au lieu du message de l'assistant. Un modèle local de 14 milliards
+ * de paramètres, chargé à froid, a mis 51 s à répondre (Ollama, 2026-11-06).
+ */
+export const TIMEOUT_MS = 90_000;
 
 /**
  * Valeurs de `reasoning_effort` (WOW_AI_REASONING_EFFORT). Essai réel, qwen3.5:9b sur Ollama

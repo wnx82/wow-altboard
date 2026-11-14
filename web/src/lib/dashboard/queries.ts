@@ -4,6 +4,7 @@ import * as t from "@/db/schema";
 import type { ActivitySnapshot } from "./activity";
 import type { LedgerDayRow } from "./finances";
 import type { MoneySnapshot } from "./gold-history";
+import type { SnapshotData } from "./history";
 import type { PlaytimeRow, SessionFact } from "./playtime";
 import type { ReputationRow } from "./reputations";
 import type { LevelRow } from "./levels";
@@ -46,37 +47,36 @@ export type CharacterListItem = {
 };
 
 export async function listCharacters(db: Database): Promise<CharacterListItem[]> {
-  const rows = await db
-    .select({
-      id: t.characters.id,
-      name: t.characters.name,
-      realm: t.realms.name,
-      class: t.characters.class,
-      race: t.characters.race,
-      faction: t.characters.faction,
-      level: t.characters.level,
-      xp: t.characters.xp,
-      xpMax: t.characters.xpMax,
-      guild: t.characters.guild,
-      zone: t.characters.zone,
-      moneyCopper: t.characters.moneyCopper,
-      itemLevel: t.characters.itemLevel,
-      hidden: t.characters.hidden,
-      accountId: t.wowAccounts.id,
-      accountDisplayName: t.wowAccounts.displayName,
-      accountFolderHint: t.wowAccounts.folderHint,
-      accountFeatured: t.wowAccounts.featured,
-      sourceLastSeenAt: t.characters.sourceLastSeenAt,
-      lastSyncAt: t.characters.lastSyncAt,
-    })
-    .from(t.characters)
-    .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
-    .innerJoin(t.realms, eq(t.realms.id, t.characters.realmId))
-    .orderBy(desc(t.characters.level), asc(t.characters.name));
-  if (rows.length === 0) return [];
-
-  const ids = rows.map((row) => row.id);
-  const [professions, machines, goals] = await Promise.all([
+  // Quatre lectures lancées ensemble : métiers, machines et objectifs de tous les personnages, sans
+  // attendre la liste pour les filtrer (elle les contient tous).
+  const [rows, professions, machines, goals] = await Promise.all([
+    db
+      .select({
+        id: t.characters.id,
+        name: t.characters.name,
+        realm: t.realms.name,
+        class: t.characters.class,
+        race: t.characters.race,
+        faction: t.characters.faction,
+        level: t.characters.level,
+        xp: t.characters.xp,
+        xpMax: t.characters.xpMax,
+        guild: t.characters.guild,
+        zone: t.characters.zone,
+        moneyCopper: t.characters.moneyCopper,
+        itemLevel: t.characters.itemLevel,
+        hidden: t.characters.hidden,
+        accountId: t.wowAccounts.id,
+        accountDisplayName: t.wowAccounts.displayName,
+        accountFolderHint: t.wowAccounts.folderHint,
+        accountFeatured: t.wowAccounts.featured,
+        sourceLastSeenAt: t.characters.sourceLastSeenAt,
+        lastSyncAt: t.characters.lastSyncAt,
+      })
+      .from(t.characters)
+      .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
+      .innerJoin(t.realms, eq(t.realms.id, t.characters.realmId))
+      .orderBy(desc(t.characters.level), asc(t.characters.name)),
     db
       .select({
         characterId: t.characterProfessions.characterId,
@@ -87,7 +87,6 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
         isPrimary: t.characterProfessions.isPrimary,
       })
       .from(t.characterProfessions)
-      .where(inArray(t.characterProfessions.characterId, ids))
       .orderBy(asc(t.characterProfessions.characterId), asc(t.characterProfessions.position)),
     db
       .select({
@@ -98,7 +97,6 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
       })
       .from(t.characterMachines)
       .innerJoin(t.machines, eq(t.machines.id, t.characterMachines.machineId))
-      .where(inArray(t.characterMachines.characterId, ids))
       .orderBy(asc(t.machines.id)),
     db
       .select({
@@ -107,9 +105,9 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
         done: sql<number>`count(${t.characterGoals.achievedAt})::int`,
       })
       .from(t.characterGoals)
-      .where(inArray(t.characterGoals.characterId, ids))
       .groupBy(t.characterGoals.characterId),
   ]);
+  if (rows.length === 0) return [];
 
   const professionsBy = Map.groupBy(professions, (profession) => profession.characterId);
   const machinesBy = Map.groupBy(machines, (machine) => machine.characterId);
@@ -232,8 +230,19 @@ export async function getCharacterDetail(db: Database, id: number) {
       .leftJoin(t.items, eq(t.items.itemKey, t.characterItems.itemKey))
       .where(eq(t.characterItems.characterId, id))
       .orderBy(desc(t.items.quality), asc(t.items.name)),
+    // Colonnes affichées et les trois clés du document que lit l'historique (guilde, métiers,
+    // réputations) : le reste du document (statistiques, équipement…) n'est pas transféré.
     db
-      .select()
+      .select({
+        id: t.characterSnapshots.id,
+        capturedAt: t.characterSnapshots.capturedAt,
+        level: t.characterSnapshots.level,
+        xp: t.characterSnapshots.xp,
+        xpMax: t.characterSnapshots.xpMax,
+        moneyCopper: t.characterSnapshots.moneyCopper,
+        itemLevel: t.characterSnapshots.itemLevel,
+        data: sql<SnapshotData>`jsonb_build_object('guild', ${t.characterSnapshots.data}->'guild', 'professions', ${t.characterSnapshots.data}->'professions', 'reputations', ${t.characterSnapshots.data}->'reputations')`,
+      })
       .from(t.characterSnapshots)
       .where(eq(t.characterSnapshots.characterId, id))
       .orderBy(desc(t.characterSnapshots.capturedAt))
@@ -348,6 +357,18 @@ export async function listRecentSnapshots(db: Database, since: Date): Promise<Ac
  * personnage, son dernier relevé d'avant : le point de départ de sa courbe. Par personnage, du plus
  * ancien au plus récent. Sans la colonne `data` des relevés, de loin la plus lourde.
  */
+/**
+ * Dernier relevé de chaque personnage pour chaque jour (heure de Bruxelles). Période « Tout » : la
+ * courbe garde un point par jour, et les niveaux gagnés s'additionnent d'un jour à l'autre ; le
+ * reste n'était lu que pour être écarté en JavaScript.
+ */
+const lastSnapshotOfDay = sql`${t.characterSnapshots.id} in (
+    select distinct on (daily.character_id, (daily.captured_at at time zone 'Europe/Brussels')::date) daily.id
+    from ${t.characterSnapshots} daily
+    where daily.level is not null
+    order by daily.character_id, (daily.captured_at at time zone 'Europe/Brussels')::date, daily.captured_at desc
+  )`;
+
 export async function listLevelSnapshots(db: Database, since: Date | null): Promise<LevelRow[]> {
   const rows = await db
     .select({
@@ -367,7 +388,7 @@ export async function listLevelSnapshots(db: Database, since: Date | null): Prom
     .where(
       and(
         isNotNull(t.characterSnapshots.level),
-        since === null ? undefined : or(gte(t.characterSnapshots.capturedAt, since), lastSnapshotBefore(since)),
+        since === null ? lastSnapshotOfDay : or(gte(t.characterSnapshots.capturedAt, since), lastSnapshotBefore(since)),
       ),
     )
     .orderBy(asc(t.characterSnapshots.characterId), asc(t.characterSnapshots.capturedAt));

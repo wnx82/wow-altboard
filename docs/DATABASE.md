@@ -245,11 +245,32 @@ rejeu d'une synchronisation sans effet.
 
 ## Index
 
-Seuls existent les index des contraintes, plus `characters(account_id)`, `characters(realm_id)`,
+Outre les index des contraintes : `characters(account_id)`, `characters(realm_id)`,
 `sync_runs(machine_id, started_at)`, `sessions(expires_at)` et
-`server_status_checks(service, checked_at)`. Les pages lisent leurs données en
-un nombre fixe de requêtes (3 pour la liste, vérifié par test avec 1, 5 et 50 personnages) ; aucun
-autre index ne se justifie à ce volume. À réévaluer avec `EXPLAIN` si l'historique grossit.
+`server_status_checks(service, checked_at)`. Depuis le site 0.27.0 (migration `0020`), les lectures
+d'une période tous personnages confondus (`character_snapshots(captured_at)`,
+`character_sessions(started_at)`, `sync_runs(started_at)`) et les clés étrangères que la purge
+remet à null ou supprime en cascade (`sync_run_id` de `character_snapshots`, `market_imports` et
+`sync_errors` ; `market_item_latest(import_id)`, `opportunity_runs(last_import_id)`,
+`economy_audits(run_id)`). Les pages lisent leurs données en un nombre fixe de requêtes (4 pour la
+liste, lancées ensemble, vérifié par test avec 1, 5 et 50 personnages). Au volume de novembre 2026
+(54 Mo), PostgreSQL peut encore préférer un parcours complet : ces index servent quand l'historique
+grossit.
+
+## Durée de conservation
+
+Une purge quotidienne (`web/src/lib/maintenance/retention.ts`, dix minutes après le démarrage puis
+chaque jour) ne touche que ce qui se refait ou ne sert qu'au diagnostic :
+
+| Table | Gardé |
+|---|---|
+| `sync_runs` (et `sync_errors`, en cascade) | 180 jours ; la dernière synchronisation de chaque PC et sa dernière réussie restent. Relevés et imports de prix gardent leur ligne, sans le lien |
+| `opportunity_runs` (et `opportunities`, en cascade) | les 30 derniers calculs de chaque marché, plus ceux qu'un audit du jour cite |
+| `server_status_checks` | 8 jours ([SERVER-STATUS](SERVER-STATUS.md)) |
+| `sessions` | jusqu'à leur expiration |
+
+L'historique des personnages (relevés, sessions, temps par niveau, finances) et celui des prix
+(`market_item_days`) ne sont jamais purgés : ils n'existent nulle part ailleurs.
 
 ## Migrations
 
@@ -290,6 +311,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0017_item_specs_all_items` | contrainte `item_specs_class_check` supprimée (tous les objets, plus seulement l'équipement) ; `build` des lignes existantes vidé pour que l'import suivant reprenne tout. Aucune ligne supprimée |
 | `0018_item_specs_bonding` | colonne `item_specs.bonding` (ajout seul) ; `build` des lignes existantes vidé pour que l'import suivant la remplisse. Aucune ligne supprimée |
 | `0019_item_tooltips` | `item_tooltips` (ajout seul) |
+| `0020_perf_indexes` | neuf index (ajouts seuls, voir **Index**) |
 
 ## Checkpoint B
 

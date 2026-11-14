@@ -1302,7 +1302,9 @@ body {
   }
   .category-chevron { flex: none; color: var(--faint); transition: transform 150ms ease; }
   .category-section:not([open]) .category-chevron { transform: rotate(-90deg); }
-  .category-section > .bag-grid { padding: 0.1rem 0.3rem 0.85rem; }
+  /* Hors de l'écran, la grille d'une catégorie n'est ni mise en page ni peinte : la vue par
+     catégorie montre tous les objets d'un coup, le sommaire doit pouvoir viser chacune. */
+  .category-section > .bag-grid { padding: 0.1rem 0.3rem 0.85rem; content-visibility: auto; contain-intrinsic-size: auto 12rem; }
 
   /* Filtres des Inventaires : fenêtre du jeu, une rangée étiquetée par question. */
   .filter-window {

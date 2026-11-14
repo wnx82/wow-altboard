@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { readSettings } from "@/lib/settings/store";
+import { cachedEconomy } from "./cache";
 import { DEFAULT_CRAFT_OPTIONS, evaluateRecipe, type CraftEvaluation, type Recipe } from "./craft";
 import { addDays, todayInBrussels } from "./days";
 import { farmSignal, type FarmSignal } from "./farm";
@@ -149,8 +150,35 @@ function statsWindow(settings: { marketHistoryFrom: Date | null; charactersCutof
   return { historyFrom, today, from: historyFrom && historyFrom > windowStart ? historyFrom : windowStart };
 }
 
-/** Contexte complet, ou null tant qu'aucun prix n'a été reçu. */
+/**
+ * Contexte complet, ou null tant qu'aucun prix n'a été reçu. Gardé en mémoire tant que sa base ne
+ * change pas (voir cache.ts) : une seule petite requête pour le vérifier. Le contexte rendu est
+ * partagé entre les affichages : ne pas le modifier.
+ */
 export async function loadEconomy(db: Database, options: { marketId?: number; now: Date }): Promise<EconomyContext | null> {
+  const [settings, version] = await Promise.all([
+    readSettings(db),
+    db.execute<{ run: string | null; import: string | null; characters: number }>(sql`
+      select (select max(id) from ${t.syncRuns})::text as run,
+             (select max(id) from ${t.marketImports})::text as import,
+             (select count(*) from ${t.characters})::int as characters
+    `),
+  ]);
+  const basis = version.rows[0];
+  const key = JSON.stringify([
+    options.marketId ?? null,
+    todayInBrussels(options.now),
+    basis.run,
+    basis.import,
+    basis.characters,
+    settings.marketHistoryFrom?.toISOString() ?? null,
+    settings.charactersCutoffAt?.toISOString() ?? null,
+    settings.auctionCutPercent,
+  ]);
+  return cachedEconomy(key, () => computeEconomy(db, options));
+}
+
+async function computeEconomy(db: Database, options: { marketId?: number; now: Date }): Promise<EconomyContext | null> {
   const markets = await listMarkets(db);
   const market = markets.find((m) => m.id === options.marketId) ?? markets.find((m) => m.lastDay !== null) ?? markets[0];
   if (!market) return null;

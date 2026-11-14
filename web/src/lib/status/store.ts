@@ -1,4 +1,4 @@
-import { desc, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import { serverStatusChecks } from "@/db/schema";
 import type { CheckRecord } from "./monitor";
@@ -39,21 +39,40 @@ export type CheckRow = {
   error: string | null;
 };
 
+/** Services surveillés, dans l'ordre d'affichage (contrainte server_status_checks_service_check). */
+const SERVICES = ["auth", "game"] as const;
+
+/**
+ * Dernière ligne de chaque service, une lecture par service servie par l'index (service,
+ * checked_at) : un DISTINCT ON parcourait toute la table pour rendre deux lignes, à chaque
+ * ouverture de l'accueil.
+ */
+async function lastPerService(db: Database, answeredOnly: boolean): Promise<CheckRow[]> {
+  const rows = await Promise.all(
+    SERVICES.map((service) =>
+      db
+        .select(CHECK_COLUMNS)
+        .from(serverStatusChecks)
+        .where(
+          answeredOnly
+            ? and(eq(serverStatusChecks.service, service), inArray(serverStatusChecks.status, ["up", "degraded"]))
+            : eq(serverStatusChecks.service, service),
+        )
+        .orderBy(desc(serverStatusChecks.checkedAt))
+        .limit(1),
+    ),
+  );
+  return rows.flat();
+}
+
 /** Dernier contrôle de chaque service. */
-export async function latestChecks(db: Database): Promise<CheckRow[]> {
-  return db
-    .selectDistinctOn([serverStatusChecks.service], CHECK_COLUMNS)
-    .from(serverStatusChecks)
-    .orderBy(serverStatusChecks.service, desc(serverStatusChecks.checkedAt));
+export function latestChecks(db: Database): Promise<CheckRow[]> {
+  return lastPerService(db, false);
 }
 
 /** Dernier contrôle de chaque service où il a répondu : la dernière mesure valide. */
-export async function lastAnswers(db: Database): Promise<CheckRow[]> {
-  return db
-    .selectDistinctOn([serverStatusChecks.service], CHECK_COLUMNS)
-    .from(serverStatusChecks)
-    .where(inArray(serverStatusChecks.status, ["up", "degraded"]))
-    .orderBy(serverStatusChecks.service, desc(serverStatusChecks.checkedAt));
+export function lastAnswers(db: Database): Promise<CheckRow[]> {
+  return lastPerService(db, true);
 }
 
 export type HourBucket = {

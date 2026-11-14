@@ -11,7 +11,10 @@ export const ANTHROPIC_MODEL = "claude-opus-5-5";
 
 /** Réflexion comprise : une réponse de quelques phrases reste loin de ce plafond. */
 const MAX_TOKENS = 16_000;
-/** Une reprise après une panne passagère (surcharge, coupure) ; le délai s'applique à chaque essai. */
+/**
+ * Une reprise après une panne passagère (surcharge, coupure), dans le même délai total : un essai
+ * qui a épuisé le délai n'est pas repris (Cloudflare couperait la page à 100 s).
+ */
 const MAX_RETRIES = 1;
 /**
  * Modèles qui acceptent le repli côté serveur : si leurs filtres déclinent la question, l'API la
@@ -25,15 +28,22 @@ export async function completeWithClaude(config: ClaudeConfig, system: string, u
   const fallback = FALLBACK_MODELS.has(config.model);
   let message: Anthropic.Beta.BetaMessage;
   try {
-    message = await client.beta.messages.create({
+    message = await client.beta.messages.create(
+      {
       model: config.model,
       max_tokens: MAX_TOKENS,
       system,
       messages: [{ role: "user", content: user }],
       output_config: { effort: "medium" },
       ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
-    });
+      },
+      // Délai total, reprise comprise ; le délai du client s'applique, lui, à chaque essai.
+      { signal: AbortSignal.timeout(config.timeoutMs) },
+    );
   } catch (error) {
+    if (error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
+      return { ok: false, error: `L'assistant n'a pas répondu en ${Math.round(config.timeoutMs / 1000)} s.` };
+    }
     if (error instanceof Anthropic.AuthenticationError) return { ok: false, error: "Clé d'API Anthropic refusée." };
     if (error instanceof Anthropic.PermissionDeniedError) return { ok: false, error: "Clé d'API Anthropic sans accès à ce modèle." };
     if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "Limite de l'API Anthropic atteinte. Réessayez dans quelques minutes." };

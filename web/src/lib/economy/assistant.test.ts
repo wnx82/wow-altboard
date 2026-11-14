@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { askAssistant, assistantConfig, probeAssistant, ungroundedNumbers, type AssistantConfig } from "./assistant";
+import { askAssistant, assistantConfig, probeAssistant, TIMEOUT_MS, ungroundedNumbers, type AssistantConfig } from "./assistant";
 import type { EconomyFacts } from "./facts";
 
 const FACTS = {
@@ -46,7 +46,7 @@ describe("assistant", () => {
       url: "http://10.0.0.5:11434/v1",
       model: "qwen",
       apiKey: null,
-      timeoutMs: 120_000,
+      timeoutMs: TIMEOUT_MS,
       reasoningEffort: null,
     });
   });
@@ -59,7 +59,7 @@ describe("assistant", () => {
       url: "https://api.anthropic.com",
       model: "claude-opus-5-5",
       apiKey: "sk-ant-test",
-      timeoutMs: 120_000,
+      timeoutMs: TIMEOUT_MS,
       reasoningEffort: null,
     });
     assert.equal(assistantConfig({ WOW_AI_PROVIDER: "anthropic", WOW_AI_API_KEY: "k", WOW_AI_MODEL: "claude-haiku-5-5" })?.model, "claude-haiku-5-5");
@@ -116,6 +116,21 @@ describe("assistant", () => {
 
     const empty = await askAssistant(CLAUDE, FACTS, "?", claudeServer([{ type: "thinking", thinking: "", signature: "sig" }]).fetchImpl);
     assert.deepEqual(empty, { ok: false, error: "Réponse de l'assistant illisible." });
+  });
+
+  test("Claude : délai total, reprise comprise ; un essai qui l'a épuisé n'est pas repris", async () => {
+    let calls = 0;
+    // Serveur muet : la requête ne finit qu'à son abandon.
+    const silent = ((_input: string | URL | Request, init?: RequestInit) => {
+      calls++;
+      return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+    }) as typeof fetch;
+    const started = Date.now();
+    const answer = await askAssistant(CLAUDE, FACTS, "?", silent);
+    assert.deepEqual(answer, { ok: false, error: "L'assistant n'a pas répondu en 1 s." });
+    assert.equal(calls, 1);
+    assert.ok(Date.now() - started < 2_500, "pas de second essai après le délai");
+    assert.ok(TIMEOUT_MS < 100_000, "sous la coupure de Cloudflare");
   });
 
   test("les nombres des faits sont reconnus sous toutes leurs écritures", () => {

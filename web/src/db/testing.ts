@@ -1,6 +1,7 @@
 import { getTableName, is, sql } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import type { Pool } from "pg";
+import { invalidateEconomyCache } from "../lib/economy/cache";
 import { createDatabase, createPool, type Database } from "./client";
 import { testDatabaseUrl } from "./env";
 import { runMigrations } from "./migrate";
@@ -26,6 +27,8 @@ export async function openTestDatabase(): Promise<TestDatabase> {
     pool,
     reset: async () => {
       await db.execute(sql.raw(`truncate table ${TABLES.join(", ")} restart identity cascade`));
+      // Identifiants remis à zéro : une clé du cache de l'économie pourrait reparaître à l'identique.
+      invalidateEconomyCache();
     },
     close: () => pool.end(),
   };

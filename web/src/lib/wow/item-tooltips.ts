@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
@@ -117,15 +117,31 @@ const isFresh = (row: { status: string; fetchedAt: Date }, now: Date) =>
   now.getTime() - row.fetchedAt.getTime() < (row.status === "ok" ? FRESH_MS : MISSING_RETRY_MS);
 
 /**
+ * Objet que le site connaît : relevé par l'addon, présent dans la table des objets du jeu
+ * (wago.tools) ou dans ses caractéristiques. Un identifiant inventé n'y est pas.
+ */
+export async function isKnownItem(db: Database, itemId: number): Promise<boolean> {
+  const result = await db.execute<{ known: boolean }>(sql`
+    select exists (select 1 from ${t.items} where ${t.items.itemId} = ${itemId})
+        or exists (select 1 from ${t.itemNames} where ${t.itemNames.itemId} = ${itemId})
+        or exists (select 1 from ${t.itemSpecs} where ${t.itemSpecs.itemId} = ${itemId}) as known
+  `);
+  return result.rows[0]?.known === true;
+}
+
+/**
  * Bulle d'un objet : celle gardée en base tant qu'elle est récente, sinon relue chez Wowhead puis
  * enregistrée. Wowhead injoignable : la bulle gardée, même ancienne, sinon « unavailable ».
+ * knownOnly : un objet que le site ne connaît pas n'est pas demandé à Wowhead (« missing », rien
+ * d'enregistré) ; la route publique s'en sert, pour qu'un identifiant inventé ne coûte aucun appel.
  */
-export async function getItemTooltip(db: Database, itemKey: string, options: { now: Date; fetch?: Fetch }): Promise<ItemTooltip> {
+export async function getItemTooltip(db: Database, itemKey: string, options: { now: Date; fetch?: Fetch; knownOnly?: boolean }): Promise<ItemTooltip> {
   const target = tooltipKey(itemKey);
   if (!target) return { status: "unavailable" };
   const [stored] = await db.select().from(t.itemTooltips).where(eq(t.itemTooltips.itemKey, target.key));
   const kept: ItemTooltip | null = stored ? { status: stored.status === "ok" ? "ok" : "missing", lines: stored.lines, fetchedAt: stored.fetchedAt } : null;
   if (stored && kept && isFresh(stored, options.now)) return kept;
+  if (!kept && options.knownOnly && !(await isKnownItem(db, target.itemId))) return { status: "missing", lines: [], fetchedAt: options.now };
 
   const pending = inflight.get(target.key);
   if (pending) return pending;

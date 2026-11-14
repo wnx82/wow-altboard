@@ -141,6 +141,13 @@
       "when": 1794554166292,
       "tag": "0019_item_tooltips",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794651837862,
+      "tag": "0020_perf_indexes",
+      "breakpoints": true
     }
   ]
 }

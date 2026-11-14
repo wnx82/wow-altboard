@@ -290,6 +290,10 @@ describe("lecture du tableau de bord", () => {
     );
 
     assert.deepEqual((await listLevelSnapshots(database.db, null)).map((row) => row.level), [10, 15, 20, 5]);
+
+    // Période « Tout » : le dernier relevé de chaque jour (heure de Bruxelles) seulement.
+    await database.db.insert(t.characterSnapshots).values([at(first.id, "2026-09-20T15:00:00Z", 21, 100), at(first.id, "2026-09-20T22:30:00Z", 22, 50)]);
+    assert.deepEqual((await listLevelSnapshots(database.db, null)).map((row) => row.level), [10, 15, 21, 22, 5]);
   });
 
   test("les finances lisent les journées de la période, avec le personnage et son compte, en une requête", async () => {

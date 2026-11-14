@@ -486,6 +486,8 @@ export const characterSessions = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.characterId, t.startedAt] }),
+    // Activité et Temps de jeu lisent une période, tous personnages confondus.
+    index("character_sessions_started_idx").on(t.startedAt),
     check("character_sessions_values_check", sql`${t.durationSeconds} >= 0 and ${t.xpGained} >= 0 and ${t.levels} >= 0`),
   ],
 );
@@ -550,21 +552,27 @@ export const syncRuns = pgTable(
   },
   (t) => [
     index("sync_runs_machine_started_idx").on(t.machineId, t.startedAt),
+    // Journal de toutes les machines (Machines, accueil) et purge par ancienneté.
+    index("sync_runs_started_idx").on(t.startedAt),
     check("sync_runs_status_check", sql`${t.status} in ('success', 'partial', 'failed')`),
   ],
 );
 
-export const syncErrors = pgTable("sync_errors", {
-  id: id(),
-  syncRunId: bigint("sync_run_id", { mode: "number" })
-    .notNull()
-    .references(() => syncRuns.id, { onDelete: "cascade" }),
-  accountKey: text("account_key"),
-  characterGuid: text("character_guid"),
-  code: text("code").notNull(),
-  message: text("message").notNull(),
-  createdAt: createdAt(),
-});
+export const syncErrors = pgTable(
+  "sync_errors",
+  {
+    id: id(),
+    syncRunId: bigint("sync_run_id", { mode: "number" })
+      .notNull()
+      .references(() => syncRuns.id, { onDelete: "cascade" }),
+    accountKey: text("account_key"),
+    characterGuid: text("character_guid"),
+    code: text("code").notNull(),
+    message: text("message").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sync_errors_sync_run_idx").on(t.syncRunId)],
+);
 
 // ---------------------------------------------------------------------------
 // Historique
@@ -591,7 +599,13 @@ export const characterSnapshots = pgTable(
     restedXp: integer("rested_xp"),
     data: jsonb("data").notNull(),
   },
-  (t) => [unique("character_snapshots_character_captured_key").on(t.characterId, t.capturedAt)],
+  (t) => [
+    unique("character_snapshots_character_captured_key").on(t.characterId, t.capturedAt),
+    // Activité et Niveaux lisent une période, tous personnages confondus.
+    index("character_snapshots_captured_idx").on(t.capturedAt),
+    // Clé étrangère : la purge du journal des synchronisations la remet à null.
+    index("character_snapshots_sync_run_idx").on(t.syncRunId),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -641,6 +655,7 @@ export const marketImports = pgTable(
   (t) => [
     unique("market_imports_market_account_content_key").on(t.marketId, t.accountId, t.contentHash),
     index("market_imports_market_received_idx").on(t.marketId, t.receivedAt),
+    index("market_imports_sync_run_idx").on(t.syncRunId),
   ],
 );
 
@@ -678,7 +693,11 @@ export const marketItemLatest = pgTable(
     observedAt: ts("observed_at").notNull(),
     importId: bigint("import_id", { mode: "number" }).references(() => marketImports.id, { onDelete: "set null" }),
   },
-  (t) => [primaryKey({ columns: [t.marketId, t.itemKey] }), check("market_item_latest_min_check", sql`${t.minCopper} > 0`)],
+  (t) => [
+    primaryKey({ columns: [t.marketId, t.itemKey] }),
+    index("market_item_latest_import_idx").on(t.importId),
+    check("market_item_latest_min_check", sql`${t.minCopper} > 0`),
+  ],
 );
 
 // Prix d'achat chez un marchand (stock illimité), à l'unité : prix de la pile divisé par sa taille,
@@ -813,7 +832,7 @@ export const opportunityRuns = pgTable(
     parameters: jsonb("parameters").notNull(),
     opportunitiesCount: integer("opportunities_count").notNull(),
   },
-  (t) => [index("opportunity_runs_market_computed_idx").on(t.marketId, t.computedAt)],
+  (t) => [index("opportunity_runs_market_computed_idx").on(t.marketId, t.computedAt), index("opportunity_runs_last_import_idx").on(t.lastImportId)],
 );
 
 export const opportunities = pgTable(
@@ -854,7 +873,7 @@ export const economyAudits = pgTable(
     text: text("text").notNull(),
     writtenAt: ts("written_at").notNull(),
   },
-  (t) => [unique("economy_audits_market_day_key").on(t.marketId, t.day)],
+  (t) => [unique("economy_audits_market_day_key").on(t.marketId, t.day), index("economy_audits_run_idx").on(t.runId)],
 );
 
 // Alerte de prix posée sur un objet d'un marché (web/src/lib/economy/alerts.ts) : déclenchée quand

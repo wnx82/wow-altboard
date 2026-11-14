@@ -11,6 +11,9 @@ import { sessionCookieName } from "@/lib/auth/cookie";
 // session du site (mise à jour du service worker, par exemple). Fichiers fixes, sans donnée.
 const PUBLIC_PATHS = new Set(["/login", "/robots.txt", "/app.webmanifest", "/sw.js"]);
 
+/** Empreinte SHA-256 de « display:none », l'attribut des morceaux SVG différés de React. */
+export const REACT_HIDDEN_SEGMENT_STYLE = "sha256-aqNNdDLnnrDOnTNdkJpYlAxKVJtLt9CtFLklmInuUAE=";
+
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
@@ -29,6 +32,10 @@ export function proxy(request: NextRequest) {
     // En développement, le rechargement à chaud injecte des styles non signés ; un nonce présent
     // ferait ignorer 'unsafe-inline' par le navigateur, d'où deux formes distinctes.
     development ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
+    // Seul attribut style admis, et seulement celui-là : React masque ainsi les morceaux d'une grande
+    // page envoyés en différé dans un contexte SVG (<svg aria-hidden="true" style="display:none">).
+    // Refusé, il laissait trois violations dans la console de Marché.
+    ...(development ? [] : [`style-src-attr 'unsafe-hashes' '${REACT_HIDDEN_SEGMENT_STYLE}'`]),
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",

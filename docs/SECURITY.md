@@ -37,7 +37,7 @@ de l'agent.
 | Taille | corps limité à 8 Mio, que `Content-Length` soit présent, absent ou faux |
 | Validation | schéma Zod strict : champs inconnus, types, bornes, longueurs, octet nul |
 | Version | `schemaVersion` inconnu refusé |
-| Réponses et journaux | jamais de valeur reçue, jamais de jeton, jamais de détail technique. Une erreur n'est journalisée (journal, `sync_errors`) que par son type et son code PostgreSQL ou réseau (`web/src/lib/errors.ts`) : le message d'une requête Drizzle porte le SQL et ses paramètres, celui de PostgreSQL peut citer une valeur reçue |
+| Réponses et journaux | jamais de valeur reçue, jamais de jeton, jamais de détail technique. Une erreur n'est journalisée (journal, `sync_errors`) que par son type et son code PostgreSQL ou réseau (`web/src/lib/errors.ts`) : le message d'une requête Drizzle porte le SQL et ses paramètres, celui de PostgreSQL peut citer une valeur reçue. Une erreur non attrapée, que Next écrit lui-même, passe par un filtre qui masque les paramètres d'une requête Drizzle dans son message, sa pile et `params` (`web/src/lib/log-redaction.ts`, site 0.27.0) |
 | Horloge | un horodatage de personnage plus d'une heure après l'heure du serveur fait refuser le document (`future_timestamp`) : sinon tous les envois suivants de ce personnage seraient ignorés comme plus anciens, jusqu'à cette date |
 
 Les données d'un fichier `AltBoard.lua` sont traitées comme **non fiables** de bout en bout : le
@@ -68,12 +68,16 @@ hors limites, le serveur revalide tout.
 
 ```text
 default-src 'self'; script-src 'self' 'nonce-…' 'strict-dynamic'; style-src 'self' 'nonce-…';
-img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self';
+style-src-attr 'unsafe-hashes' 'sha256-aqNNdDLnnrDOnTNdkJpYlAxKVJtLt9CtFLklmInuUAE='; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self';
 object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
 Les pages n'utilisent aucun style en ligne : couleurs de classe et de qualité passent par des
 attributs `data-*`, les jauges par l'élément `<progress>`, les graphiques par des attributs SVG.
+Seul attribut `style` admis, par son empreinte : `display:none`, que React pose sur les morceaux
+d'une grande page envoyés en différé dans un contexte SVG (`<svg aria-hidden="true"
+style="display:none">`, vu sur **Marché**, site 0.27.0). Aucun autre attribut ni bloc de style n'est
+admis.
 
 Icônes de classe et de métier : elles viennent du CDN de Blizzard (`render.worldofwarcraft.com`),
 mais c'est **le serveur** qui les récupère, par l'optimiseur d'images de Next.js (`/_next/image`).

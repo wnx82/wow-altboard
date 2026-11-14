@@ -170,7 +170,7 @@ describe("historique des contrôles", () => {
 });
 
 describe("vue de la page", () => {
-  test("statut présent, dernière mesure valide, disponibilité et changements, en quatre requêtes", async () => {
+  test("statut présent, dernière mesure valide, disponibilité et changements, en six requêtes", async () => {
     await recordChecks(database.db, [
       check("auth", "11:57:00", "up", 28),
       check("auth", "11:58:00", "up", 31),
@@ -188,7 +188,8 @@ describe("vue de la page", () => {
     const view = await getServerStatusView(database.db, CONFIG, new Date("2026-10-08T11:59:30Z"));
     (database.pool as { query: unknown }).query = original;
 
-    assert.equal(queries, 4);
+    // Dernier contrôle et dernière réponse : une lecture indexée par service (deux services).
+    assert.equal(queries, 6);
     assert.equal(view.configured, true);
     assert.equal(view.hasHistory, true);
     assert.deepEqual(
@@ -258,7 +259,7 @@ describe("vue de la page", () => {
     assert.equal(view.services[1].status, "up");
   });
 
-  test("miniatures de l'accueil : état présent et 24 dernières heures, en trois requêtes", async () => {
+  test("miniatures de l'accueil : état présent et 24 dernières heures, en cinq requêtes", async () => {
     await recordChecks(database.db, [
       // Hors de la fenêtre de 24 heures : ni compté ni affiché.
       { ...check("game", "00:00:00", "down"), checkedAt: new Date("2026-10-07T10:00:00Z") },
@@ -279,7 +280,7 @@ describe("vue de la page", () => {
     const summaries = await getServiceSummaries(database.db, CONFIG, new Date("2026-10-08T11:59:30Z"));
     (database.pool as { query: unknown }).query = original;
 
-    assert.equal(queries, 3);
+    assert.equal(queries, 5);
     assert.deepEqual(
       summaries.map((summary) => [summary.service, summary.status, summary.latencyMs, summary.hours.length, summary.hours.at(-1)!.status]),
       [

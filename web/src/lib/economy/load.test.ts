@@ -125,6 +125,24 @@ describe("chargement du moteur", () => {
     assert.equal(await countRows(database.db, t.opportunityRuns), 2);
   });
 
+  test("contexte gardé en mémoire tant que sa base ne change pas : synchronisation, réglages, jour", async () => {
+    const first = await loadEconomy(database.db, { now: NOW });
+    assert.equal(await loadEconomy(database.db, { now: new Date(NOW.getTime() + 60_000) }), first, "même jour, même base : même contexte");
+
+    await processSync(database.db, structuredClone(BASE), { tokenId, requestId: "again", now: new Date(NOW.getTime() + 60_000) });
+    const afterSync = await loadEconomy(database.db, { now: NOW });
+    assert.notEqual(afterSync, first);
+
+    await writeSettings(database.db, { auctionCutPercent: 10 }, NOW);
+    const afterSettings = (await loadEconomy(database.db, { now: NOW }))!;
+    assert.notEqual(afterSettings, afterSync);
+    assert.equal(afterSettings.auctionCut, 0.1);
+
+    const nextDay = (await loadEconomy(database.db, { now: new Date(NOW.getTime() + 24 * 60 * 60_000) }))!;
+    assert.notEqual(nextDay, afterSettings);
+    assert.equal(nextDay.today, "2026-11-07");
+  });
+
   test("un fichier plus ancien reçu après coup ne passe pas pour le dernier relevé, mais change la base du calcul", async () => {
     const first = (await loadEconomy(database.db, { now: NOW }))!;
     const run = await ensureOpportunityRun(database.db, first, NOW);

@@ -3,6 +3,7 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import type { Parsed } from "@/lib/settings/input";
 import { attachItemIcons } from "@/lib/wow/icon-files";
+import { invalidateEconomyCache } from "./cache";
 import type { ItemName } from "./load";
 
 // Noms des objets qu'aucun personnage n'a possédés. L'addon ne nomme que les objets vus dans les
@@ -182,6 +183,8 @@ export async function importItemNames(db: Database, options: { now: Date; fetch?
       .returning({ itemId: t.itemNames.itemId });
     return gone.length;
   });
+  // Les pages de l'économie nomment les objets : leur contexte gardé en mémoire est périmé.
+  invalidateEconomyCache();
   return { ok: true, build: build.value, count: parsed.value.length, removed };
 }
 

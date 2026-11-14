@@ -4,6 +4,44 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.27.0 — 2026-11-14
+
+Performance et durée de conservation (lot C de l'audit du 2026-11-13). Rien n'était lent au
+volume actuel (base de 54 Mo) : ces changements comptent quand l'historique grossit.
+
+### Ajouté
+
+- Purge quotidienne : journal des synchronisations gardé 180 jours (la dernière de chaque PC
+  reste), 30 calculs d'opportunités par marché (plus ceux d'un audit du jour). L'historique des
+  personnages et des prix n'est jamais purgé. Détail dans `docs/DATABASE.md`.
+- Neuf index (migration `0020`) : lectures par période de **Activité**, **Niveaux**, **Temps de
+  jeu** et du journal des synchronisations, clés étrangères touchées par la purge.
+
+### Modifié
+
+- **Opportunités**, **Marché**, **Craft**, **Farm**, **Audit** et la fiche d'un objet gardent le
+  calcul du moteur en mémoire tant que sa base ne change pas (synchronisation, import de prix,
+  réglages, jour, noms des objets) : une petite requête au lieu de douze et du recalcul complet.
+- **Inventaires** : un survol ne redessine plus que la grille de la case survolée ; la vue par
+  catégorie ne met en page que les catégories visibles à l'écran.
+- La fiche d'un personnage ne lit plus le document complet de ses 200 derniers relevés, seulement
+  ce que l'historique affiche.
+- État des serveurs : une lecture indexée par service au lieu d'un parcours de toute la table.
+- Accueil : les quatre lectures de la liste partent ensemble.
+- **Niveaux**, période « Tout » : un relevé par personnage et par jour, choisi en SQL.
+
+### Corrigé
+
+- Assistant : réponse attendue 90 s au plus, reprise comprise (120 s par essai, deux essais
+  avant) ; Cloudflare coupait la page à 100 s, avec une erreur 524 au lieu du message.
+- Bulles d'objets : un identifiant que le site ne connaît pas (ni relevé, ni dans la table des
+  objets du jeu) ne déclenche plus d'appel à Wowhead.
+- Journal du serveur : une erreur de base non attrapée n'y écrit plus les paramètres de sa
+  requête (adresse e-mail, empreinte de jeton, texte saisi).
+- **Marché** : trois violations de la CSP dans la console. React masque les morceaux différés
+  d'une grande page par `style="display:none"` ; cet attribut, et lui seul, est admis par son
+  empreinte (`style-src-attr`).
+
 ## Site 0.26.0 — 2026-11-14
 
 ### Ajouté

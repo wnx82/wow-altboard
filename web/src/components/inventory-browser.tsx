@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { InventoryCharacter, InventoryData, InventoryGuild } from "@/lib/dashboard/inventory";
 import {
   categoryOf,
@@ -154,6 +154,17 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
   );
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   const worth = useMemo(() => holdingsValue(holdings, data.prices, now), [holdings, data.prices, now]);
+  // Valeur de chaque catégorie et de chaque groupe, calculée une fois par filtre, pas à chaque survol.
+  const groupWorths = useMemo(
+    () =>
+      groups.map((group) => ({
+        group: holdingsValue(group.sections.flatMap((section) => section.rows.flatMap((row) => row.holdings)), data.prices, now),
+        sections: group.sections.map((section) => holdingsValue(section.rows.flatMap((row) => row.holdings), data.prices, now)),
+      })),
+    [groups, data.prices, now],
+  );
+  // Même tableau d'un rendu à l'autre : la grille mémoïsée ne se redessine pas au survol.
+  const visibleRows = useMemo(() => rows.slice(0, limit), [rows, limit]);
 
   if (data.characters.length === 0) {
     return (
@@ -190,23 +201,10 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
     [state.gearType, state.gearSlot, state.minLevel + state.maxLevel, state.wearer].filter((value) => value !== "").length;
   const tipRow = tip ? rowsByKey.get(tip.itemKey) : undefined;
   const slot: SlotContext = { items: data.items, prices: data.prices, tip, events: slotEvents };
-  const itemGrid = (list: ItemRow[]) => (
-    <ul className="bag-grid" data-size="lg">
-      {list.map((row) => (
-        <li key={row.itemKey}>
-          <ItemSlot
-            info={data.items[row.itemKey]}
-            itemKey={row.itemKey}
-            slotId={`all:${row.itemKey}`}
-            quantity={row.total}
-            flag={rowFlag(row.holdings, now)}
-            tip={tip}
-            events={slotEvents}
-          />
-        </li>
-      ))}
-    </ul>
-  );
+  // Seule la grille qui contient la case survolée reçoit la bulle : les autres, mémoïsées, ne se
+  // redessinent pas à chaque survol.
+  const tipIn = (list: readonly ItemRow[]) => (tip && tip.slotId === `all:${tip.itemKey}` && list.some((row) => row.itemKey === tip.itemKey) ? tip : null);
+  const itemGrid = (list: ItemRow[]) => <ItemGrid rows={list} items={data.items} now={now} tip={tipIn(list)} events={slotEvents} />;
   const viewNav = (
     <nav className="segmented" aria-label="Présentation">
       {(["items", "characters"] as const).map((view) => (
@@ -546,9 +544,9 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
             }}
           >
             {sections.length > 1 && <SectionNav label="Catégories" items={sectionLinks} />}
-            {groups.map((group) => {
+            {groups.map((group, groupIndex) => {
               const groupRows = group.sections.flatMap((section) => section.rows);
-              const groupWorth = holdingsValue(groupRows.flatMap((row) => row.holdings), data.prices, now);
+              const groupWorth = groupWorths[groupIndex].group;
               return (
                 <section key={group.group} className="bag-window category-window" aria-label={group.group}>
                   <header className="category-window-head">
@@ -563,8 +561,8 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
                       )}
                     </p>
                   </header>
-                  {group.sections.map((section) => {
-                    const worth = holdingsValue(section.rows.flatMap((row) => row.holdings), data.prices, now);
+                  {group.sections.map((section, sectionIndex) => {
+                    const worth = groupWorths[groupIndex].sections[sectionIndex];
                     return (
                       <details key={section.category} className="category-section" open>
                         <summary id={`categorie-${section.category}`} className="category-summary">
@@ -593,7 +591,7 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
       ) : state.view === "items" ? (
         rows.length > 0 && (
           <section className="bag-window p-3 sm:p-4" aria-label="Objets">
-            {itemGrid(rows.slice(0, limit))}
+            {itemGrid(visibleRows)}
             {rows.length > limit && (
               <div className="mt-4 text-center">
                 <button type="button" className="button" onClick={() => setLimit((current) => current + PAGE_SIZE)}>
@@ -624,6 +622,34 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
     </div>
   );
 }
+
+/**
+ * Grille des objets regroupés. Mémoïsée : un survol ne redessine que la grille qui contient la case
+ * survolée (tip vaut null pour toutes les autres).
+ */
+const ItemGrid = memo(function ItemGrid({
+  rows,
+  items,
+  now,
+  tip,
+  events,
+}: {
+  rows: readonly ItemRow[];
+  items: InventoryData["items"];
+  now: Date;
+  tip: Tip | null;
+  events: SlotEvents;
+}) {
+  return (
+    <ul className="bag-grid" data-size="lg">
+      {rows.map((row) => (
+        <li key={row.itemKey}>
+          <ItemSlot info={items[row.itemKey]} itemKey={row.itemKey} slotId={`all:${row.itemKey}`} quantity={row.total} flag={rowFlag(row.holdings, now)} tip={tip} events={events} />
+        </li>
+      ))}
+    </ul>
+  );
+});
 
 /** Bulle d'objet : nom à la couleur de la qualité, total et valeur, puis chaque détenteur. */
 function ItemTooltip({
