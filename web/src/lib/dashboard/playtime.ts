@@ -7,6 +7,7 @@ import { brusselsDay } from "./gold-history";
 export const PLAYTIME_WEEKS = 12;
 
 export type PlaytimeRow = { characterId: number; accountId: number; accountLabel: string; totalSeconds: number | null };
+export type CharacterPlaytimeRow = PlaytimeRow & { name: string; class: string | null; level: number | null };
 export type SessionFact = { characterId: number; startedAt: Date; durationSeconds: number | null; xpGained: number | null; levels: number | null; tag: string | null };
 
 export type AccountPlaytime = { accountId: number; label: string; seconds: number; characters: number; unmeasured: number };
@@ -41,6 +42,30 @@ export function playtimeByAccount(rows: PlaytimeRow[]): AccountPlaytime[] {
     else account.seconds += row.totalSeconds;
   }
   return [...accounts.values()].sort((a, b) => b.seconds - a.seconds);
+}
+
+export type CharacterPlaytime = CharacterPlaytimeRow & { recentSeconds: number; sessions: number; lastSessionAt: Date | null };
+
+/**
+ * Temps de chaque personnage : dernier /played connu, et temps des sessions reçues (celles de la
+ * période lue). Du plus gros /played au plus petit ; un personnage jamais mesuré passe après,
+ * rangé par temps récent.
+ */
+export function playtimeByCharacter(rows: CharacterPlaytimeRow[], sessions: SessionFact[]): CharacterPlaytime[] {
+  const recent = new Map<number, { seconds: number; sessions: number; last: Date | null }>();
+  for (const session of sessions) {
+    const entry = recent.get(session.characterId) ?? { seconds: 0, sessions: 0, last: null };
+    entry.seconds += session.durationSeconds ?? 0;
+    entry.sessions += 1;
+    if (entry.last === null || session.startedAt > entry.last) entry.last = session.startedAt;
+    recent.set(session.characterId, entry);
+  }
+  return rows
+    .map((row) => {
+      const entry = recent.get(row.characterId);
+      return { ...row, recentSeconds: entry?.seconds ?? 0, sessions: entry?.sessions ?? 0, lastSessionAt: entry?.last ?? null };
+    })
+    .sort((a, b) => (b.totalSeconds ?? -1) - (a.totalSeconds ?? -1) || b.recentSeconds - a.recentSeconds || a.name.localeCompare(b.name, "fr"));
 }
 
 /**

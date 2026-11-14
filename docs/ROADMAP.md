@@ -4,7 +4,7 @@ Statuts : ⬜ À faire · 🟡 En cours · ✅ Validé · 🔴 Bloqué
 
 Une étape n'est ✅ que si elle est implémentée, testée et vérifiée sur un résultat réel.
 
-Dernière mise à jour : 2026-11-08.
+Dernière mise à jour : 2026-11-14.
 
 ## Synthèse
 
@@ -214,7 +214,7 @@ Depuis l'agent 0.4.0 : saisie du jeton dans la fenêtre, sans ligne de commande.
 Roadmap dédiée, phases P0 à P15 de l'économie : statuts détaillés dans
 `Roadmaps/AltBoard-WoW-Economy-Roadmaps/ROADMAP-PRINCIPALE.md`, non versionné. Règles du moteur :
 [ECONOMY-ENGINE](ECONOMY-ENGINE.md).
-Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée**.
+Branche `feat/economy` (site 0.3.0, agent 0.5.0) fusionnée et déployée le 2026-11-06.
 
 | Étape | Statut | Note |
 |---|---|---|
@@ -233,7 +233,7 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 
 | Quoi | Qui |
 |---|---|
-| Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer la dernière version de l'agent (0.5.1 depuis le 2026-11-08), téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
+| Sortie officielle, sur chaque PC : copier les addons AltBoard et Allemano Ledger dans `_forever_\Interface\AddOns`, puis installer la dernière version de l'agent (0.8.1 depuis le 2026-11-14), téléchargeable depuis la page **Machines**, qui lit la racine `World of Warcraft` (avec l'agent 0.4.0 : `config set wowPath`, voir [AGENT § Découverte](AGENT.md#découverte)). Fait sur `MSI` le 2026-10-29 ; restent `LAPTOP-WNX` et `LAPTOP-LENOVO` | joueur |
 | Créer son compte d'accès (voir [DEPLOYMENT § Comptes et jetons](DEPLOYMENT.md)) | joueur |
 | Recette après une vraie modification en jeu | joueur |
 | Agent sur les autres PC : copier `AltBoardSync.exe`, créer un jeton par PC | joueur |
@@ -245,9 +245,9 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0), **ni fusionnée ni déployée*
 | Version | Contenu |
 |---|---|
 | V2 | ✅ agent 0.2.0 : `watch`, démarrage à l'ouverture de session, icône de zone de notification ; agent 0.3.0 : fenêtre et journal des modifications ; agent 0.4.0 : jeton saisi dans la fenêtre ; agent 0.4.1 : racine `World of Warcraft` par défaut, pour la sortie officielle |
-| V3 | ✅ comparaison des métiers (page **Métiers**), activité des 30 derniers jours (page **Activité**) et évolution des niveaux de tous les personnages (page **Niveaux**) ; reste l'historique détaillé |
-| V4 | n8n, notifications, rapports |
-| V5 | installation et mise à jour automatiques de l'agent |
+| V3 | ✅ comparaison des métiers (page **Métiers**), activité des 30 derniers jours (page **Activité**) et évolution des niveaux de tous les personnages (page **Niveaux**) ; site 0.28.0 : personnages comparés côte à côte (page **Comparer**), patrimoine par personnage et par compte (page **Patrimoine**), filtres de **Réputations**, **Métiers** et **Activité** ; reste l'historique détaillé |
+| V4 | 🟡 site 0.28.0 : webhook sortant vers n8n sur quatre événements et rapport hebdomadaire ([NOTIFICATIONS](NOTIFICATIONS.md)), testé sur la base de test ; pas encore essayé avec le n8n réel |
+| V5 | 🟡 agent 0.8.1 : l'agent annonce la version servie par le site, le nouvel exécutable lancé à la main remplace l'ancien ; restent le téléchargement et la vérification automatiques |
 
 ## Écarts par rapport au cahier des charges
 

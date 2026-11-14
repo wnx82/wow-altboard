@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, test } from "node:test";
+import { eq } from "drizzle-orm";
 import ExcelJS from "exceljs";
+import * as t from "@/db/schema";
 import { openTestDatabase, type TestDatabase } from "@/db/testing";
 import { createAgentToken } from "@/lib/agent-tokens";
 import { processSync } from "@/lib/sync/process";
@@ -43,12 +45,17 @@ beforeEach(async () => {
 test("le classeur contient une feuille par thème et les valeurs de la base", async () => {
   const { id } = await createAgentToken(database.db, "PC de test");
   await processSync(database.db, BASE, { tokenId: id, requestId: "test", now: NOW });
+  const [mageRow] = await database.db.select({ id: t.characters.id }).from(t.characters).where(eq(t.characters.name, "Élodie Brisefer"));
+  await database.db.insert(t.characterGoals).values([
+    { characterId: mageRow.id, position: 0, label: "Niveau 30", kind: "level", params: { target: 30 } },
+    { characterId: mageRow.id, position: 1, label: "Niveau 20", kind: "level", params: { target: 20 }, achievedAt: NOW },
+  ]);
 
   const workbook = await read(await buildExport(database.db, NOW));
 
   assert.deepEqual(
     workbook.worksheets.map((sheet) => sheet.name),
-    ["Résumé", "Personnages", "Métiers", "Équipement", "Monnaies", "Réputations", "Comptes", "Machines"],
+    ["Résumé", "Personnages", "Métiers", "Équipement", "Monnaies", "Réputations", "Objectifs", "Comptes", "Machines"],
   );
 
   const characters = workbook.getWorksheet("Personnages")!;
@@ -68,6 +75,9 @@ test("le classeur contient une feuille par thème et les valeurs de la base", as
   assert.equal(count("Monnaies"), 1);
   assert.equal(count("Comptes"), 2);
   assert.equal(count("Machines"), 1);
+  const goals = workbook.getWorksheet("Objectifs")!;
+  assert.deepEqual(rowValues(goals, 2).slice(0, 6), ["Élodie Brisefer", "ClassicBetaPvE2", "Niveau 30", "Niveau", "25 / 30", "non"]);
+  assert.deepEqual(rowValues(goals, 3).slice(0, 6), ["Élodie Brisefer", "ClassicBetaPvE2", "Niveau 20", "Niveau", "25 / 20", "oui"]);
 
   const summary = workbook.getWorksheet("Résumé")!;
   assert.deepEqual(rowValues(summary, 3), ["Personnages", 6]);
@@ -77,7 +87,7 @@ test("le classeur contient une feuille par thème et les valeurs de la base", as
 test("une base vide donne un classeur valide, sans ligne de données", async () => {
   const workbook = await read(await buildExport(database.db, NOW));
 
-  assert.equal(workbook.worksheets.length, 8);
+  assert.equal(workbook.worksheets.length, 9);
   assert.equal(workbook.getWorksheet("Personnages")!.rowCount, 1);
   assert.deepEqual(rowValues(workbook.getWorksheet("Résumé")!, 3), ["Personnages", 0]);
 });

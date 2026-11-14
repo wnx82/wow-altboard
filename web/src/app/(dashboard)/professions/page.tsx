@@ -1,22 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountFilter, FilterForm, SelectFilter, TextFilterInput } from "@/components/filter-form";
 import { EmptyState, Meter, PageHeader, ProfessionIcon, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { homeHref } from "@/lib/dashboard/browser-state";
 import { compareProfessions, PRIMARY_SLOTS, type ProfessionRow } from "@/lib/dashboard/professions";
 import { listCharacters, type CharacterListItem } from "@/lib/dashboard/queries";
+import { accountOptions, idParam, matchesRoster, readRosterFilter, rosterActive } from "@/lib/dashboard/roster-filter";
 import { classKey } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Métiers" };
 
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
-export default async function ProfessionsPage() {
+export default async function ProfessionsPage({ searchParams }: PageProps<"/professions">) {
   await requireSession();
+  const params = await searchParams;
+  const roster = readRosterFilter(params);
+  const skillLine = idParam(params, "profession");
   // Rangés par niveau décroissant : c'est l'ordre qui départage deux personnages de même rang.
   const characters = await listCharacters(getDatabase());
-  const { primary, secondary, openSlots } = compareProfessions(characters, collator.compare);
+  const all = compareProfessions(characters, collator.compare);
+  const shown = characters.filter((character) => matchesRoster({ name: character.name, accountId: character.account.id }, roster));
+  const compared = compareProfessions(shown, collator.compare);
+  const chosen = (rows: ProfessionRow<CharacterListItem>[]) => (skillLine === null ? rows : rows.filter((row) => row.skillLine === skillLine));
+  const primary = chosen(compared.primary);
+  const secondary = chosen(compared.secondary);
+  // Un métier choisi : les emplacements libres ne le concernent pas.
+  const openSlots = skillLine === null ? compared.openSlots : [];
+  const active = rosterActive(roster) || skillLine !== null;
+  const known = all.primary.length > 0 || all.secondary.length > 0;
 
   return (
     <>
@@ -24,11 +38,29 @@ export default async function ProfessionsPage() {
         Qui exerce quoi, et à quel rang : pour chaque métier, les personnages du plus avancé au moins avancé, tous comptes confondus.
       </PageHeader>
 
-      {primary.length === 0 && secondary.length === 0 ? (
+      {known && (
+        <FilterForm action="/professions" active={active}>
+          <SelectFilter
+            name="profession"
+            label="Métier"
+            value={skillLine === null ? "" : String(skillLine)}
+            all="Tous les métiers"
+            options={[...all.primary, ...all.secondary].map((row) => ({ value: String(row.skillLine), label: row.name }))}
+          />
+          <AccountFilter accounts={accountOptions(characters.map((character) => ({ accountId: character.account.id, account: character.account.label })))} value={roster.account} />
+          <TextFilterInput name="character" label="Personnage" value={roster.character.raw} placeholder="Nom du personnage" />
+        </FilterForm>
+      )}
+
+      {primary.length === 0 && secondary.length === 0 && openSlots.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun métier connu">
-            Les métiers apparaissent après une synchronisation d&apos;un personnage qui en a appris au moins un.
-          </EmptyState>
+          {known ? (
+            <EmptyState title="Aucun métier ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+          ) : (
+            <EmptyState title="Aucun métier connu">
+              Les métiers apparaissent après une synchronisation d&apos;un personnage qui en a appris au moins un.
+            </EmptyState>
+          )}
         </div>
       ) : (
         <div className="mt-8 space-y-10">

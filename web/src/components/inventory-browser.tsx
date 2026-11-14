@@ -61,7 +61,7 @@ const plural = (count: number, word: string) => `${formatInteger(count)} ${word}
 type SlotContext = { items: InventoryData["items"]; prices: InventoryData["prices"]; tip: Tip | null; events: SlotEvents };
 
 /** Tous les inventaires : sacs, banque, courrier, enchères et banques de guilde, en cases comme en jeu. */
-export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; now: string }) {
+export function InventoryBrowser({ data, now: nowIso, exportPath }: { data: InventoryData; now: string; exportPath: string }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const searchParams = useSearchParams();
   const [state, setState] = useState<InventoryState>(() => readInventoryState(searchParams));
@@ -282,6 +282,12 @@ export function InventoryBrowser({ data, now: nowIso }: { data: InventoryData; n
             <button type="button" className="text-xs text-gold hover:underline" onClick={() => update({ ...DEFAULT_STATE, sort: state.sort })}>
               Effacer les filtres
             </button>
+          )}
+          {rows.length > 0 && (
+            // La vue affichée, filtres et tri compris : le serveur relit les mêmes paramètres.
+            <a className="text-xs text-gold hover:underline" href={`${exportPath}${writeInventoryState(state)}`} download>
+              Exporter la vue (Excel)
+            </a>
           )}
         </div>
       </div>

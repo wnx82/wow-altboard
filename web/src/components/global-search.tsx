@@ -6,17 +6,17 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import type { SearchResults } from "@/lib/dashboard/global-search";
 import { fold } from "@/lib/dashboard/inventory-view";
 import { NAV_GROUPS } from "@/lib/navigation";
-import { classKey, formatInteger } from "@/lib/wow/format";
+import { classKey, formatInteger, REACTION_LABELS } from "@/lib/wow/format";
 import { ItemThumb } from "./item-slots";
 import { ClassAvatar } from "./ui";
 
 // Recherche globale : Ctrl+K (⌘K sur Mac) ou la loupe de l'en-tête ouvrent une fenêtre qui cherche
-// pages, personnages et objets. Les pages sont filtrées ici ; personnages et objets viennent de
+// pages, personnages, objets, recettes et factions. Les pages sont filtrées ici ; le reste vient de
 // /api/search, une requête par pause de frappe.
 
 const DEBOUNCE_MS = 180;
 
-type Option = { id: string; href: string; group: "Pages" | "Personnages" | "Objets"; content: React.ReactNode; label: string };
+type Option = { id: string; href: string; group: "Pages" | "Personnages" | "Objets" | "Recettes" | "Factions"; content: React.ReactNode; label: string };
 
 const PAGES = NAV_GROUPS.flatMap((group) => group.items.map((item) => ({ ...item, group: group.label })));
 
@@ -129,7 +129,43 @@ export function GlobalSearch({ basePath }: { basePath: string }) {
         </>
       ),
     }));
-    return [...characters, ...items, ...pages.slice(0, needle === "" ? PAGES.length : 6)];
+    const recipes = (data?.recipes ?? []).filter((recipe) => still(recipe.name)).map<Option>((recipe) => ({
+      id: `recipe-${recipe.spellId}`,
+      href: recipe.href,
+      group: "Recettes",
+      label: recipe.name,
+      content: (
+        <>
+          <ItemThumb icon={recipe.icon} quality={recipe.quality} />
+          <span className="min-w-0">
+            <span className="block truncate font-medium" data-quality={recipe.quality ?? undefined}>
+              <span className={recipe.quality === null ? "" : "quality-text"}>{recipe.name}</span>
+            </span>
+            <span className="block truncate text-xs text-muted">
+              {recipe.crafters.map((crafter) => crafter.name).join(", ")}
+              {recipe.crafterCount > recipe.crafters.length && ` et ${recipe.crafterCount - recipe.crafters.length} autre${recipe.crafterCount - recipe.crafters.length > 1 ? "s" : ""}`}
+            </span>
+          </span>
+          <span className="ml-auto whitespace-nowrap text-xs text-faint">{recipe.profession ?? "Recette"}</span>
+        </>
+      ),
+    }));
+    const factions = (data?.factions ?? []).filter((faction) => still(faction.name)).map<Option>((faction) => ({
+      id: `faction-${faction.factionId}`,
+      href: faction.href,
+      group: "Factions",
+      label: faction.name,
+      content: (
+        <>
+          <span className="min-w-0 truncate font-medium text-text">{faction.name}</span>
+          <span className="ml-auto whitespace-nowrap text-xs text-faint">
+            {faction.characters} personnage{faction.characters > 1 ? "s" : ""}
+            {faction.best !== null && REACTION_LABELS[faction.best] ? ` · ${REACTION_LABELS[faction.best]}` : ""}
+          </span>
+        </>
+      ),
+    }));
+    return [...characters, ...items, ...recipes, ...factions, ...pages.slice(0, needle === "" ? PAGES.length : 6)];
   }, [needle, results, failed]);
 
   const current = options[Math.min(active, options.length - 1)];
@@ -180,8 +216,8 @@ export function GlobalSearch({ basePath }: { basePath: string }) {
               aria-controls={listId}
               aria-activedescendant={current ? `${listId}-${current.id}` : undefined}
               aria-autocomplete="list"
-              aria-label="Chercher une page, un personnage ou un objet"
-              placeholder="Page, personnage ou objet…"
+              aria-label="Chercher une page, un personnage, un objet, une recette ou une faction"
+              placeholder="Page, personnage, objet, recette, faction…"
               maxLength={60}
               autoComplete="off"
               spellCheck={false}
@@ -235,7 +271,7 @@ export function GlobalSearch({ basePath }: { basePath: string }) {
                 : searchable(needle) && options.length === 0
                   ? "Aucun résultat."
                   : needle !== "" && !searchable(needle)
-                    ? "Encore une lettre pour chercher personnages et objets."
+                    ? "Encore une lettre pour chercher personnages, objets, recettes et factions."
                     : "↑ ↓ pour choisir, Entrée pour ouvrir.")}
           </p>
         </div>

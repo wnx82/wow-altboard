@@ -70,7 +70,8 @@ personnage recréé, et à tous les autres.
   d'un coup qui en est où. Fait le 2026-11-09 (site 0.9.0).
 - [ ] **P3 · S** — Liste récurrente (remise à zéro chaque jour ou chaque semaine), manuelle
   seulement : l'addon ne relève aucun verrou.
-- [ ] **P3 · S** — Feuille « Objectifs » dans l'export XLSX.
+- [x] **P3 · S** — Feuille « Objectifs » dans l'export XLSX. Fait le 2026-11-14 (site 0.28.0) :
+  une ligne par objectif, progression et atteinte.
 
 ### 1.2 Avec les données déjà synchronisées
 
@@ -97,13 +98,26 @@ personnage recréé, et à tous les autres.
   progression. Fait le 2026-11-09 (site 0.9.0) : 90 jours, sur l'accueil.
 - [x] **P2 · S** — Page **Réputations** comparées, sur le modèle de la page **Métiers**. Fait le
   2026-11-09 (site 0.9.0).
-- [ ] **P2 · M** — Temps de jeu : total par compte et tous personnages confondus ; temps du niveau N
+- [x] **P2 · M** — Temps de jeu : total par compte et tous personnages confondus ; temps du niveau N
   comparé d'un personnage à l'autre. Le total par compte est fait le 2026-11-09 (site 0.9.0, page
-  **Temps de jeu**) ; la comparaison du temps par niveau reste à faire.
+  **Temps de jeu**) ; la comparaison du temps par niveau le 2026-11-14 (site 0.28.0, page
+  **Comparer**), avec un tableau par personnage sur **Temps de jeu**.
 - [x] **P2 · M** — Sessions : résumé par semaine (heures jouées, expérience), répartition par
   étiquette (`Leveling`, `Dungeon`, `Farming`), carte jour × heure. Fait le 2026-11-09 (site
   0.9.0, page **Temps de jeu**).
-- [ ] **P3 · M** — Comparaison de deux personnages côte à côte (statistiques, équipement).
+- [x] **P3 · M** — Comparaison de deux personnages côte à côte (statistiques, équipement). Fait le
+  2026-11-14 (site 0.28.0) : page **Comparer**, deux à quatre personnages, avec métiers,
+  réputations et temps par niveau ; la meilleure valeur de chaque ligne est mise en avant.
+- [x] **P2 · M** — Patrimoine par personnage et par compte : or, plus la valeur de marché des sacs,
+  de la banque, du courrier et des ventes en cours, plus les banques de guilde. Fait le 2026-11-14
+  (site 0.28.0, audit du 2026-11-13) : page **Patrimoine**.
+- [x] **P2 · S** — Filtres de **Réputations** (faction, groupe), **Métiers** (métier) et
+  **Activité** (sorte de changement), plus compte et personnage sur les trois. Fait le 2026-11-14
+  (site 0.28.0, audit du 2026-11-13), dans l'adresse de la page.
+- [x] **P3 · S** — Ctrl+K : recettes (qui sait fabriquer un objet) et factions. Fait le 2026-11-14
+  (site 0.28.0, audit du 2026-11-13).
+- [x] **P3 · S** — Export Excel de la vue affichée de **Inventaires** et **Finances**. Fait le
+  2026-11-14 (site 0.28.0, audit du 2026-11-13).
 - [ ] **P3 · S** — Notes libres et étiquettes par personnage (principal, reroll, banque), saisies
   sur le site.
 - [x] **P3 · S** — Site installable sur le téléphone (manifeste et icônes). Fait le 2026-11-09
@@ -146,9 +160,14 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
 
 ### 1.4 Notifications et rapports (V4 de la feuille de route)
 
-- [ ] **P2 · M** — Webhook sortant vers n8n, réglable dans **Paramètres**, sur quatre événements :
-  niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet depuis N jours.
-- [ ] **P3 · M** — Rapport hebdomadaire : niveaux gagnés, or, temps joué, objectifs atteints.
+- [x] **P2 · M** — Webhook sortant vers n8n, réglable dans **Paramètres**, sur quatre événements :
+  niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet depuis N jours. Fait
+  le 2026-11-14 (site 0.28.0, [NOTIFICATIONS](NOTIFICATIONS.md)) ; pas encore essayé avec le n8n
+  réel.
+- [x] **P3 · M** — Rapport hebdomadaire : niveaux gagnés, or, temps joué, objectifs atteints. Fait
+  le 2026-11-14 (site 0.28.0) : envoyé par le même webhook, le lundi à partir de 9 h.
+- [ ] **P3 · S** — Notifications : nouvel essai d'un envoi échoué (aujourd'hui abandonné et
+  journalisé), si des pertes se voient.
 
 ### 1.5 Agent (V5 de la feuille de route)
 

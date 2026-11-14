@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountFilter, FilterForm, SelectFilter, TextFilterInput } from "@/components/filter-form";
 import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { buildActivity } from "@/lib/dashboard/activity";
+import { buildActivity, CHANGE_KIND_LABELS, filterActivity, isChangeKind } from "@/lib/dashboard/activity";
 import { ACTIVITY_DAYS, listRecentSnapshots } from "@/lib/dashboard/queries";
+import { accountOptions, param, readRosterFilter, rosterActive } from "@/lib/dashboard/roster-filter";
 import { classKey, formatDateTime } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Activité" };
@@ -12,11 +14,18 @@ export const metadata: Metadata = { title: "Activité" };
 const dayLabel = new Intl.DateTimeFormat("fr-BE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Brussels" });
 const hour = new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
 
-export default async function ActivityPage() {
+export default async function ActivityPage({ searchParams }: PageProps<"/activity">) {
   await requireSession();
+  const params = await searchParams;
+  const roster = readRosterFilter(params);
+  const requestedKind = param(params, "kind");
+  const kind = isChangeKind(requestedKind) ? requestedKind : null;
   const now = new Date();
   const since = new Date(now.getTime() - ACTIVITY_DAYS * 24 * 3600 * 1000);
-  const days = buildActivity(await listRecentSnapshots(getDatabase(), since), since);
+  const snapshots = await listRecentSnapshots(getDatabase(), since);
+  const all = buildActivity(snapshots, since);
+  const days = filterActivity(all, roster, kind);
+  const active = rosterActive(roster) || kind !== null;
 
   return (
     <>
@@ -25,7 +34,26 @@ export default async function ActivityPage() {
         changement porte l&apos;heure du relevé qui le montre, pas celle où il s&apos;est produit en jeu.
       </PageHeader>
 
-      {days.length === 0 ? (
+      {all.length > 0 && (
+        <FilterForm action="/activity" active={active}>
+          <SelectFilter
+            name="kind"
+            label="Changement"
+            value={kind ?? ""}
+            all="Tous les changements"
+            options={Object.entries(CHANGE_KIND_LABELS).map(([value, label]) => ({ value, label }))}
+          />
+          <AccountFilter accounts={accountOptions(snapshots.map((snapshot) => snapshot.character))} value={roster.account} />
+          <TextFilterInput name="character" label="Personnage" value={roster.character.raw} placeholder="Nom du personnage" />
+        </FilterForm>
+      )}
+
+      {/* Sans aucun changement, les filtres (alors masqués) n'y sont pour rien. */}
+      {days.length === 0 && active && all.length > 0 ? (
+        <div className="mt-6">
+          <EmptyState title="Aucun changement ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+        </div>
+      ) : days.length === 0 ? (
         <div className="mt-6">
           <EmptyState title="Aucun changement sur la période">
             L&apos;activité se lit en comparant deux relevés d&apos;un même personnage : elle apparaît à partir de la deuxième synchronisation

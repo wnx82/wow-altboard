@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { compareReputations, OTHER_GROUP, standingProgress, type ReputationRow } from "./reputations";
+import { compareReputations, filterReputationRows, OTHER_GROUP, readReputationFilter, reputationFilterActive, standingProgress, type ReputationRow } from "./reputations";
 
 const collator = new Intl.Collator("fr", { sensitivity: "base" });
 const row = (character: string, factionId: number, name: string, groupName: string | null, reaction: number, currentValue: number): ReputationRow<string> => ({
@@ -42,5 +42,33 @@ describe("réputations comparées", () => {
       groups[0].factions[1].holders.map((holder) => holder.character),
       ["Bob", "Cid", "Anna"],
     );
+  });
+});
+
+describe("réputations filtrées", () => {
+  type Character = { name: string; accountId: number };
+  const ada: Character = { name: "Ada", accountId: 1 };
+  const bob: Character = { name: "Bob", accountId: 2 };
+  const of = (character: Character, factionId: number, name: string, groupName: string | null): ReputationRow<Character> => ({
+    character,
+    factionId,
+    name,
+    groupName,
+    reaction: 5,
+    currentValue: 4_000,
+    minValue: 3_000,
+    maxValue: 9_000,
+  });
+  const rows = [of(ada, 1, "Hurlevent", "Alliance"), of(bob, 1, "Hurlevent", "Alliance"), of(ada, 2, "Cartel Gentepression", null)];
+  const keep = (params: Record<string, string>) =>
+    filterReputationRows(rows, readReputationFilter(params)).map((row) => `${row.character.name}:${row.name}`);
+
+  test("faction cherchée sans accent, groupe exact, « Autres » pour une faction sans groupe", () => {
+    assert.deepEqual(keep({ faction: "HURLE" }), ["Ada:Hurlevent", "Bob:Hurlevent"]);
+    assert.deepEqual(keep({ group: OTHER_GROUP }), ["Ada:Cartel Gentepression"]);
+    assert.deepEqual(keep({ group: "Alliance", account: "2" }), ["Bob:Hurlevent"]);
+    assert.deepEqual(keep({ character: "ad", faction: "cartel" }), ["Ada:Cartel Gentepression"]);
+    assert.equal(reputationFilterActive(readReputationFilter({})), false);
+    assert.equal(reputationFilterActive(readReputationFilter({ group: "Alliance" })), true);
   });
 });

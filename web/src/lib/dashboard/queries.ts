@@ -5,7 +5,7 @@ import type { ActivitySnapshot } from "./activity";
 import type { LedgerDayRow } from "./finances";
 import type { MoneySnapshot } from "./gold-history";
 import type { SnapshotData } from "./history";
-import type { PlaytimeRow, SessionFact } from "./playtime";
+import type { CharacterPlaytimeRow, SessionFact } from "./playtime";
 import type { ReputationRow } from "./reputations";
 import type { LevelRow } from "./levels";
 
@@ -337,6 +337,7 @@ export async function listRecentSnapshots(db: Database, since: Date): Promise<Ac
       id: t.characters.id,
       name: t.characters.name,
       class: t.characters.class,
+      accountId: t.wowAccounts.id,
       accountDisplayName: t.wowAccounts.displayName,
       accountFolderHint: t.wowAccounts.folderHint,
     })
@@ -346,9 +347,9 @@ export async function listRecentSnapshots(db: Database, since: Date): Promise<Ac
     .where(or(gte(t.characterSnapshots.capturedAt, since), lastBefore))
     .orderBy(asc(t.characterSnapshots.characterId), asc(t.characterSnapshots.capturedAt));
 
-  return rows.map(({ id, name, class: classToken, accountDisplayName, accountFolderHint, ...snapshot }) => ({
+  return rows.map(({ id, name, class: classToken, accountId, accountDisplayName, accountFolderHint, ...snapshot }) => ({
     ...snapshot,
-    character: { id, name, class: classToken, account: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }) },
+    character: { id, name, class: classToken, accountId, account: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }) },
   }));
 }
 
@@ -516,7 +517,7 @@ export async function listRecentRuns(db: Database, limit = 15) {
   return runs.map((run) => ({ ...run, errors: byRun.get(run.id) ?? [] }));
 }
 
-export type ReputationCharacter = { id: number; name: string; class: string | null; level: number | null; account: string };
+export type ReputationCharacter = { id: number; name: string; class: string | null; level: number | null; accountId: number; account: string };
 
 /** Réputations de tous les personnages, rangés par niveau décroissant. */
 export async function listReputationRows(db: Database): Promise<ReputationRow<ReputationCharacter>[]> {
@@ -533,6 +534,7 @@ export async function listReputationRows(db: Database): Promise<ReputationRow<Re
       characterName: t.characters.name,
       class: t.characters.class,
       level: t.characters.level,
+      accountId: t.wowAccounts.id,
       accountDisplayName: t.wowAccounts.displayName,
       accountFolderHint: t.wowAccounts.folderHint,
     })
@@ -540,17 +542,20 @@ export async function listReputationRows(db: Database): Promise<ReputationRow<Re
     .innerJoin(t.characters, eq(t.characters.id, t.characterReputations.characterId))
     .innerJoin(t.wowAccounts, eq(t.wowAccounts.id, t.characters.accountId))
     .orderBy(desc(t.characters.level), asc(t.characters.name));
-  return rows.map(({ id, characterName, class: classToken, level, accountDisplayName, accountFolderHint, ...reputation }) => ({
+  return rows.map(({ id, characterName, class: classToken, level, accountId, accountDisplayName, accountFolderHint, ...reputation }) => ({
     ...reputation,
-    character: { id, name: characterName, class: classToken, level, account: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }) },
+    character: { id, name: characterName, class: classToken, level, accountId, account: accountLabel({ displayName: accountDisplayName, folderHint: accountFolderHint }) },
   }));
 }
 
 /** Dernier /played connu de chaque personnage, avec son compte ; null si jamais mesuré. */
-export async function listPlaytimeRows(db: Database): Promise<PlaytimeRow[]> {
+export async function listPlaytimeRows(db: Database): Promise<CharacterPlaytimeRow[]> {
   const rows = await db
     .select({
       characterId: t.characters.id,
+      name: t.characters.name,
+      class: t.characters.class,
+      level: t.characters.level,
       accountId: t.wowAccounts.id,
       accountDisplayName: t.wowAccounts.displayName,
       accountFolderHint: t.wowAccounts.folderHint,

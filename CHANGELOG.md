@@ -4,6 +4,35 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.28.0 — 2026-11-14
+
+Nouvelles fonctions (lot D de l'audit du 2026-11-13). Migration `0021` : ajouts seuls.
+
+### Ajouté
+
+- Page **Comparer** (menu Personnages, lien sur chaque fiche) : deux à quatre personnages côte à
+  côte, choisis dans l'adresse (`/compare?c=1&c=2`). Identité, statistiques, équipement, métiers,
+  réputations et temps passé sur chaque niveau ; la meilleure valeur de chaque ligne est en or.
+- Page **Patrimoine** (menu Économie) : par personnage et par compte, l'or plus la valeur de
+  marché des sacs, de la banque, du courrier et des ventes en cours, et les banques de guilde de
+  chaque compte. Chaque montant mène à **Inventaires** filtré sur le personnage et l'endroit.
+- Filtres, gardés dans l'adresse de la page :
+  - **Réputations** : faction, groupe, compte, personnage ;
+  - **Métiers** : métier, compte, personnage ;
+  - **Activité** : sorte de changement (niveau, or, niveau d'objet, métier, réputation, guilde),
+    compte, personnage.
+- **Temps de jeu** : tableau par personnage (/played, 12 dernières semaines, sessions, dernière
+  session).
+- Ctrl+K : les recettes (qui sait fabriquer un objet, par le nom de l'objet) et les factions
+  (combien de personnages, meilleur palier, lien vers **Réputations** filtré).
+- Export Excel de la vue affichée : **Inventaires** (mêmes filtres et même tri que la page) et
+  **Finances** (période choisie). Feuille **Objectifs** dans l'export complet.
+- Notifications (**Paramètres → Notifications**) : webhook sortant, pour n8n par exemple, sur
+  quatre événements (niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet
+  depuis N jours) et un rapport hebdomadaire le lundi matin ; jeton facultatif, bouton d'essai.
+  Rien du passé n'est annoncé à l'activation ; l'adresse et le jeton ne sont jamais
+  réaffichés ni journalisés. Détail dans `docs/NOTIFICATIONS.md`.
+
 ## Site 0.27.0 — 2026-11-14
 
 Performance et durée de conservation (lot C de l'audit du 2026-11-13). Rien n'était lent au

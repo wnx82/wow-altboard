@@ -1,19 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountFilter, FilterForm, SelectFilter, TextFilterInput } from "@/components/filter-form";
 import { EmptyState, Meter, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { listReputationRows, type ReputationCharacter } from "@/lib/dashboard/queries";
-import { compareReputations, type FactionRow, type ReputationHolder } from "@/lib/dashboard/reputations";
+import { compareReputations, filterReputationRows, OTHER_GROUP, readReputationFilter, reputationFilterActive, type FactionRow, type ReputationHolder } from "@/lib/dashboard/reputations";
+import { accountOptions } from "@/lib/dashboard/roster-filter";
 import { classKey, formatInteger, REACTION_LABELS } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Réputations" };
 
 const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
-export default async function ReputationsPage() {
+export default async function ReputationsPage({ searchParams }: PageProps<"/reputations">) {
   await requireSession();
-  const groups = compareReputations(await listReputationRows(getDatabase()), collator.compare);
+  const filter = readReputationFilter(await searchParams);
+  const rows = await listReputationRows(getDatabase());
+  const groups = compareReputations(filterReputationRows(rows, filter), collator.compare);
+  const groupNames = [...new Set(rows.map((row) => row.groupName ?? OTHER_GROUP))].sort((a, b) =>
+    a === OTHER_GROUP ? 1 : b === OTHER_GROUP ? -1 : collator.compare(a, b),
+  );
+  const active = reputationFilterActive(filter);
 
   return (
     <>
@@ -22,11 +30,24 @@ export default async function ReputationsPage() {
         puis l&apos;avancement dans ce palier.
       </PageHeader>
 
+      {rows.length > 0 && (
+        <FilterForm action="/reputations" active={active}>
+          <TextFilterInput name="faction" label="Faction" value={filter.faction.raw} placeholder="Nom de faction" />
+          <SelectFilter name="group" label="Groupe" value={filter.group} all="Tous les groupes" options={groupNames.map((name) => ({ value: name, label: name }))} />
+          <AccountFilter accounts={accountOptions(rows.map((row) => row.character))} value={filter.roster.account} />
+          <TextFilterInput name="character" label="Personnage" value={filter.roster.character.raw} placeholder="Nom du personnage" />
+        </FilterForm>
+      )}
+
       {groups.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucune réputation connue">
-            Les réputations apparaissent après une synchronisation d&apos;un personnage relevé par l&apos;addon.
-          </EmptyState>
+          {active && rows.length > 0 ? (
+            <EmptyState title="Aucune réputation ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+          ) : (
+            <EmptyState title="Aucune réputation connue">
+              Les réputations apparaissent après une synchronisation d&apos;un personnage relevé par l&apos;addon.
+            </EmptyState>
+          )}
         </div>
       ) : (
         <div className="mt-8 space-y-10">

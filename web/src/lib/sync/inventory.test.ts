@@ -209,7 +209,7 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
 
   test("recherche globale : personnages et objets, possédés d'abord, sans accent", async () => {
     await sync(clone());
-    assert.deepEqual(await searchEverything(database.db, "e"), { characters: [], items: [] });
+    assert.deepEqual(await searchEverything(database.db, "e"), { characters: [], items: [], recipes: [], factions: [] });
 
     const found = await searchEverything(database.db, "ELODIE");
     assert.deepEqual(
@@ -243,9 +243,9 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
     assert.deepEqual(owned, [...owned].sort((a, b) => Number(b) - Number(a)), "possédés d'abord");
     assert.deepEqual((await searchEverything(database.db, "999001")).items.map((item) => item.itemKey), ["999001"]);
     // Les caractères spéciaux de LIKE sont cherchés tels quels.
-    assert.deepEqual(await searchEverything(database.db, "%%"), { characters: [], items: [] });
+    assert.deepEqual(await searchEverything(database.db, "%%"), { characters: [], items: [], recipes: [], factions: [] });
     // Au-delà de 9 chiffres, aucun identifiant d'objet possible : pas d'erreur de la colonne integer.
-    assert.deepEqual(await searchEverything(database.db, "99999999999"), { characters: [], items: [] });
+    assert.deepEqual(await searchEverything(database.db, "99999999999"), { characters: [], items: [], recipes: [], factions: [] });
 
     // Des objets relevés un jour mais plus détenus, mieux classés, ne chassent pas l'objet possédé.
     await database.db.insert(t.items).values(
@@ -256,6 +256,31 @@ describe("Baganator : courrier, enchères et banques de guilde", () => {
       crowded.items.map((item) => item.itemKey),
       ["15210:1017"],
     );
+  });
+
+  test("recherche globale : qui sait fabriquer un objet, et les factions connues", async () => {
+    await sync(clone());
+    const [mage] = await database.db.select({ id: t.characters.id }).from(t.characters).where(eq(t.characters.guid, MAGE));
+    // Recette apprise, objet fabriqué nommé par la table du jeu seulement ; une autre que personne ne connaît.
+    await database.db.insert(t.itemNames).values({ itemId: 999101, name: "Potion de soins mineure", quality: 1, source: "wago", build: "1.60.1.70888" });
+    await database.db.insert(t.recipes).values([
+      { spellId: 2330, skillLine: 171, outputItemId: 999101, outputQuantity: 1 },
+      { spellId: 2331, skillLine: 171, outputItemId: 999101, outputQuantity: 1 },
+    ]);
+    await database.db.insert(t.characterRecipes).values({ characterId: mage.id, spellId: 2330 });
+    const potion = await searchEverything(database.db, "POTION de");
+    assert.deepEqual(
+      potion.recipes.map((recipe) => [recipe.spellId, recipe.itemKey, recipe.name, recipe.crafters.map((crafter) => crafter.name), recipe.crafterCount, recipe.href]),
+      [[2330, "999101", "Potion de soins mineure", ["Élodie Brisefer"], 1, "/market/999101"]],
+    );
+
+    const factions = await searchEverything(database.db, "gnomeregan");
+    assert.deepEqual(
+      factions.factions.map((faction) => [faction.factionId, faction.name, faction.characters, faction.href]),
+      [[54, "Exilés de Gnomeregan", 4, "/reputations?faction=Exil%C3%A9s%20de%20Gnomeregan"]],
+    );
+    // Un identifiant ne cherche que les objets.
+    assert.deepEqual((await searchEverything(database.db, "54")).factions, []);
   });
 
   test("à surveiller : le courrier qui expire dans les trois jours, objets et première échéance", async () => {

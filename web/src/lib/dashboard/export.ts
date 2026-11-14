@@ -1,6 +1,8 @@
 import { asc, eq } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { evaluateGoal, formatProgress, KIND_SPECS, readKind, readParams } from "@/lib/goals/evaluate";
+import { loadGoalFacts } from "@/lib/goals/store";
 import { classLabel, progressPercent, QUALITY_LABELS, REACTION_LABELS, SLOT_LABELS } from "@/lib/wow/format";
 import { buildWorkbook, type Sheet } from "@/lib/xlsx/workbook";
 import { getOverview, listAccounts, listCharacters, listMachines } from "./queries";
@@ -17,7 +19,7 @@ export function exportFileName(now: Date): string {
 export async function buildExport(db: Database, now: Date): Promise<Buffer> {
   const characterRef = { character: t.characters.name, realm: t.realms.name };
 
-  const [characters, overview, accounts, machines, equipment, currencies, reputations] = await Promise.all([
+  const [characters, overview, accounts, machines, equipment, currencies, reputations, goals] = await Promise.all([
     listCharacters(db),
     getOverview(db),
     listAccounts(db),
@@ -40,7 +42,22 @@ export async function buildExport(db: Database, now: Date): Promise<Buffer> {
       .innerJoin(t.characters, eq(t.characters.id, t.characterReputations.characterId))
       .innerJoin(t.realms, eq(t.realms.id, t.characters.realmId))
       .orderBy(asc(t.characters.name), asc(t.characterReputations.groupName), asc(t.characterReputations.name)),
+    db
+      .select({
+        ...characterRef,
+        characterId: t.characters.id,
+        label: t.characterGoals.label,
+        kind: t.characterGoals.kind,
+        params: t.characterGoals.params,
+        achievedAt: t.characterGoals.achievedAt,
+      })
+      .from(t.characterGoals)
+      .innerJoin(t.characters, eq(t.characters.id, t.characterGoals.characterId))
+      .innerJoin(t.realms, eq(t.realms.id, t.characters.realmId))
+      .orderBy(asc(t.characters.name), asc(t.characterGoals.position), asc(t.characterGoals.id)),
   ]);
+  // Progression lue comme sur la fiche : seuls les personnages qui ont un objectif.
+  const goalFacts = await loadGoalFacts(db, [...new Set(goals.map((goal) => goal.characterId))]);
 
   const levels = characters.map((c) => c.level).filter((level): level is number => level !== null);
   const totalCopper = characters.reduce((total, c) => total + (c.moneyCopper ?? 0), 0);
@@ -94,6 +111,23 @@ export async function buildExport(db: Database, now: Date): Promise<Buffer> {
       name: "Réputations",
       columns: [{ header: "Personnage", width: 28 }, { header: "Royaume", width: 20 }, { header: "Groupe", width: 24 }, { header: "Faction", width: 36 }, { header: "Palier", width: 12 }, { header: "Valeur", width: 10 }, { header: "Minimum du palier", width: 18 }, { header: "Maximum du palier", width: 18 }],
       rows: reputations.map((r) => [r.character, r.realm, r.group, r.name, r.reaction === null ? null : (REACTION_LABELS[r.reaction] ?? String(r.reaction)), r.current, r.min, r.max]),
+    },
+    {
+      name: "Objectifs",
+      columns: [
+        { header: "Personnage", width: 28 },
+        { header: "Royaume", width: 20 },
+        { header: "Objectif", width: 40 },
+        { header: "Type", width: 22 },
+        { header: "Progression", width: 20 },
+        { header: "Atteint", width: 9 },
+        { header: "Date d'atteinte", width: 20 },
+      ],
+      rows: goals.map((goal) => {
+        const kind = readKind(goal.kind);
+        const progress = evaluateGoal({ kind, params: readParams(goal.params), achievedAt: goal.achievedAt }, goalFacts.get(goal.characterId) ?? null);
+        return [goal.character, goal.realm, goal.label, KIND_SPECS[kind].label, formatProgress(kind, progress), progress.reached ? "oui" : "non", goal.achievedAt];
+      }),
     },
     {
       name: "Comptes",

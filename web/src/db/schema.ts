@@ -941,6 +941,9 @@ export const characterGoals = pgTable(
     kind: goalKind("kind"),
     params: jsonb("params").notNull().default({}),
     achievedAt: ts("achieved_at"),
+    // Atteinte déjà annoncée (ou écartée, sans webhook) par les notifications : null tant qu'une
+    // atteinte attend. Décocher un objectif manuel la remet à null.
+    notifiedAt: ts("notified_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1001,9 +1004,36 @@ export const appSettings = pgTable(
     marketHistoryFrom: ts("market_history_from"),
     // Commission de l'hôtel des ventes en pourcentage du prix de vente. Null : 5 %.
     auctionCutPercent: doublePrecision("auction_cut_percent"),
+    // Notifications sortantes (voir docs/NOTIFICATIONS.md). Adresse du webhook (n8n) : null, aucune
+    // notification. Jeton envoyé dans l'en-tête Authorization, jamais réaffiché.
+    notifyWebhookUrl: text("notify_webhook_url"),
+    notifyWebhookToken: text("notify_webhook_token"),
+    // Événements envoyés ; null : tous.
+    notifyEvents: jsonb("notify_events").$type<string[]>(),
+    // Un PC sans synchronisation depuis ce nombre de jours est signalé. Null : 3.
+    notifySilentDays: smallint("notify_silent_days"),
     updatedAt: updatedAt(),
   },
   (t) => [check("app_settings_single_row_check", sql`${t.id} = 1`)],
+);
+
+// Où en sont les notifications : ce qui a déjà été examiné. Une seule ligne (id = 1), créée au
+// premier passage aux valeurs du moment : rien d'antérieur n'est annoncé.
+export const notificationState = pgTable(
+  "notification_state",
+  {
+    id: smallint("id").primaryKey().default(1),
+    // Dernier relevé de personnage examiné (niveaux gagnés).
+    lastSnapshotId: bigint("last_snapshot_id", { mode: "number" }).notNull(),
+    // Dernier contrôle de serveur examiné (serveur de jeu de nouveau en ligne).
+    lastCheckId: bigint("last_check_id", { mode: "number" }).notNull(),
+    // PC déjà signalés muets : identifiant → dernière synchronisation (ISO) au moment du signalement.
+    silentMachines: jsonb("silent_machines").$type<Record<string, string>>().notNull().default({}),
+    // Lundi (AAAA-MM-JJ) de la semaine dont le rapport hebdomadaire a été traité.
+    lastWeeklyReport: text("last_weekly_report"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("notification_state_single_row_check", sql`${t.id} = 1`)],
 );
 
 // ---------------------------------------------------------------------------

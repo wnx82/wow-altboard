@@ -1,4 +1,4 @@
-// Navigation principale : vingt et une pages en trois groupes, pour que l'en-tête tienne sur une ligne
+// Navigation principale : vingt-trois pages en trois groupes, pour que l'en-tête tienne sur une ligne
 // à toutes les largeurs. Chaque groupe s'ouvre en liste déroulante ; sur téléphone, un seul bouton
 // ouvre les trois groupes à la fois.
 
@@ -14,6 +14,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/goals", label: "Objectifs" },
       { href: "/inventory", label: "Inventaires" },
       { href: "/gear", label: "Équipement" },
+      { href: "/compare", label: "Comparer" },
       { href: "/items", label: "Objets" },
       { href: "/professions", label: "Métiers" },
       { href: "/reputations", label: "Réputations" },
@@ -31,6 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/crafting", label: "Craft" },
       { href: "/farming", label: "Farm" },
       { href: "/finances", label: "Finances" },
+      { href: "/wealth", label: "Patrimoine" },
       { href: "/audit", label: "Audit" },
     ],
   },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { hourlyHeatmap, playtimeByAccount, weekOf, weeklySummary, type SessionFact } from "./playtime";
+import { hourlyHeatmap, playtimeByAccount, playtimeByCharacter, weekOf, weeklySummary, type SessionFact } from "./playtime";
 
 const session = (startedAt: string, durationSeconds: number | null, extra: Partial<SessionFact> = {}): SessionFact => ({
   characterId: 1,
@@ -66,5 +66,36 @@ describe("temps de jeu", () => {
     assert.equal(grid[0][20], 1_800);
     assert.equal(grid[0][21], 3_600);
     assert.equal(grid.flat().reduce((sum, seconds) => sum + seconds, 0), 5_400);
+  });
+});
+
+describe("temps de jeu par personnage", () => {
+  test("/played d'abord, puis temps récent ; sessions additionnées, dernière datée", () => {
+    const row = (characterId: number, name: string, totalSeconds: number | null) => ({
+      characterId,
+      name,
+      class: null,
+      level: 10,
+      accountId: 1,
+      accountLabel: "A",
+      totalSeconds,
+    });
+    const result = playtimeByCharacter(
+      [row(1, "Ada", 3_600), row(2, "Bob", null), row(3, "Cid", 7_200), row(4, "Dan", null)],
+      [
+        session("2026-10-05T10:00:00Z", 600, { characterId: 1 }),
+        session("2026-10-06T10:00:00Z", null, { characterId: 1 }),
+        session("2026-10-04T10:00:00Z", 1_200, { characterId: 4 }),
+      ],
+    );
+    assert.deepEqual(
+      result.map((entry) => [entry.name, entry.recentSeconds, entry.sessions, entry.lastSessionAt?.toISOString() ?? null]),
+      [
+        ["Cid", 0, 0, null],
+        ["Ada", 600, 2, "2026-10-06T10:00:00.000Z"],
+        ["Dan", 1_200, 1, "2026-10-04T10:00:00.000Z"],
+        ["Bob", 0, 0, null],
+      ],
+    );
   });
 });

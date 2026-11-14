@@ -1,6 +1,8 @@
 // Réputations de tous les personnages, mises côte à côte sur le modèle de la page Métiers : pour
 // chaque faction, qui en est où. Pur, sans base.
 
+import { matchesRoster, param, readRosterFilter, rosterActive, textMatches, textParam, type RosterFilter, type SearchParams, type TextFilter } from "./roster-filter";
+
 export type ReputationRow<C> = {
   character: C;
   factionId: number;
@@ -49,4 +51,22 @@ export function compareReputations<C>(rows: ReputationRow<C>[], compareNames: (a
   return [...groups.entries()]
     .sort(([a], [b]) => (a === OTHER_GROUP ? 1 : b === OTHER_GROUP ? -1 : compareNames(a, b)))
     .map(([name, list]) => ({ name, factions: list.sort((a, b) => compareNames(a.name, b.name)) }));
+}
+
+export type ReputationFilter = { roster: RosterFilter; faction: TextFilter; group: string };
+
+export function readReputationFilter(params: SearchParams): ReputationFilter {
+  return { roster: readRosterFilter(params), faction: textParam(params, "faction"), group: param(params, "group").slice(0, 100) };
+}
+
+export const reputationFilterActive = (filter: ReputationFilter) => rosterActive(filter.roster) || filter.faction.needle !== "" || filter.group !== "";
+
+/** Lignes des personnages du filtre, pour les factions dont le nom et le groupe correspondent. */
+export function filterReputationRows<C extends { name: string; accountId: number }>(rows: ReputationRow<C>[], filter: ReputationFilter): ReputationRow<C>[] {
+  return rows.filter(
+    (row) =>
+      matchesRoster(row.character, filter.roster) &&
+      textMatches(row.name, filter.faction) &&
+      (filter.group === "" || (row.groupName ?? OTHER_GROUP) === filter.group),
+  );
 }

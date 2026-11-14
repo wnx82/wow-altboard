@@ -137,6 +137,22 @@ La page **Serveurs** fait ouvrir au serveur web des connexions TCP sortantes
 | Journal et base | code d'erreur seulement (`ECONNREFUSED`), jamais le message, qui contient l'adresse |
 | Navigateur | n'ouvre aucune connexion vers les serveurs de jeu : la CSP reste à `connect-src 'self'` |
 
+## Notifications (webhook sortant)
+
+Le serveur envoie des événements en `POST` à une adresse réglée dans **Paramètres**
+([NOTIFICATIONS](NOTIFICATIONS.md)).
+
+| Mesure | Détail |
+|---|---|
+| Adresse | saisie par un utilisateur connecté : `http` ou `https` seulement, 500 caractères au plus, sans identifiants (`user:pass@`) ni fragment. Jamais réaffichée : la page n'en montre que `schéma://hôte/…`, un champ vide garde la valeur en place |
+| Adresses privées admises | contrairement aux sondes des serveurs de jeu, une adresse du réseau local est acceptée : n8n y tourne. Le serveur ne fait que poster ; il ne renvoie au navigateur que le statut HTTP de l'essai, jamais le corps de la réponse, qui est abandonné sans être lu |
+| Jeton | facultatif, envoyé en `Authorization: Bearer`. Stocké **en clair** dans `app_settings` (il doit être renvoyé tel quel) ; jamais réaffiché, jamais journalisé, jamais dans l'export Excel |
+| Redirections | refusées : une redirection emporterait le jeton vers une autre adresse |
+| Données envoyées | noms des personnages et des PC, niveaux, objectifs, or, temps joué, état du serveur de jeu. Ni compte Battle.net, ni jeton d'agent, ni adresse e-mail |
+| Débit et durée | un passage par minute, envois un par un, 10 s au plus chacun, sans nouvel essai ; bouton **Envoyer un essai** : 5 essais par tranche de 5 min et par utilisateur ; l'action ne reçoit aucune adresse, elle n'utilise que celle enregistrée |
+| Journal | type d'événement, statut HTTP, durée, raison d'un échec ; ni l'adresse ni le jeton. Un changement de réglage n'est noté que par ce qui a changé (`replaced`, `kept`, `removed`) |
+| Navigateur | n'appelle jamais le webhook : la CSP reste à `connect-src 'self'` |
+
 ## Base de données
 
 - Base et rôle dédiés ; le rôle n'a accès à aucune base d'un autre projet (vérifié en production).
@@ -150,6 +166,7 @@ La page **Serveurs** fait ouvrir au serveur web des connexions TCP sortantes
 | Chaînes de connexion | `deploy/.env` sur le serveur, `web/.env.local` en développement — jamais versionnés |
 | Jeton d'agent | `token.dat` (DPAPI) sur le PC ; empreinte en base |
 | Mot de passe du tableau de bord | hash scrypt en base |
+| Jeton du webhook des notifications | en clair en base (`app_settings`), saisi dans **Paramètres** ; jamais réaffiché ni journalisé |
 
 Le dépôt ne contient que des identifiants de développement locaux (`dev-only-password`, base Docker
 liée à `127.0.0.1`) et des fixtures anonymisées. Le source de l'addon, sous droits réservés, n'est
@@ -162,7 +179,7 @@ Utilisateur non privilégié, système de fichiers en lecture seule, toutes capa
 Cloudflare, dans un autre conteneur LXC, est le seul chemin depuis Internet. Connexions sortantes
 hors base : le CDN d'icônes de Blizzard, wago.tools pour la table des noms des objets (chaque jour),
 Wowhead pour les bulles des objets (à la demande, gardées en base) et, si des adresses sont
-configurées, les sondes vers les serveurs de jeu.
+configurées, les sondes vers les serveurs de jeu et le webhook des notifications.
 
 ## Limites assumées
 

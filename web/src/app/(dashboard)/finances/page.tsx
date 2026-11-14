@@ -89,8 +89,16 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
       ))}
     </nav>
   );
+  const actions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {periodNav}
+      <a className="button" href={`${process.env.WOW_BASE_PATH ?? ""}/api/export/finances?period=${period.key}`} download>
+        Exporter (Excel)
+      </a>
+    </div>
+  );
   const header = (
-    <PageHeader art="galleons" section="economy" title="Finances" actions={periodNav}>
+    <PageHeader art="galleons" section="economy" title="Finances" actions={actions}>
       {intro}
     </PageHeader>
   );

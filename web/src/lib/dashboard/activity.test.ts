@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildActivity, type ActivitySnapshot } from "./activity";
+import { buildActivity, filterActivity, isChangeKind, type ActivitySnapshot } from "./activity";
+import { readRosterFilter } from "./roster-filter";
 
-const ELODIE = { id: 1, name: "Élodie", class: "MAGE", account: "Compte A" };
-const AEGIR = { id: 2, name: "Ægir", class: "HUNTER", account: "Compte B" };
+const ELODIE = { id: 1, name: "Élodie", class: "MAGE", accountId: 1, account: "Compte A" };
+const AEGIR = { id: 2, name: "Ægir", class: "HUNTER", accountId: 2, account: "Compte B" };
 
 const snapshot = (character: typeof ELODIE, capturedAt: string, level: number, moneyCopper: number): ActivitySnapshot => ({
   character,
@@ -75,4 +76,24 @@ test("sans changement lisible, il n'y a pas d'activité", () => {
   assert.deepEqual(buildActivity([snapshot(ELODIE, "2026-10-02T08:00:00Z", 20, 500), snapshot(ELODIE, "2026-10-03T08:00:00Z", 20, 500)], SINCE), []);
   assert.deepEqual(buildActivity([snapshot(ELODIE, "2026-10-02T08:00:00Z", 20, 500)], SINCE), []);
   assert.deepEqual(buildActivity([], SINCE), []);
+});
+
+test("filtre : compte, nom et type de changement ; un relevé sans changement retenu disparaît", () => {
+  const days = buildActivity(
+    [
+      snapshot(ELODIE, "2026-10-02T08:00:00Z", 20, 500),
+      snapshot(ELODIE, "2026-10-02T20:00:00Z", 21, 900),
+      snapshot(AEGIR, "2026-10-02T09:00:00Z", 10, 100),
+      snapshot(AEGIR, "2026-10-03T19:30:00Z", 10, 350),
+    ],
+    SINCE,
+  );
+  const texts = (result: ReturnType<typeof filterActivity>) =>
+    result.map((day) => [day.day, day.entries.map((entry) => [entry.character.name, entry.changes.map((change) => change.text)])]);
+
+  assert.deepEqual(texts(filterActivity(days, readRosterFilter({}), "level")), [["2026-10-02", [["Élodie", ["Niveau 20 → 21"]]]]]);
+  assert.deepEqual(texts(filterActivity(days, readRosterFilter({ account: "2" }), null)), [["2026-10-03", [["Ægir", ["+2 pa 50 pc"]]]]]);
+  assert.deepEqual(texts(filterActivity(days, readRosterFilter({ character: "elo" }), "guild")), []);
+  assert.equal(isChangeKind("level"), true);
+  assert.equal(isChangeKind("toString"), false);
 });

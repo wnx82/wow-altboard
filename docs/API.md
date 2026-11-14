@@ -261,8 +261,18 @@ réessayez dans quelques secondes. » Voir [DATABASE § Délais](DATABASE.md).
 ## `GET /api/export/xlsx`
 
 Session du tableau de bord requise (401 sinon). Renvoie `AltBoard-export-AAAA-MM-JJ.xlsx` :
-feuilles Résumé, Personnages, Métiers, Équipement, Monnaies, Réputations, Comptes, Machines.
-Le classeur est une photographie : la base reste la source.
+feuilles Résumé, Personnages, Métiers, Équipement, Monnaies, Réputations, Objectifs, Comptes,
+Machines. Le classeur est une photographie : la base reste la source.
+
+## `GET /api/export/inventory` et `GET /api/export/finances`
+
+La vue affichée d'une page, en Excel : lien « Exporter » de la page. Session requise (401 sinon),
+vérifiée par la route elle-même.
+
+| Route | Paramètres | Fichier |
+|---|---|---|
+| `/api/export/inventory` | ceux de l'adresse de la page **Inventaires** (`q`, `perso`, `lieux`, filtres, `tri`…), mêmes valeurs par défaut | `AltBoard-inventaires-AAAA-MM-JJ.xlsx` : Résumé (filtres appliqués), Objets (une ligne par objet, dans l'ordre de la page), Détail (une ligne par personnage et par endroit) |
+| `/api/export/finances` | `period` : `7`, `30` (par défaut), `90` ou `all` | `AltBoard-finances-AAAA-MM-JJ.xlsx` : Bilan, Par jour (Par mois pour « Tout »), Par personnage, Journées ; revenus et dépenses par source |
 
 ## `GET /api/agent/zip` et `GET /api/agent`
 
@@ -291,13 +301,20 @@ majuscules ignorés. Réponse `Cache-Control: private, no-store` :
 
 ```json
 {"characters":[{"id":6,"name":"…","realm":"…","class":"PALADIN","level":6}],
- "items":[{"itemKey":"2589","name":"Étoffe de lin","quality":1,"icon":"inv_fabric_linen_01","owned":550,"href":"/inventory?q=…"}]}
+ "items":[{"itemKey":"2589","name":"Étoffe de lin","quality":1,"icon":"inv_fabric_linen_01","owned":550,"href":"/inventory?q=…"}],
+ "recipes":[{"spellId":3275,"itemKey":"1251","name":"Bandage en lin","quality":1,"icon":"…","profession":"Secourisme",
+   "crafters":[{"id":1,"name":"…","class":"MAGE"}],"crafterCount":1,"href":"/market/1251"}],
+ "factions":[{"factionId":1090,"name":"Kirin Tor","characters":1,"best":5,"href":"/reputations?faction=Kirin%20Tor"}]}
 ```
 
-6 personnages et 8 objets au plus, rangés par pertinence (le nom commence par le texte, puis l'un
+6 personnages, 8 objets, 5 recettes et 4 factions au plus, rangés par pertinence (le nom commence par le texte, puis l'un
 de ses mots, puis ailleurs). Les objets possédés passent d'abord et mènent à la page Inventaires ;
 les autres ne sont proposés que si l'hôtel des ventes les a déjà vus, et mènent à leur fiche de
-marché. Les pages du menu sont cherchées par le navigateur, sans appel.
+marché. Une recette est cherchée par le nom de l'objet fabriqué, parmi celles qu'au moins un
+personnage connaît ; elle nomme 4 fabricants au plus, du plus haut niveau au plus bas, et mène à
+la fiche de marché de l'objet. Une faction (connue d'au moins un personnage, `best` : palier le plus avancé) mène à la
+page **Réputations** filtrée. Un identifiant numérique ne cherche ni recette ni faction. Les pages
+du menu sont cherchées par le navigateur, sans appel.
 
 ## `GET /api/items/tooltip`
 
@@ -339,4 +356,6 @@ Une ligne JSON par requête de synchronisation, sans jamais de jeton ni de conte
 
 Autres événements : `sync.rejected` (statut, code), `sync.failed`, `sync.unavailable`, `sync.busy`
 (`stage` : `queue` pour la file pleine ou l'attente dépassée, `lock` pour le verrou),
-`auth.login.succeeded`, `auth.login.failed`, `agent_token.created`, `agent_token.revoked`, `export.xlsx`.
+`auth.login.succeeded`, `auth.login.failed`, `agent_token.created`, `agent_token.revoked`, `export.xlsx`,
+`export.inventory`, `export.finances`, `notify.sent`, `notify.failed`
+([NOTIFICATIONS § Journal](NOTIFICATIONS.md#journal)).

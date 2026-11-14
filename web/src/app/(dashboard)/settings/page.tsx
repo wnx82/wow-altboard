@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EconomySettingsForm, ItemNamesImportForm } from "@/components/economy-forms";
+import { NotifySettingsForm, NotifyTestForm } from "@/components/notify-forms";
 import { ResetCharactersForm, StatusSettingsForm } from "@/components/settings-forms";
 import { PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -7,6 +8,8 @@ import { requireSession } from "@/lib/auth/session";
 import { todayInBrussels } from "@/lib/economy/days";
 import { importItemNamesAction, saveEconomySettingsAction } from "@/lib/economy/actions";
 import { catalogSummary } from "@/lib/economy/item-names";
+import { saveNotifySettingsAction, sendTestNotificationAction } from "@/lib/notify/actions";
+import { maskUrl, MAX_SILENT_DAYS, NOTIFY_EVENT_LABELS, NOTIFY_EVENTS, readNotifySettings } from "@/lib/notify/config";
 import { resetCharactersAction, saveStatusSettingsAction } from "@/lib/settings/actions";
 import { characterSummary } from "@/lib/settings/reset";
 import { readSettings } from "@/lib/settings/store";
@@ -19,7 +22,13 @@ export const metadata: Metadata = { title: "Paramètres" };
 export default async function SettingsPage() {
   await requireSession();
   const db = getDatabase();
-  const [{ config }, settings, summary, catalog] = await Promise.all([syncStatusRuntime(), readSettings(db), characterSummary(db), catalogSummary(db)]);
+  const [{ config }, settings, summary, catalog, notify] = await Promise.all([
+    syncStatusRuntime(),
+    readSettings(db),
+    characterSummary(db),
+    catalogSummary(db),
+    readNotifySettings(db),
+  ]);
   const lines = (service: ServiceKey) => config.targets[service].map(formatTarget).join("\n");
   const fromSite = config.fromSite.auth || config.fromSite.game;
 
@@ -48,6 +57,30 @@ export default async function SettingsPage() {
               maxLabelLength={MAX_LABEL_LENGTH}
               fromSite={fromSite}
             />
+          </div>
+        </section>
+
+        <section aria-label="Notifications">
+          <SectionTitle aside={notify.url ? "webhook enregistré" : "aucun webhook"}>Notifications</SectionTitle>
+          <div className="panel p-5">
+            <p className="mb-4 text-sm text-muted">
+              Le serveur envoie un document JSON en POST à un webhook (un nœud Webhook de n8n, par exemple), qui le relaie où vous voulez :
+              niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet, et un rapport chaque lundi matin. Seuls les
+              événements postérieurs à l&apos;enregistrement sont envoyés.
+            </p>
+            <NotifySettingsForm
+              action={saveNotifySettingsAction}
+              maskedUrl={maskUrl(notify.url)}
+              hasToken={notify.token !== null}
+              events={NOTIFY_EVENTS.map((key) => ({ key, label: NOTIFY_EVENT_LABELS[key], enabled: notify.events.includes(key) }))}
+              silentDays={notify.silentDays}
+              maxSilentDays={MAX_SILENT_DAYS}
+            />
+            {notify.url && (
+              <div className="mt-5 border-t border-line pt-4">
+                <NotifyTestForm action={sendTestNotificationAction} />
+              </div>
+            )}
           </div>
         </section>
 

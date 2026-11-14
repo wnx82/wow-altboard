@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { formatDuration } from "@/lib/dashboard/level-times";
-import { hourlyHeatmap, PLAYTIME_WEEKS, playtimeByAccount, weeklySummary } from "@/lib/dashboard/playtime";
+import { hourlyHeatmap, PLAYTIME_WEEKS, playtimeByAccount, playtimeByCharacter, weeklySummary } from "@/lib/dashboard/playtime";
 import { listPlaytimeRows, listSessionFacts } from "@/lib/dashboard/queries";
 import { sessionTagLabel } from "@/lib/dashboard/sessions";
-import { formatInteger } from "@/lib/wow/format";
+import { classKey, formatDateTime, formatInteger } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Temps de jeu" };
 
@@ -21,6 +22,7 @@ export default async function PlaytimePage() {
   const weeksAgo = new Date(now.getTime() - PLAYTIME_WEEKS * 7 * 24 * 3600 * 1000);
   const [playtime, sessions] = await Promise.all([listPlaytimeRows(db), listSessionFacts(db, weeksAgo)]);
   const accounts = playtimeByAccount(playtime);
+  const perCharacter = playtimeByCharacter(playtime, sessions);
   const weeks = weeklySummary(sessions, now);
   // La carte couvre les mêmes semaines que le tableau.
   const since = new Date(`${weeks.at(-1)!.week}T00:00:00Z`);
@@ -83,6 +85,49 @@ export default async function PlaytimePage() {
                         {account.unmeasured > 0 && <span className="block text-xs text-muted">dont {account.unmeasured} sans mesure</span>}
                       </td>
                       <td className="num tabular-nums">{account.seconds > 0 ? formatDuration(account.seconds) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section aria-label="Par personnage">
+            <SectionTitle aside={`/played et sessions des ${PLAYTIME_WEEKS} dernières semaines`}>Par personnage</SectionTitle>
+            <div className="panel overflow-x-auto">
+              <table className="data-table min-w-[720px]">
+                <thead>
+                  <tr>
+                    <th scope="col">Personnage</th>
+                    <th scope="col" className="num">
+                      Niveau
+                    </th>
+                    <th scope="col" className="num">
+                      Temps de jeu
+                    </th>
+                    <th scope="col" className="num">
+                      {PLAYTIME_WEEKS} semaines
+                    </th>
+                    <th scope="col" className="num">
+                      Sessions
+                    </th>
+                    <th scope="col">Dernière session</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {perCharacter.map((character) => (
+                    <tr key={character.characterId} data-class={classKey(character.class)}>
+                      <th scope="row" className="text-left">
+                        <Link href={`/characters/${character.characterId}`} prefetch={false} className="font-semibold class-text hover:underline">
+                          {character.name}
+                        </Link>
+                        <span className="block text-xs font-normal text-muted">{character.accountLabel}</span>
+                      </th>
+                      <td className="num tabular-nums">{character.level ?? "—"}</td>
+                      <td className="num tabular-nums">{character.totalSeconds === null ? "—" : formatDuration(character.totalSeconds)}</td>
+                      <td className="num tabular-nums">{character.recentSeconds > 0 ? formatDuration(character.recentSeconds) : "—"}</td>
+                      <td className="num tabular-nums">{character.sessions || "—"}</td>
+                      <td className="whitespace-nowrap text-muted">{character.lastSessionAt ? formatDateTime(character.lastSessionAt) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -162,7 +162,8 @@ export async function addGoals(db: DatabaseOrTransaction, characterId: number, g
 export async function setManualGoal(db: DatabaseOrTransaction, goalId: number, done: boolean, now: Date): Promise<boolean> {
   const updated = await db
     .update(t.characterGoals)
-    .set({ achievedAt: done ? now : null, updatedAt: now })
+    // notifiedAt : une nouvelle atteinte sera annoncée, même après une première puis un décochage.
+    .set({ achievedAt: done ? now : null, notifiedAt: null, updatedAt: now })
     .where(and(eq(t.characterGoals.id, goalId), eq(t.characterGoals.kind, "manual")))
     .returning({ id: t.characterGoals.id });
   return updated.length > 0;

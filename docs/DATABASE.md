@@ -27,7 +27,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (48)
+## Tables (53)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -119,7 +119,7 @@ reste. Un objectif `manual` se coche sur la fiche.
 
 | Table | Clé | Contenu |
 |---|---|---|
-| `character_goals` | `id` | Un objectif : personnage, position, libellé, sorte, paramètres (`jsonb` : `target`, `subject`), date d'atteinte. Supprimé en cascade avec le personnage |
+| `character_goals` | `id` | Un objectif : personnage, position, libellé, sorte, paramètres (`jsonb` : `target`, `subject`), date d'atteinte, date de son annonce par webhook (`notified_at`, [NOTIFICATIONS](NOTIFICATIONS.md)). Supprimé en cascade avec le personnage |
 | `goal_templates` | `id` | Un modèle, par son nom (unique). Indépendant des personnages : survit à leur réinitialisation |
 | `goal_template_items` | `id` | Objectif d'un modèle, sans date : position, libellé, sorte, paramètres |
 
@@ -133,7 +133,8 @@ reste. Un objectif `manual` se coche sur la fiche.
 
 | Table | Contenu |
 |---|---|
-| `app_settings` | Réglages de la page **Paramètres**, sur une seule ligne (`id = 1`), créée à la première écriture. Adresses surveillées par service (vide : rien n'est surveillé ; absente : l'environnement du serveur s'applique) et libellé d'environnement ([SERVER-STATUS](SERVER-STATUS.md)) ; date limite et date de la dernière réinitialisation des personnages ; début de l'historique des prix et commission de l'hôtel des ventes |
+| `app_settings` | Réglages de la page **Paramètres**, sur une seule ligne (`id = 1`), créée à la première écriture. Adresses surveillées par service (vide : rien n'est surveillé ; absente : l'environnement du serveur s'applique) et libellé d'environnement ([SERVER-STATUS](SERVER-STATUS.md)) ; date limite et date de la dernière réinitialisation des personnages ; début de l'historique des prix et commission de l'hôtel des ventes ; webhook des notifications (adresse, jeton, événements, délai d'un PC muet) |
+| `notification_state` | Où en sont les notifications, sur une seule ligne (`id = 1`), créée au premier passage : dernier relevé et dernier contrôle de serveur examinés, PC muets déjà signalés (`jsonb`), semaine du dernier rapport hebdomadaire ([NOTIFICATIONS](NOTIFICATIONS.md)) |
 
 ### Accès au tableau de bord
 
@@ -312,6 +313,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0018_item_specs_bonding` | colonne `item_specs.bonding` (ajout seul) ; `build` des lignes existantes vidé pour que l'import suivant la remplisse. Aucune ligne supprimée |
 | `0019_item_tooltips` | `item_tooltips` (ajout seul) |
 | `0020_perf_indexes` | neuf index (ajouts seuls, voir **Index**) |
+| `0021_notifications` | `notification_state`, colonnes `app_settings.notify_*` et `character_goals.notified_at` (ajouts seuls). Les objectifs déjà atteints reçoivent `notified_at = achieved_at` : rien n'est annoncé pour eux. Aucune ligne supprimée |
 
 ## Checkpoint B
 

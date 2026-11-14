@@ -230,6 +230,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
           Tous les personnages
         </Link>
         <span className="flex flex-wrap gap-x-4 text-sm">
+          <Link href={`/compare?c=${character.id}`} prefetch={false} className="text-muted hover:text-gold hover:underline">
+            Comparer
+          </Link>
           <NeighborLink character={neighbors.previous} direction="previous" />
           <NeighborLink character={neighbors.next} direction="next" />
         </span>

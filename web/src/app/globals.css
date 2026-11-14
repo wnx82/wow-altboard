@@ -965,6 +965,9 @@ body {
   .data-table thead th:last-child { border-top-right-radius: var(--radius-card); }
   .data-table tbody tr:nth-child(even) { background: rgb(255 255 255 / 0.012); }
   .data-table td { padding: 0.65rem 0.9rem; border-bottom: 1px solid rgb(255 255 255 / 0.05); vertical-align: middle; }
+  /* Comparateur : une colonne par personnage, nommé en clair ; la meilleure valeur de la ligne en or. */
+  .compare-table thead th { font-size: 0.86rem; letter-spacing: normal; text-transform: none; color: var(--text); }
+  .compare-table td[data-best] { color: var(--gold); font-weight: 600; }
   /* En-tête de ligne (scope="row") : une cellule ordinaire pour l'œil, un en-tête pour les lecteurs d'écran. */
   .data-table tbody th {
     font-size: inherit;
