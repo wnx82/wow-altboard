@@ -180,7 +180,7 @@ export default async function CraftingPage({ searchParams }: PageProps<"/craftin
               <tbody>
                 {rows.map(({ craft, recipe, stock }) => (
                   <tr key={craft.spellId}>
-                    <td className="min-w-[14rem]">
+                    <td className="min-w-[10rem] sm:min-w-[14rem]">
                       <ItemName itemKey={craft.outputKey} names={context.names} query={itemQuery} />
                       {craft.outputQuantity > 1 && <span className="text-muted"> × {craft.outputQuantity}</span>}
                       <div className="mt-0.5 text-xs text-muted">

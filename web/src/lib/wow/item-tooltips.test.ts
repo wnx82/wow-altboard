@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, test } from "node:test";
 import { eq } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { openTestDatabase, type TestDatabase } from "@/db/testing";
-import { fetchWowheadTooltip, getItemTooltip, resetTooltipFailures, tooltipKey, tooltipUrl } from "./item-tooltips";
+import { equippedItemKey, fetchWowheadTooltip, getEnchantText, getItemTooltip, resetTooltipFailures, tooltipKey, tooltipUrl } from "./item-tooltips";
 
 const NOW = new Date("2026-11-13T10:00:00Z");
 const DAY = 24 * 60 * 60 * 1000;
@@ -27,16 +27,26 @@ const ok = (tooltip: string): Reply => ({ status: 200, body: JSON.stringify({ na
 
 describe("bulles d'objets : clés", () => {
   test("objet, suffixe aléatoire, clé d'Auctionator ; ni mascotte ni clé illisible", () => {
-    assert.deepEqual(tooltipKey("15210"), { key: "15210", itemId: 15210, suffix: null });
-    assert.deepEqual(tooltipKey("15210:1017"), { key: "15210:1017", itemId: 15210, suffix: 1017 });
-    assert.deepEqual(tooltipKey("15210:0"), { key: "15210", itemId: 15210, suffix: null });
-    assert.deepEqual(tooltipKey("g:15210:60"), { key: "15210", itemId: 15210, suffix: null });
-    for (const bad of ["p:42", "", "abc", "0", "99999999999", "1:2:3", "-5"]) assert.equal(tooltipKey(bad), null, bad);
+    assert.deepEqual(tooltipKey("15210"), { key: "15210", itemId: 15210, suffix: null, enchant: null });
+    assert.deepEqual(tooltipKey("15210:1017"), { key: "15210:1017", itemId: 15210, suffix: 1017, enchant: null });
+    assert.deepEqual(tooltipKey("15210:0"), { key: "15210", itemId: 15210, suffix: null, enchant: null });
+    assert.deepEqual(tooltipKey("g:15210:60"), { key: "15210", itemId: 15210, suffix: null, enchant: null });
+    for (const bad of ["p:42", "", "abc", "0", "99999999999", "1:2:3", "-5", "12e", "e24", "12e1234567", "g:12e24"]) assert.equal(tooltipKey(bad), null, bad);
   });
 
-  test("adresse : WoW Forever en français, suffixe en rand", () => {
+  test("objet porté : son enchantement fait partie de la clé, zéro vaut aucun", () => {
+    assert.equal(equippedItemKey(2969, 24), "2969e24");
+    assert.equal(equippedItemKey(2969, null), "2969");
+    assert.equal(equippedItemKey(2969, 0), "2969");
+    assert.deepEqual(tooltipKey("2969e24"), { key: "2969e24", itemId: 2969, suffix: null, enchant: 24 });
+    assert.deepEqual(tooltipKey("15210:1017e1900"), { key: "15210:1017e1900", itemId: 15210, suffix: 1017, enchant: 1900 });
+    assert.deepEqual(tooltipKey("2969e0"), { key: "2969", itemId: 2969, suffix: null, enchant: null });
+  });
+
+  test("adresse : WoW Forever en français, suffixe en rand, enchantement en ench", () => {
     assert.equal(tooltipUrl(19019, null), "https://nether.wowhead.com/tooltip/item/19019?dataEnv=16&locale=2");
     assert.equal(tooltipUrl(15210, 1017), "https://nether.wowhead.com/tooltip/item/15210?dataEnv=16&locale=2&rand=1017");
+    assert.equal(tooltipUrl(2969, null, 24), "https://nether.wowhead.com/tooltip/item/2969?dataEnv=16&locale=2&ench=24");
   });
 });
 
@@ -85,6 +95,22 @@ describe("bulles d'objets : cache en base", () => {
     assert.deepEqual(wowhead.calls, [url]);
     await getItemTooltip(database.db, "15210:1017", { now: later(31), fetch: wowhead.fetchImpl });
     assert.deepEqual(wowhead.calls, [url, url]);
+  });
+
+  test("enchantement porté : bulle de l'objet enchanté, gardée à part, et son effet", async () => {
+    // Extrait réel de Wowhead (Gilet de lieur de sort, ench=24) : la ligne verte marquée « ee ».
+    const vest =
+      '<table><tr><td><!--nstart--><b class="q2">Gilet</b><!--nend--><span><!--amr-->Armure : 30</span><br><span><!--stat5-->+5 Intelligence</span><!--rs--><br /><span class="q2"><!--ee9:0:0:0:0:0-->Intelligence +2</span><!--ps--><br>Durabilité 55 / 55</td></tr></table>';
+    const wowhead = fakeWowhead({ [tooltipUrl(2969, null, 24)]: ok(vest), [tooltipUrl(2969, null, 99)]: ok(SWORD) });
+    assert.equal(await getEnchantText(database.db, 2969, 24, { now: NOW, fetch: wowhead.fetchImpl }), "Intelligence +2");
+    const [row] = await database.db.select().from(t.itemTooltips).where(eq(t.itemTooltips.itemKey, "2969e24"));
+    assert.equal(row.status, "ok");
+    // Lu une seule fois : la fiche relue sert la base.
+    assert.equal(await getEnchantText(database.db, 2969, 24, { now: later(1), fetch: wowhead.fetchImpl }), "Intelligence +2");
+    assert.equal(wowhead.calls.length, 1);
+    // Bulle sans ligne d'enchantement, ou objet inconnu : pas d'effet.
+    assert.equal(await getEnchantText(database.db, 2969, 99, { now: NOW, fetch: wowhead.fetchImpl }), null);
+    assert.equal(await getEnchantText(database.db, 31337, 5, { now: NOW, fetch: wowhead.fetchImpl }), null);
   });
 
   test("deux demandes simultanées : une seule lecture", async () => {

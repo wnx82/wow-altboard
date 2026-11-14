@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
 import { Change, Confidence, ItemName, MarketSelector, MarketSource } from "@/components/economy";
 import { DeleteAlertButton } from "@/components/economy-forms";
@@ -78,7 +79,8 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
 
       <section aria-label="Tous les objets" className="mt-8">
         <SectionTitle aside={`${formatInteger(view.total)} objet${view.total > 1 ? "s" : ""}`}>Tous les objets</SectionTitle>
-        <form method="get" action="/market" className="mb-3 flex flex-wrap items-end gap-3">
+        {/* Form de Next : l'adresse suit le préfixe du site (WOW_BASE_PATH), et la recherche reste une navigation interne. */}
+        <Form action="/market" prefetch={false} className="mb-3 flex flex-wrap items-end gap-3">
           {itemQuery && <input type="hidden" name="market" value={context.market.id} />}
           <label className="block min-w-[14rem] flex-1">
             <span className="eyebrow">Rechercher</span>
@@ -100,7 +102,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
           <button className="button" type="submit">
             Filtrer
           </button>
-        </form>
+        </Form>
 
         {view.rows.length === 0 ? (
           <div className="panel p-5 text-sm text-muted">Aucun objet ne correspond.</div>

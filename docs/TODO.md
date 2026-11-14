@@ -83,6 +83,11 @@ personnage recréé, et à tous les autres.
   combien ? ». La recherche actuelle est limitée à l'inventaire d'un personnage ; les tables
   `character_items` et `items` suffisent. Fait le 2026-11-08 (`190404c`) : page **Objets**, par
   nom (sans tenir compte des accents) ou identifiant, sacs, banque et équipement.
+- [ ] **P3 · M** — Retirer la page **Objets**, qui double en partie **Inventaires** et Ctrl+K
+  (audit du 2026-11-13). Elle seule cherche dans les objets portés : ajouter d'abord « Porté » aux
+  lieux d'**Inventaires** (sans que la page **Équipement** compte un objet porté comme une
+  réserve), puis rediriger `/items` vers `/inventory`. Gardée en l'état le 2026-11-14, sur décision
+  du propriétaire.
 - [x] **P2 · M** — Bloc « À surveiller » sur l'accueil, calculé sans nouvelle donnée : sacs pleins
   (`bag_slots_used` / `bag_slots_total`), banque jamais relevée (`bank_at` vide), personnage non
   relevé depuis N jours, emplacement d'équipement vide, métier arrivé à son maximum. Fait le
@@ -241,13 +246,15 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
 
 ### Accessibilité
 
-- [ ] **P2 · S** — Contraste : `--faint` (`#6b7690`, `web/src/app/globals.css:15`) donne entre
+- [x] **P2 · S** — Contraste : `--faint` (`#6b7690`, `web/src/app/globals.css:15`) donne entre
   3,6:1 et 4,35:1 sur les fonds du thème, sous le seuil AA de 4,5:1, pour du texte de 0,7 rem :
   en-têtes de tableau, libellés des tuiles, pied de page, indications de saisie. L'éclaircir
   (vers `#8089a3`), en gardant la teinte actuelle pour les traits. Rapports calculés, non mesurés
-  à l'écran.
-- [ ] **P2 · S** — Aucun lien « Aller au contenu » : dix éléments focalisables précèdent `<main>`
-  sur chaque page (`web/src/app/(dashboard)/layout.tsx:22`).
+  à l'écran. Fait le 2026-11-14 (site 0.26.0) : `#8590a8`, de 5,0:1 (en-tête de tableau) à 6,2:1
+  (fond de page), rapports calculés ; traits compris.
+- [x] **P2 · S** — Aucun lien « Aller au contenu » : dix éléments focalisables précèdent `<main>`
+  sur chaque page (`web/src/app/(dashboard)/layout.tsx:22`). Fait le 2026-11-14 (site 0.26.0) :
+  premier arrêt du clavier, visible au focus, vers `<main id="contenu">`.
 - [ ] **P2 · M** — Graphiques : chaque point et chaque colonne est un arrêt de tabulation
   (`web/src/components/trend-chart.tsx:124`, `column-chart.tsx:149`), soit plusieurs centaines
   sur une fiche. Un seul arrêt par graphique, les flèches pour passer d'un point à l'autre.

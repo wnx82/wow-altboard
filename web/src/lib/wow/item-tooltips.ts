@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { type Fetch, readLimited } from "@/lib/economy/item-names";
-import { parseWowheadTooltip, type TooltipLine } from "./wowhead-tooltip";
+import { enchantText, parseWowheadTooltip, type TooltipLine } from "./wowhead-tooltip";
 
 // Bulles d'objets à la manière de Wowhead : dégâts, vitesse, armure, caractéristiques, effets,
 // ensemble, durabilité, prix de vente. Les tables du jeu publiées par wago.tools ne suffisent pas :
@@ -21,22 +21,31 @@ const MAX_BYTES = 256 * 1024;
 /** Lectures simultanées chez Wowhead, toutes demandes confondues. */
 const MAX_CONCURRENT = 3;
 
-export const tooltipUrl = (itemId: number, suffix: number | null) =>
-  `https://nether.wowhead.com/tooltip/item/${itemId}?dataEnv=${WOWHEAD_DATA_ENV}&locale=${WOWHEAD_LOCALE}${suffix === null ? "" : `&rand=${suffix}`}`;
+export const tooltipUrl = (itemId: number, suffix: number | null, enchant: number | null = null) =>
+  `https://nether.wowhead.com/tooltip/item/${itemId}?dataEnv=${WOWHEAD_DATA_ENV}&locale=${WOWHEAD_LOCALE}${suffix === null ? "" : `&rand=${suffix}`}${
+    enchant === null ? "" : `&ench=${enchant}`
+  }`;
+
+/** Clé d'un objet porté : l'identifiant, suivi de « e » et de l'enchantement quand il y en a un (« 2969e24 »). */
+export const equippedItemKey = (itemId: number, enchantId: number | null) => (enchantId === null || enchantId === 0 ? String(itemId) : `${itemId}e${enchantId}`);
+
+export type TooltipTarget = { key: string; itemId: number; suffix: number | null; enchant: number | null };
 
 /**
- * Clé de cache d'une clé d'objet : « 1234 », « 1234:567 » (suffixe aléatoire relevé par l'addon) ;
- * « g:1234:60 » (Auctionator) désigne l'objet de base. Null pour une mascotte (« p:… ») ou une clé
- * illisible.
+ * Clé de cache d'une clé d'objet : « 1234 », « 1234:567 » (suffixe aléatoire relevé par l'addon),
+ * « 2969e24 » (objet porté et son enchantement) ; « g:1234:60 » (Auctionator) désigne l'objet de
+ * base. Null pour une mascotte (« p:… ») ou une clé illisible.
  */
-export function tooltipKey(itemKey: string): { key: string; itemId: number; suffix: number | null } | null {
+export function tooltipKey(itemKey: string): TooltipTarget | null {
   const auction = /^g:(\d{1,10})(?::\d{1,5})?$/.exec(itemKey);
-  const own = /^(\d{1,10})(?::(\d{1,7}))?$/.exec(itemKey);
+  const own = /^(\d{1,10})(?::(\d{1,7}))?(?:e(\d{1,6}))?$/.exec(itemKey);
   const itemId = Number(auction?.[1] ?? own?.[1] ?? Number.NaN);
   if (!Number.isInteger(itemId) || itemId < 1 || itemId > 2_147_483_647) return null;
-  const suffix = auction ? null : own?.[2] === undefined ? null : Number(own[2]);
-  if (suffix === 0) return { key: String(itemId), itemId, suffix: null };
-  return { key: suffix === null ? String(itemId) : `${itemId}:${suffix}`, itemId, suffix };
+  const read = (value: string | undefined) => (auction || value === undefined || Number(value) === 0 ? null : Number(value));
+  const suffix = read(own?.[2]);
+  const enchant = read(own?.[3]);
+  const key = `${itemId}${suffix === null ? "" : `:${suffix}`}${enchant === null ? "" : `e${enchant}`}`;
+  return { key, itemId, suffix, enchant };
 }
 
 export type ItemTooltip = { status: "ok" | "missing"; lines: TooltipLine[]; fetchedAt: Date } | { status: "unavailable" };
@@ -46,10 +55,10 @@ const responseSchema = z.object({ tooltip: z.string().max(MAX_BYTES) });
 type Fetched = { ok: true; lines: TooltipLine[] } | { ok: true; missing: true } | { ok: false; error: string };
 
 /** Bulle d'un objet chez Wowhead ; « missing » quand Wowhead ne le connaît pas. */
-export async function fetchWowheadTooltip(fetchImpl: Fetch, itemId: number, suffix: number | null): Promise<Fetched> {
+export async function fetchWowheadTooltip(fetchImpl: Fetch, itemId: number, suffix: number | null, enchant: number | null = null): Promise<Fetched> {
   let response: Response;
   try {
-    response = await fetchImpl(tooltipUrl(itemId, suffix), {
+    response = await fetchImpl(tooltipUrl(itemId, suffix, enchant), {
       headers: { accept: "application/json", "user-agent": "wow-altboard" },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "error",
@@ -122,7 +131,7 @@ export async function getItemTooltip(db: Database, itemKey: string, options: { n
   if (pending) return pending;
   if ((failedUntil.get(target.key) ?? 0) > options.now.getTime()) return kept ?? { status: "unavailable" };
   const work = limited(async (): Promise<ItemTooltip> => {
-    const fetched = await fetchWowheadTooltip(options.fetch ?? fetch, target.itemId, target.suffix);
+    const fetched = await fetchWowheadTooltip(options.fetch ?? fetch, target.itemId, target.suffix, target.enchant);
     if (!fetched.ok) {
       remember(target.key, options.now);
       return kept ?? { status: "unavailable" };
@@ -143,4 +152,13 @@ export async function getItemTooltip(db: Database, itemKey: string, options: { n
   }).finally(() => inflight.delete(target.key));
   inflight.set(target.key, work);
   return work;
+}
+
+/**
+ * Effet d'un enchantement porté (« Intelligence +2 »), lu dans la bulle de l'objet enchanté : les
+ * tables du jeu ne sont pas importées ici. Null quand Wowhead ne le donne pas.
+ */
+export async function getEnchantText(db: Database, itemId: number, enchantId: number, options: { now: Date; fetch?: Fetch }): Promise<string | null> {
+  const tooltip = await getItemTooltip(db, equippedItemKey(itemId, enchantId), options);
+  return tooltip.status === "ok" ? enchantText(tooltip.lines) : null;
 }

@@ -136,3 +136,8 @@ export function writeBrowserState(state: BrowserState, current = ""): string {
   const search = params.toString();
   return search === "" ? "" : `?${search}`;
 }
+
+/** Lien vers l'accueil filtré, depuis une autre page : « /?compte=780 », « /?metier=Couture ». */
+export function homeHref(filters: Partial<Filters>): string {
+  return `/${writeBrowserState({ ...DEFAULT_STATE, filters: { ...NO_FILTERS, ...filters } })}`;
+}

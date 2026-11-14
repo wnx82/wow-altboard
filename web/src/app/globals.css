@@ -13,7 +13,8 @@
   --line-strong: rgb(255 255 255 / 0.16);
   --text: #e8ecf5;
   --muted: #9aa5bd;
-  --faint: #6b7690;
+  /* Texte secondaire (en-têtes de tableau, notes) : 5:1 au moins sur toutes les surfaces (AA). */
+  --faint: #8590a8;
   --gold: #e3bd6a;
   --gold-deep: #a9802f;
   --accent: #6f9bff;
@@ -878,6 +879,27 @@ body {
   .field:focus { border-color: var(--gold); outline: none; background: rgb(7 10 18 / 0.9); }
   select.field { padding-right: 2rem; }
   select.field option { background: var(--surface); color: var(--text); }
+  /* Écran tactile : sous 16 px, Safari sur iPhone agrandit la page à chaque saisie. */
+  @media (pointer: coarse) {
+    .field { font-size: 1rem; }
+  }
+
+  /* « Aller au contenu » : premier arrêt du clavier, visible seulement quand il a le focus. */
+  .skip-link {
+    position: fixed;
+    z-index: 50;
+    top: 0.6rem;
+    left: 0.75rem;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--gold);
+    border-radius: 0.7rem;
+    background: var(--surface);
+    color: var(--gold);
+    font-size: 0.85rem;
+    font-weight: 600;
+    transform: translateY(-200%);
+  }
+  .skip-link:focus { transform: none; }
 
   .button {
     display: inline-flex;
@@ -959,6 +981,18 @@ body {
   .data-table tbody tr { transition: background 120ms ease; }
   .data-table tbody tr:hover { background: rgb(255 255 255 / 0.035); }
   .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* Téléphone : la première colonne (le nom) reste en place quand un tableau large défile. Fond
+     opaque, celui des panneaux : le reste de la ligne passe dessous. */
+  @media (max-width: 767px) {
+    .data-table :is(thead, tbody) > tr > :first-child:not([colspan]) {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: #131a2b;
+      box-shadow: inset -1px 0 0 var(--line);
+    }
+    .data-table thead > tr > :first-child:not([colspan]) { background: #181f30; }
+  }
 
   /* Courbes de l'historique. Couleurs de série validées sur la surface sombre
      (bande de luminosité, contraste et séparation en vision daltonienne). */

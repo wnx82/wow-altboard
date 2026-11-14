@@ -4,6 +4,37 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.26.0 — 2026-11-14
+
+### Ajouté
+
+- **Fiche d'un personnage :**
+  - bulles d'objets sur l'équipement, comme dans les inventaires ;
+  - effet de chaque enchantement (« Intelligence +2 », « Croisé ») au lieu de son numéro, lu dans
+    la bulle Wowhead de l'objet enchanté (paramètre `ench`) puis gardé en base trente jours ;
+  - lien « Améliorations en réserve » vers **Équipement** pour ce personnage ;
+  - « Monnaies » dans le sommaire ;
+  - personnage précédent et suivant, dans l'ordre de l'accueil.
+- Liens entre les pages :
+  - **Comptes** vers l'accueil filtré sur le compte (`/?compte=`) ;
+  - **Métiers** vers l'accueil filtré sur le métier (`/?metier=`) ;
+  - fiche d'un objet du **Marché** vers **Inventaires** (`/inventory?q=`).
+- Lien « Aller au contenu », premier arrêt du clavier sur chaque page.
+
+### Modifié
+
+- Texte secondaire (`--faint`) éclairci en `#8590a8` : 5:1 au moins sur toutes les surfaces (AA).
+- Sur écran tactile, les champs de saisie passent à 16 px : Safari sur iPhone n'agrandit plus la
+  page à chaque saisie.
+- Sur téléphone, la première colonne d'un tableau large reste en place quand il défile.
+- Une fois connecté, une adresse inconnue affiche sa page 404 avec l'en-tête et le menu du tableau
+  de bord, toujours avec le code 404. Cadre partagé : `components/dashboard-shell.tsx`.
+
+### Corrigé
+
+- Le formulaire de recherche du **Marché** suit le préfixe du site (`WOW_BASE_PATH`) : il
+  utilise `next/form`.
+
 ## Site 0.25.0 — 2026-11-14
 
 ### Ajouté

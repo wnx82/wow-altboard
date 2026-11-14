@@ -71,6 +71,8 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
   const marketSuffix = marketQuery(context.market, context.markets, "&");
   const itemQuery = marketQuery(context.market, context.markets);
   const owned = context.stock.get(key) ?? 0;
+  // Inventaires cherche par identifiant (« 1234 » et ses variantes) ; une mascotte (« p:… ») n'y a pas d'entrée.
+  const inventoryId = /^(?:g:)?(\d{1,10})(?::|$)/.exec(key)?.[1] ?? null;
 
   return (
     <>
@@ -204,7 +206,25 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section aria-label="Stock">
-          <SectionTitle aside={owned > 0 ? `${formatInteger(owned)} au total` : undefined}>Vos stocks</SectionTitle>
+          <SectionTitle
+            aside={
+              owned > 0 ? (
+                <>
+                  {formatInteger(owned)} au total
+                  {inventoryId !== null && (
+                    <>
+                      {" · "}
+                      <Link href={`/inventory?q=${inventoryId}`} prefetch={false} className="text-gold hover:underline">
+                        Voir dans Inventaires
+                      </Link>
+                    </>
+                  )}
+                </>
+              ) : undefined
+            }
+          >
+            Vos stocks
+          </SectionTitle>
           {holdings.length === 0 ? (
             <div className="panel p-5 text-sm text-muted">Aucun personnage n&apos;en possède (sacs et banques relevés).</div>
           ) : (

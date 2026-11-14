@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { DEFAULT_STATE, NO_FILTERS, readBrowserState, writeBrowserState, type BrowserState } from "./browser-state";
+import { DEFAULT_STATE, homeHref, NO_FILTERS, readBrowserState, writeBrowserState, type BrowserState } from "./browser-state";
 
 const read = (search: string) => readBrowserState(new URLSearchParams(search));
 
@@ -67,5 +67,13 @@ describe("état de la liste de l'accueil dans l'adresse", () => {
   test("les paramètres étrangers à la liste sont conservés", () => {
     assert.equal(writeBrowserState({ ...DEFAULT_STATE, favoritesOnly: true }, "?q=ancien&utm=x"), "?utm=x&favoris=1");
     assert.equal(writeBrowserState(DEFAULT_STATE, "utm=x&tri=nom"), "?utm=x");
+  });
+
+  test("liens vers l'accueil filtré, relus tels quels par la liste", () => {
+    assert.equal(homeHref({}), "/");
+    assert.equal(homeHref({ account: "780" }), "/?compte=780");
+    const profession = homeHref({ profession: "Premiers soins" });
+    assert.equal(profession, "/?metier=Premiers+soins");
+    assert.equal(read(profession.slice(1)).filters.profession, "Premiers soins");
   });
 });

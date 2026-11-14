@@ -171,6 +171,24 @@ export async function getOverview(db: Database): Promise<Overview> {
   };
 }
 
+export type CharacterLink = { id: number; name: string; class: string | null };
+
+/** Personnages avant et après celui-ci, dans l'ordre de l'accueil par défaut ; null aux extrémités. */
+export function neighborsOf<T extends { id: number }>(ordered: readonly T[], id: number): { previous: T | null; next: T | null } {
+  const index = ordered.findIndex((entry) => entry.id === id);
+  if (index < 0) return { previous: null, next: null };
+  return { previous: ordered[index - 1] ?? null, next: ordered[index + 1] ?? null };
+}
+
+/** Voisins d'une fiche : même ordre que listCharacters (niveau décroissant, puis nom), l'identifiant départage. */
+export async function getCharacterNeighbors(db: Database, id: number): Promise<{ previous: CharacterLink | null; next: CharacterLink | null }> {
+  const ordered = await db
+    .select({ id: t.characters.id, name: t.characters.name, class: t.characters.class })
+    .from(t.characters)
+    .orderBy(desc(t.characters.level), asc(t.characters.name), asc(t.characters.id));
+  return neighborsOf(ordered, id);
+}
+
 /** Sessions de jeu lues pour une fiche : les plus récentes. */
 export const SESSIONS_SHOWN = 100;
 

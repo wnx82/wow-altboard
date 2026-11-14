@@ -14,6 +14,7 @@ import { buildActivity } from "./activity";
 import { buildLevelProgress } from "./levels";
 import {
   getCharacterDetail,
+  getCharacterNeighbors,
   getOverview,
   hasLedgerDays,
   listAccounts,
@@ -23,6 +24,7 @@ import {
   listMachines,
   listRecentRuns,
   listRecentSnapshots,
+  neighborsOf,
 } from "./queries";
 
 const BASE: SyncPayload = JSON.parse(
@@ -146,6 +148,18 @@ describe("lecture du tableau de bord", () => {
     assert.equal(detail.stats?.intellect, 116);
     // Le nom des objets vient du référentiel partagé.
     assert.ok(detail.bags.every((item) => item.name !== null));
+  });
+
+  test("personnage précédent et suivant : l'ordre de l'accueil, rien aux extrémités", async () => {
+    await sync(BASE);
+    const listed = await listCharacters(database.db);
+    assert.ok(listed.length >= 2, "le jeu d'essai doit compter au moins deux personnages");
+    const first = await getCharacterNeighbors(database.db, listed[0].id);
+    assert.deepEqual([first.previous, first.next?.id], [null, listed[1].id]);
+    const last = await getCharacterNeighbors(database.db, listed.at(-1)!.id);
+    assert.deepEqual([last.previous?.id, last.next], [listed.at(-2)!.id, null]);
+    assert.deepEqual(await getCharacterNeighbors(database.db, 999_999), { previous: null, next: null });
+    assert.deepEqual(neighborsOf([{ id: 1 }, { id: 2 }, { id: 3 }], 2), { previous: { id: 1 }, next: { id: 3 } });
   });
 
   test("comptes et machines sont agrégés", async () => {

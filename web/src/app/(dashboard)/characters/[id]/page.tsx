@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
+import { cache, Suspense } from "react";
+import { CharacterEquipment, type EquipmentRow } from "@/components/character-equipment";
 import { CharacterGoals } from "@/components/character-goals";
 import { CharacterInventory, type CharacterInventoryPlace } from "@/components/character-inventory";
-import { ItemThumb } from "@/components/item-slots";
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { ClassAvatar, FactionBadge, GameIcon, Meter, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
+import { describeError } from "@/lib/errors";
 import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
 import { buildHistory } from "@/lib/dashboard/history";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
-import { getCharacterDetail, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
+import { getCharacterDetail, getCharacterNeighbors, SESSIONS_SHOWN, type CharacterDetail, type CharacterLink } from "@/lib/dashboard/queries";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
 import { isGear } from "@/lib/wow/gear";
 import { loadItemSpecs } from "@/lib/wow/item-specs";
+import { equippedItemKey, getEnchantText } from "@/lib/wow/item-tooltips";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
 import {
   classKey,
@@ -57,6 +59,7 @@ export async function generateMetadata({ params }: PageProps<"/characters/[id]">
 const SECTIONS: SectionLink[] = [
   { id: "goals", label: "Objectifs" },
   { id: "professions", label: "Métiers" },
+  { id: "currencies", label: "Monnaies" },
   { id: "equipment", label: "Équipement" },
   { id: "stats", label: "Statistiques" },
   { id: "reputations", label: "Réputations" },
@@ -79,12 +82,13 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
   const now = new Date();
   const heldKeys = [...character.bags, ...character.bank, ...character.mail, ...character.auctions].map((item) => item.itemKey);
   const equipmentKeys = character.equipment.flatMap((item) => (item.itemId === null ? [] : [String(item.itemId)]));
-  const [goals, templates, itemNames, values, specs] = await Promise.all([
+  const [goals, templates, itemNames, values, specs, neighbors] = await Promise.all([
     listCharacterGoals(db, character.id),
     listTemplates(db),
     loadItemNames(db, [...heldKeys, ...equipmentKeys]),
     loadMarketValues(db, heldKeys, now),
-    loadItemSpecs(db, heldKeys),
+    loadItemSpecs(db, [...heldKeys, ...equipmentKeys]),
+    getCharacterNeighbors(db, character.id),
   ]);
   // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
   const slotItems = Object.fromEntries(
@@ -120,6 +124,38 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         }))
       : []),
   ];
+
+  // Équipement : même bulle que les inventaires ; celle d'un objet enchanté porte son enchantement.
+  const equipmentRows: EquipmentRow[] = character.equipment.map((item) => {
+    const spec = item.itemId === null ? undefined : specs.get(String(item.itemId));
+    const gear = isGear(spec) ? spec : undefined;
+    return {
+      slot: item.slot,
+      slotLabel: SLOT_LABELS[item.slot] ?? `Emplacement ${item.slot}`,
+      tipKey: item.itemId === null ? null : equippedItemKey(item.itemId, item.enchantId),
+      name: item.name ?? (item.itemId === null ? "Objet inconnu" : `Objet n° ${item.itemId}`),
+      quality: item.quality,
+      qualityLabel: item.quality === null ? undefined : QUALITY_LABELS[item.quality],
+      icon: item.itemId === null ? null : (itemNames.get(String(item.itemId))?.icon ?? null),
+      itemLevel: item.itemLevel,
+      ...(gear ? { gear } : {}),
+    };
+  });
+  // Effet de chaque enchantement : lu chez Wowhead à la première visite, il arrive après le reste de la page.
+  const enchants = Object.fromEntries(
+    character.equipment.flatMap((item) =>
+      item.enchantId === null || item.enchantId === 0
+        ? []
+        : [
+            [
+              item.slot,
+              <Suspense key={item.slot} fallback="Enchantement…">
+                <EnchantEffect itemId={item.itemId} enchantId={item.enchantId} />
+              </Suspense>,
+            ],
+          ],
+    ),
+  );
 
   const stats = character.stats;
   const history = buildHistory(character.snapshots);
@@ -189,9 +225,15 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
 
   return (
     <div data-class={classKey(character.class)}>
-      <Link href="/" className="page-eyebrow hover:underline">
-        Tous les personnages
-      </Link>
+      <nav aria-label="Autres personnages" className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <Link href="/" className="page-eyebrow hover:underline">
+          Tous les personnages
+        </Link>
+        <span className="flex flex-wrap gap-x-4 text-sm">
+          <NeighborLink character={neighbors.previous} direction="previous" />
+          <NeighborLink character={neighbors.next} direction="next" />
+        </span>
+      </nav>
 
       <header className="panel character-card character-hero isolate mt-4 flex flex-wrap items-center gap-5 p-6 sm:p-7" data-class={classKey(character.class)}>
         {/* Grande icône de la classe, floue, en fond : la même signature que le podium de l'accueil. */}
@@ -341,41 +383,23 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         </section>
 
         <section aria-labelledby="equipment">
-          <SectionTitle aside={`${character.equipment.length} emplacement${character.equipment.length > 1 ? "s" : ""} équipé${character.equipment.length > 1 ? "s" : ""}`}>
+          <SectionTitle
+            aside={
+              <>
+                {`${character.equipment.length} emplacement${character.equipment.length > 1 ? "s" : ""} équipé${character.equipment.length > 1 ? "s" : ""} · `}
+                <Link href={`/gear?pour=${character.id}&ameliorations=1`} prefetch={false} className="text-gold hover:underline">
+                  Améliorations en réserve
+                </Link>
+              </>
+            }
+          >
             <span id="equipment">Équipement</span>
           </SectionTitle>
           <div className="panel overflow-x-auto">
             {character.equipment.length === 0 ? (
               <p className="p-5 text-sm text-muted">Aucun objet équipé relevé.</p>
             ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Emplacement</th>
-                    <th scope="col">Objet</th>
-                    <th scope="col" className="num">
-                      Niveau
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {character.equipment.map((item) => (
-                    <tr key={item.slot} data-quality={item.quality ?? undefined}>
-                      <td className="whitespace-nowrap text-muted">{SLOT_LABELS[item.slot] ?? `Emplacement ${item.slot}`}</td>
-                      <td>
-                        <span className="item-link">
-                          <ItemThumb icon={item.itemId === null ? null : itemNames.get(String(item.itemId))?.icon} quality={item.quality} />
-                          <span className="quality-text font-medium" title={item.quality === null ? undefined : QUALITY_LABELS[item.quality]}>
-                            {item.name ?? (item.itemId === null ? "Objet inconnu" : `Objet n° ${item.itemId}`)}
-                          </span>
-                        </span>
-                        {item.enchantId !== null && <span className="block pl-[1.9rem] text-xs text-ok">Enchantement n° {item.enchantId}</span>}
-                      </td>
-                      <td className="num">{item.itemLevel ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <CharacterEquipment rows={equipmentRows} enchants={enchants} />
             )}
           </div>
         </section>
@@ -665,4 +689,30 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
 
 function formatNullable(value: number | null | undefined): string | null {
   return value === null || value === undefined ? null : formatInteger(value);
+}
+
+/** Personnage voisin dans l'ordre de l'accueil (niveau décroissant, puis nom). */
+function NeighborLink({ character, direction }: { character: CharacterLink | null; direction: "previous" | "next" }) {
+  if (!character) return null;
+  const previous = direction === "previous";
+  return (
+    <Link href={`/characters/${character.id}`} prefetch={false} rel={previous ? "prev" : "next"} className="hover:underline" data-class={classKey(character.class)}>
+      <span className="text-muted">{previous ? "← Précédent : " : "Suivant : "}</span>
+      <span className="class-text font-semibold">{character.name}</span>
+      {!previous && <span className="text-muted"> →</span>}
+    </Link>
+  );
+}
+
+/** Effet d'un enchantement porté ; son numéro quand Wowhead ne le donne pas. */
+async function EnchantEffect({ itemId, enchantId }: { itemId: number | null; enchantId: number }) {
+  const fallback = `Enchantement n° ${enchantId}`;
+  if (itemId === null) return fallback;
+  try {
+    return (await getEnchantText(getDatabase(), itemId, enchantId, { now: new Date() })) ?? fallback;
+  } catch (error) {
+    // Base indisponible : la fiche reste lisible, l'enchantement garde son numéro.
+    console.error(JSON.stringify({ event: "character.enchant.failed", itemId, enchantId, error: describeError(error) }));
+    return fallback;
+  }
 }

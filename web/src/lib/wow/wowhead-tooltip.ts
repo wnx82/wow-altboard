@@ -14,7 +14,7 @@ export type TooltipSegment = { text: string; tone?: TooltipTone };
  * calée à gauche et à droite (« Tête » / « Plaques », « Dégâts » / « Vitesse »), ou prix de vente.
  */
 export type TooltipLine =
-  | { type: "text"; segments: TooltipSegment[]; indent?: true }
+  | { type: "text"; segments: TooltipSegment[]; indent?: true; enchant?: true }
   | { type: "pair"; left: TooltipSegment[]; right: TooltipSegment[] }
   | { type: "money"; copper: number };
 
@@ -143,12 +143,16 @@ export function parseWowheadTooltip(html: string): TooltipLine[] {
   const lines: TooltipLine[] = [];
   let current: TooltipSegment[] = [];
   let indent = false;
+  // Ligne de l'enchantement demandé (paramètre ench) : Wowhead la signale par un commentaire « ee ».
+  let enchant = false;
 
   const flush = () => {
     const segments = tidy(current);
+    const enchanted = enchant;
     current = [];
+    enchant = false;
     if (segments.length === 0 || lines.length >= MAX_LINES) return;
-    lines.push({ type: "text", segments: setCount(segments), ...(indent ? { indent: true as const } : {}) });
+    lines.push({ type: "text", segments: setCount(segments), ...(indent ? { indent: true as const } : {}), ...(enchanted ? { enchant: true as const } : {}) });
   };
 
   // Texte d'une cellule, sur une seule ligne : un retour à la ligne devient une espace.
@@ -208,13 +212,18 @@ export function parseWowheadTooltip(html: string): TooltipLine[] {
         case "script":
         case "style":
           break;
+        case "enchmark":
+          enchant = true;
+          break;
         default:
           block(child, childTone);
       }
     }
   };
 
-  block(parseTree(html.replace(/<!--nstart-->[\s\S]*?<!--nend-->/, "")), undefined);
+  // Les commentaires sont abandonnés par parseTree : celui de l'enchantement devient une balise vide.
+  const marked = html.replace(/<!--nstart-->[\s\S]*?<!--nend-->/, "").replace(/<!--ee[\d:]{0,40}-->/g, "<enchmark/>");
+  block(parseTree(marked), undefined);
   flush();
   return lines;
 }
@@ -228,9 +237,17 @@ function setCount(segments: TooltipSegment[]): TooltipSegment[] {
   return [...segments.slice(0, -1), { ...last, text: `${last.text.slice(0, match.index)} (${match[1]} pièces)` }];
 }
 
-/** Fiche de l'objet sur Wowhead, version WoW Forever en français. */
-export const wowheadItemUrl = (itemId: number, suffix: number | null = null) =>
-  `https://www.wowhead.com/forever/fr/item=${itemId}${suffix === null ? "" : `?rand=${suffix}`}`;
+/** Effet de l'enchantement tel que Wowhead l'écrit (« Intelligence +2 », « Croisé »), ou null. */
+export function enchantText(lines: readonly TooltipLine[]): string | null {
+  const line = lines.find((candidate) => candidate.type === "text" && candidate.enchant === true);
+  return line ? lineText(line) : null;
+}
+
+/** Fiche de l'objet sur Wowhead, version WoW Forever en français ; suffixe et enchantement en paramètres. */
+export function wowheadItemUrl(itemId: number, suffix: number | null = null, enchant: number | null = null): string {
+  const params = [suffix === null ? null : `rand=${suffix}`, enchant === null ? null : `ench=${enchant}`].filter(Boolean);
+  return `https://www.wowhead.com/forever/fr/item=${itemId}${params.length === 0 ? "" : `?${params.join("&")}`}`;
+}
 
 /** Texte brut d'une ligne, pour les tests et l'accessibilité. */
 export function lineText(line: TooltipLine): string {

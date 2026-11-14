@@ -3,6 +3,7 @@ import Link from "next/link";
 import { EmptyState, Meter, PageHeader, ProfessionIcon, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
+import { homeHref } from "@/lib/dashboard/browser-state";
 import { compareProfessions, PRIMARY_SLOTS, type ProfessionRow } from "@/lib/dashboard/professions";
 import { listCharacters, type CharacterListItem } from "@/lib/dashboard/queries";
 import { classKey } from "@/lib/wow/format";
@@ -78,9 +79,10 @@ function ProfessionGrid({ title, rows }: { title: string; rows: ProfessionRow<Ch
               <h3 className="display text-lg font-bold">
                 <ProfessionIcon skillLine={row.skillLine} size={22} /> {row.name}
               </h3>
-              <span className="text-xs text-muted">
+              <Link href={homeHref({ profession: row.name })} prefetch={false} className="text-xs text-muted hover:text-gold hover:underline">
                 {row.holders.length} personnage{row.holders.length > 1 ? "s" : ""}
-              </span>
+                <span className="sr-only"> : voir à l&apos;accueil</span>
+              </Link>
             </div>
             <ol className="mt-4 space-y-3">
               {row.holders.map(({ character, rank, maxRank }) => (

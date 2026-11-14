@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { decodeEntities, lineText, MAX_LINES, parseWowheadTooltip, type TooltipLine, wowheadItemUrl } from "./wowhead-tooltip";
+import { decodeEntities, enchantText, lineText, MAX_LINES, parseWowheadTooltip, type TooltipLine, wowheadItemUrl } from "./wowhead-tooltip";
 
 // Bulles réelles de Wowhead (WoW Forever, en français), relevées le 2026-11-13.
 const THUNDERFURY =
@@ -121,5 +121,20 @@ describe("bulles de Wowhead : lecture", () => {
     assert.equal(decodeEntities("a&nbsp;b &quot;c&quot; &#39;d&#39; &#0; &#xFFFFFFF;"), "a b \"c\" 'd' &#0; &#xFFFFFFF;");
     assert.equal(wowheadItemUrl(19019), "https://www.wowhead.com/forever/fr/item=19019");
     assert.equal(wowheadItemUrl(15210, 1017), "https://www.wowhead.com/forever/fr/item=15210?rand=1017");
+    assert.equal(wowheadItemUrl(2969, null, 24), "https://www.wowhead.com/forever/fr/item=2969?ench=24");
+    assert.equal(wowheadItemUrl(15210, 1017, 24), "https://www.wowhead.com/forever/fr/item=15210?rand=1017&ench=24");
+  });
+
+  test("enchantement demandé (ench) : sa ligne verte est marquée, et seule elle", () => {
+    // Relevé réel du 2026-11-14 : Déchireuse en arcanite, ench=1900 (Croisé).
+    const reaper =
+      '<table><tr><td><!--nstart--><b class="q3">Déchireuse en arcanite</b><!--nend--><table width="100%"><tr><td>Deux mains</td><th><span class="q1">Hache</span></th></tr></table><span><!--stat7-->+13 Endurance</span><!--ebstats--><!--egstats--><!--eistats--><!--nameDescStats--><!--rs--><br /><span class="q2"><!--ee1900:0:0:0:0:0-->Croisé</span><!--ps--><br>Durabilité 100 / 100</td></tr></table>';
+    const lines = parseWowheadTooltip(reaper);
+    assert.deepEqual(texts(lines), ["Deux mains | Hache", "+13 Endurance", "Croisé", "Durabilité 100 / 100"]);
+    assert.deepEqual(lines[2], { type: "text", segments: [{ text: "Croisé", tone: "q2" }], enchant: true });
+    assert.equal(enchantText(lines), "Croisé");
+    // Sans ench, ni marque ni effet ; un « Équiper : » vert n'est pas un enchantement.
+    assert.equal(enchantText(parseWowheadTooltip(EQUIP)), null);
+    assert.ok(parseWowheadTooltip(THUNDERFURY).every((line) => line.type !== "text" || line.enchant === undefined));
   });
 });

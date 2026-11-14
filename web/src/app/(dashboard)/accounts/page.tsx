@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AccountReference } from "@/components/account-reference";
 import { DeleteAccountForm, RenameForm } from "@/components/admin-forms";
 import { FavoriteToggle } from "@/components/favorite-toggle";
@@ -6,6 +7,7 @@ import { EmptyState, Money, PageHeader, StarIcon } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { deleteAccountAction, renameAccountAction } from "@/lib/dashboard/actions";
+import { homeHref } from "@/lib/dashboard/browser-state";
 import { listAccounts } from "@/lib/dashboard/queries";
 import { formatDateTime, formatRelative } from "@/lib/wow/format";
 
@@ -44,6 +46,14 @@ export default async function AccountsPage() {
                 <div>
                   <dt className="eyebrow">Personnages</dt>
                   <dd className="mt-0.5 text-lg font-semibold tabular-nums">{account.characters}</dd>
+                  {account.characters > 0 && (
+                    <dd>
+                      <Link href={homeHref({ account: String(account.id) })} prefetch={false} className="text-xs text-gold hover:underline">
+                        Voir à l&apos;accueil
+                        <span className="sr-only"> les personnages de {account.label}</span>
+                      </Link>
+                    </dd>
+                  )}
                 </div>
                 <div>
                   <dt className="eyebrow">Niveau max.</dt>

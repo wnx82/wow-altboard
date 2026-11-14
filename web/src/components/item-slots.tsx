@@ -317,8 +317,9 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-/** Clé dont Wowhead peut décrire l'objet : « 1234 » ou « 1234:567 » (suffixe), pas une mascotte. */
-const describable = (itemKey: string) => /^\d{1,10}(?::\d{1,7})?$/.test(itemKey);
+/** Clé dont Wowhead peut décrire l'objet : « 1234 », « 1234:567 » (suffixe) ou « 1234e24 » (enchanté), pas une mascotte. */
+const DESCRIBABLE = /^(\d{1,10})(?::(\d{1,7}))?(?:e(\d{1,6}))?$/;
+const describable = (itemKey: string) => DESCRIBABLE.test(itemKey);
 
 const isLines = (value: unknown): value is TooltipLine[] =>
   Array.isArray(value) && value.every((line) => typeof line === "object" && line !== null && typeof (line as { type?: unknown }).type === "string");
@@ -412,7 +413,8 @@ export function TooltipLines({ lines }: { lines: readonly TooltipLine[] }) {
  */
 export function ItemDetails({ itemKey, gear, pinned }: { itemKey: string; gear: GearSpec | undefined; pinned: boolean }) {
   const known = useItemDetails(itemKey, pinned);
-  const match = /^(\d+)(?::(\d+))?$/.exec(itemKey);
+  const match = DESCRIBABLE.exec(itemKey);
+  const optional = (value: string | undefined) => (value === undefined ? null : Number(value));
   if (known?.status === "ok") {
     return (
       <>
@@ -420,7 +422,7 @@ export function ItemDetails({ itemKey, gear, pinned }: { itemKey: string; gear: 
         {pinned && match && (
           <p className="mt-1.5">
             <a
-              href={wowheadItemUrl(Number(match[1]), match[2] === undefined ? null : Number(match[2]))}
+              href={wowheadItemUrl(Number(match[1]), optional(match[2]), optional(match[3]))}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[0.72rem] text-[#8f9bb8] hover:text-white hover:underline"
