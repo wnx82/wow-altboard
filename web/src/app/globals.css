@@ -1676,6 +1676,122 @@ body {
   .gear-others { margin-top: 0.55rem; }
   .gear-others summary { cursor: pointer; font-size: 0.75rem; color: var(--muted); }
   .gear-others summary:hover { color: var(--gold); }
+
+  /* Fiche d'un personnage, équipement à la manière de la fenêtre Personnage du jeu : armure à gauche
+     et à droite (en miroir), la classe au centre, les armes en bas. Une colonne sur téléphone. */
+  .paperdoll {
+    display: grid;
+    gap: 0.9rem 1.25rem;
+    padding: 0.9rem;
+    grid-template-areas: "center" "left" "right" "weapons";
+  }
+  .paperdoll-center { grid-area: center; }
+  .paperdoll-column[data-column="left"] { grid-area: left; }
+  .paperdoll-column[data-column="right"] { grid-area: right; }
+  .paperdoll-column[data-column="weapons"] {
+    grid-area: weapons;
+    padding-top: 0.9rem;
+    border-top: 1px solid rgb(227 189 106 / 0.12);
+  }
+  .paperdoll-column { display: grid; gap: 0.3rem; align-content: start; min-width: 0; }
+  @media (min-width: 640px) {
+    .paperdoll {
+      padding: 1.25rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas: "center center" "left right" "weapons weapons";
+    }
+    .paperdoll-column[data-column="right"] .paperdoll-slot {
+      flex-direction: row-reverse;
+      padding: 0.3rem 0.3rem 0.3rem 0.55rem;
+      text-align: right;
+      background: linear-gradient(270deg, rgb(255 255 255 / 0.035), transparent 85%);
+    }
+    .paperdoll-column[data-column="weapons"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (min-width: 1024px) {
+    .paperdoll {
+      grid-template-columns: minmax(0, 1fr) minmax(14rem, 17rem) minmax(0, 1fr);
+      grid-template-areas: "left center right" "weapons weapons weapons";
+    }
+    .paperdoll-column[data-column="weapons"] { grid-template-columns: repeat(3, minmax(0, 18rem)); justify-content: center; }
+  }
+
+  .paperdoll-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    padding: 1.25rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--class) 30%, transparent);
+    border-radius: 1rem;
+    text-align: center;
+    background:
+      radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--class) 18%, transparent), transparent 70%),
+      linear-gradient(180deg, rgb(24 32 52 / 0.75), rgb(10 14 24 / 0.75));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  }
+  .paperdoll-medallion {
+    display: block;
+    width: 5.5rem;
+    height: 5.5rem;
+    overflow: hidden;
+    border: 2px solid color-mix(in srgb, var(--class) 70%, transparent);
+    border-radius: 999px;
+    background: #0d0d11;
+    box-shadow: 0 0 0 4px rgb(0 0 0 / 0.45), 0 0 30px -4px var(--class);
+  }
+  .paperdoll-medallion img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .paperdoll-ilvl { display: grid; justify-items: center; gap: 0.2rem; }
+  .paperdoll-ilvl span { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .paperdoll-ilvl strong { font-size: 2.1rem; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .paperdoll-qualities { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem; }
+  .paperdoll-qualities li {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.1rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--quality) 35%, transparent);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    background: color-mix(in srgb, var(--quality) 8%, transparent);
+  }
+  .paperdoll-qualities strong { font-variant-numeric: tabular-nums; }
+
+  .paperdoll-slot {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    min-width: 0;
+    min-height: 3.7rem;
+    padding: 0.3rem 0.55rem 0.3rem 0.3rem;
+    border: 1px solid transparent;
+    border-radius: 0.65rem;
+    color: inherit;
+    text-align: left;
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.035), transparent 85%);
+  }
+  button.paperdoll-slot { cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
+  button.paperdoll-slot:hover,
+  .paperdoll-slot[aria-expanded="true"] {
+    border-color: color-mix(in srgb, var(--quality) 40%, transparent);
+    background-color: color-mix(in srgb, var(--quality) 7%, transparent);
+  }
+  .paperdoll-slot:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .paperdoll-slot[aria-expanded="true"] { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .paperdoll .paperdoll-column .paperdoll-slot[data-empty] { background: none; }
+  /* Après .item-slot : la case garde son liseré et son reflet, à une taille fixe. */
+  .paperdoll-icon { flex: none; width: 3rem; height: 3rem; }
+  .paperdoll-slot[data-empty] .paperdoll-icon { border-style: dashed; opacity: 0.7; }
+  .paperdoll-text { display: grid; gap: 0.08rem; min-width: 0; line-height: 1.25; }
+  .paperdoll-label { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(227 189 106 / 0.72); }
+  .paperdoll-level { letter-spacing: 0.04em; color: var(--muted); }
+  .paperdoll-name,
+  .paperdoll-enchant { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paperdoll-name { font-size: 0.9rem; font-weight: 600; }
+  .paperdoll-enchant { font-size: 0.72rem; color: var(--ok); }
+  .paperdoll-none { font-size: 0.8rem; color: var(--faint); }
 }
 
 @keyframes refresh-pulse {

@@ -4,6 +4,21 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.30.0 — 2026-11-16
+
+### Modifié
+
+- **Fiche d'un personnage, Équipement** : le tableau devient une fiche à la manière de la fenêtre
+  Personnage du jeu. L'armure est à gauche (tête à poignets) et à droite (mains à bijoux), les trois
+  armes sont en bas. Chaque emplacement montre sa case d'icône au liseré de qualité, le nom de
+  l'objet, son niveau et son enchantement. Un emplacement vide reste visible.
+- Au centre de la fiche : le médaillon de la classe, le niveau d'objet moyen, les emplacements
+  garnis (chemise et tabard mis à part), les objets enchantés et le compte des objets par qualité.
+  La bulle de chaque objet ne change pas.
+- La fiche et les statistiques prennent toute la largeur sur grand écran. Les statistiques passent
+  alors sur trois colonnes.
+- Sur téléphone, la fiche tient sur une seule colonne, avec le centre en premier.
+
 ## Site 0.29.0 — 2026-11-16
 
 Pour la mise à jour automatique de l'agent 0.9.0. Migration `0022` : données seulement.

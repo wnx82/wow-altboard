@@ -35,7 +35,6 @@ import {
   progressPercent,
   QUALITY_LABELS,
   REACTION_LABELS,
-  SLOT_LABELS,
 } from "@/lib/wow/format";
 
 // L'identifiant vient de l'URL : seul un entier positif est accepté. Mis en cache le temps de la
@@ -131,7 +130,6 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
     const gear = isGear(spec) ? spec : undefined;
     return {
       slot: item.slot,
-      slotLabel: SLOT_LABELS[item.slot] ?? `Emplacement ${item.slot}`,
       tipKey: item.itemId === null ? null : equippedItemKey(item.itemId, item.enchantId),
       name: item.name ?? (item.itemId === null ? "Objet inconnu" : `Objet n° ${item.itemId}`),
       quality: item.quality,
@@ -385,29 +383,32 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
           </div>
         </section>
 
-        <section aria-labelledby="equipment">
+        {/* Fiche à la manière du jeu : pleine largeur, comme les statistiques en dessous. */}
+        <section aria-labelledby="equipment" className="xl:col-span-2">
+          {/* Le compte des emplacements garnis est au centre de la fiche. */}
           <SectionTitle
             aside={
-              <>
-                {`${character.equipment.length} emplacement${character.equipment.length > 1 ? "s" : ""} équipé${character.equipment.length > 1 ? "s" : ""} · `}
-                <Link href={`/gear?pour=${character.id}&ameliorations=1`} prefetch={false} className="text-gold hover:underline">
-                  Améliorations en réserve
-                </Link>
-              </>
+              <Link href={`/gear?pour=${character.id}&ameliorations=1`} prefetch={false} className="text-gold hover:underline">
+                Améliorations en réserve
+              </Link>
             }
           >
             <span id="equipment">Équipement</span>
           </SectionTitle>
-          <div className="panel overflow-x-auto">
+          <div className="panel">
             {character.equipment.length === 0 ? (
               <p className="p-5 text-sm text-muted">Aucun objet équipé relevé.</p>
             ) : (
-              <CharacterEquipment rows={equipmentRows} enchants={enchants} />
+              <CharacterEquipment
+                rows={equipmentRows}
+                enchants={enchants}
+                hero={{ name: character.name, classToken: character.class, level: character.level, itemLevel: character.itemLevel }}
+              />
             )}
           </div>
         </section>
 
-        <section aria-labelledby="stats">
+        <section aria-labelledby="stats" className="xl:col-span-2">
           <SectionTitle aside={character.statsAt ? `Relevées ${formatRelative(character.statsAt, now)}, améliorations actives incluses` : undefined}>
             <span id="stats">Statistiques</span>
           </SectionTitle>
@@ -415,7 +416,7 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
             {statRows.every(([, value]) => value === null) ? (
               <p className="text-sm text-muted">Aucune statistique relevée.</p>
             ) : (
-              <dl className="grid grid-cols-1 gap-x-8 text-sm sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-x-8 text-sm sm:grid-cols-2 xl:grid-cols-3">
                 {statRows
                   .filter(([, value]) => value !== null)
                   .map(([label, value]) => (
