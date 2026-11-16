@@ -11,6 +11,9 @@ public sealed record JournalEntry
     public const string Failed = "failed";
     public const string Info = "info";
 
+    /// <summary>Mise à jour automatique en échec : la synchronisation, elle, continue.</summary>
+    public const string UpdateFailed = "update_failed";
+
     public required DateTimeOffset At { get; init; }
 
     public required string Kind { get; init; }
@@ -76,6 +79,8 @@ public sealed class SyncJournal(string directory, Func<DateTimeOffset> now)
     public void Failed(string message) => Append(new JournalEntry { At = now(), Kind = JournalEntry.Failed, Message = message });
 
     public void Info(string message) => Append(new JournalEntry { At = now(), Kind = JournalEntry.Info, Message = message });
+
+    public void UpdateFailed(string message) => Append(new JournalEntry { At = now(), Kind = JournalEntry.UpdateFailed, Message = message });
 
     /// <summary>Les dernières entrées, la plus récente en premier.</summary>
     public IReadOnlyList<JournalEntry> ReadLatest(int count = KeptEntries)

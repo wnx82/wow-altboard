@@ -304,6 +304,10 @@ const account = z
     characters: z.array(character).max(200),
     items: z.array(item).max(50_000),
     warnings,
+    // Informations sans gravité (personnages vus par Baganator mais pas par AltBoard…) : gardées comme
+    // les avertissements, sans rendre la synchronisation partielle. Facultatives : un agent antérieur
+    // à 0.9.0 ne les envoie pas.
+    notices: warnings.optional(),
     // Facultatifs : un agent antérieur à 0.5.0 ne les envoie pas.
     auctionator: auctionator.optional(),
     recipes: recipes.optional(),

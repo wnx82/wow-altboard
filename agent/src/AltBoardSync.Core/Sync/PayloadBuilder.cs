@@ -34,9 +34,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// les empreintes enregistrées par l'agent précédent ne correspondent plus, et chaque compte est
     /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
     /// 3 : finances par jour d'Allemano Ledger (0.7.0). 4 : courrier, enchères et banques de guilde de
-    /// Baganator (0.8.0).
+    /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0).
     /// </summary>
-    public const string PayloadFormat = "4";
+    public const string PayloadFormat = "5";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -50,7 +50,8 @@ public sealed class PayloadBuilder(StableFileReader reader)
             var economyWarnings = new List<string>();
             var auctionator = await ReadAuctionatorAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
             var recipes = await ReadRecipesAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
-            var (baganator, baganatorItems) = await ReadBaganatorAsync(source, characters, economyWarnings, cancellationToken).ConfigureAwait(false);
+            var notices = new List<string>();
+            var (baganator, baganatorItems) = await ReadBaganatorAsync(source, characters, economyWarnings, notices, cancellationToken).ConfigureAwait(false);
             var payload = new AccountPayload(
                 AccountKey.Compute(source.AccountFolder),
                 AccountKey.Hint(source.AccountFolder),
@@ -66,6 +67,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 Auctionator = auctionator,
                 Recipes = recipes,
                 Baganator = baganator,
+                Notices = notices.Count > 0 ? PayloadLimits.Warnings(notices) : null,
             };
             return new AccountReadResult(source, payload, null)
             {
@@ -162,7 +164,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// (un personnage de la bêta et son homonyme de WoW Forever, que Syndicator confond).
     /// </summary>
     private async Task<(BaganatorPayload? Payload, IReadOnlyList<ItemPayload> Items)> ReadBaganatorAsync(
-        AccountSource source, IReadOnlyList<CharacterPayload> characters, List<string> warnings, CancellationToken cancellationToken)
+        AccountSource source, IReadOnlyList<CharacterPayload> characters, List<string> warnings, List<string> notices, CancellationToken cancellationToken)
     {
         if (source.SyndicatorFilePath is null) return (null, []);
         try
@@ -175,19 +177,16 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 .GroupBy(c => c.Name, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.MaxBy(c => c.LastSeen)!.Guid, StringComparer.Ordinal);
             var held = new List<CharacterHoldingsPayload>();
-            var unknown = 0;
+            var unknown = new SortedSet<string>(StringComparer.Ordinal);
             foreach (var character in data.Characters)
             {
-                if (!guidByName.TryGetValue(character.Name, out var guid)) unknown++;
+                if (!guidByName.TryGetValue(character.Name, out var guid)) unknown.Add(character.Name);
                 else if (held.All(h => h.Guid != guid)) held.Add(new CharacterHoldingsPayload(guid, character.Mail, character.Auctions));
             }
 
-            if (unknown > 0)
-            {
-                warnings.Add(unknown == 1
-                    ? "Baganator : 1 personnage absent d'AltBoard sur ce compte, son courrier et ses enchères ne sont pas transmis."
-                    : $"Baganator : {unknown} personnages absents d'AltBoard sur ce compte, leur courrier et leurs enchères ne sont pas transmis.");
-            }
+            // Une information, pas un avertissement : un personnage jamais connecté avec AltBoard (ou
+            // supprimé) n'empêche rien d'autre de partir.
+            if (unknown.Count > 0) notices.Add(UnknownToAltBoard(unknown));
             if (held.Count == 0 && data.Guilds.Count == 0) return (null, []);
             held.Sort((a, b) => string.CompareOrdinal(a.Guid, b.Guid));
             return (new BaganatorPayload(FileOf(snapshot), held, data.Guilds), data.Items);
@@ -197,6 +196,19 @@ public sealed class PayloadBuilder(StableFileReader reader)
             warnings.Add(Truncate($"Baganator illisible, courrier, enchères et banques de guilde non transmis : {e.Message}"));
             return (null, []);
         }
+    }
+
+    /// <summary>Noms cités au plus dans l'information sur les personnages absents d'AltBoard.</summary>
+    private const int MaxNamedCharacters = 10;
+
+    /// <summary>« Baganator : 2 personnages absents d'AltBoard sur ce compte (Alpha, Beta) : … ».</summary>
+    public static string UnknownToAltBoard(IReadOnlyCollection<string> names)
+    {
+        var shown = string.Join(", ", names.Take(MaxNamedCharacters));
+        if (names.Count > MaxNamedCharacters) shown += $" et {names.Count - MaxNamedCharacters} autres";
+        return names.Count == 1
+            ? $"Baganator : 1 personnage absent d'AltBoard sur ce compte ({shown}) : son courrier et ses enchères ne sont pas transmis."
+            : $"Baganator : {names.Count} personnages absents d'AltBoard sur ce compte ({shown}) : leur courrier et leurs enchères ne sont pas transmis.";
     }
 
     /// <summary>Référentiel d'objets du compte : celui d'AltBoard d'abord, complété par les objets que lui seul ignore.</summary>

@@ -194,6 +194,19 @@ describe("lecture du tableau de bord", () => {
     assert.deepEqual(run.errors[0], { code: "agent_warning", message: "avertissement 1" });
   });
 
+  test("les informations de l'agent sont listées à part, sans compter comme erreurs", async () => {
+    const payload = structuredClone(BASE);
+    payload.accounts[0].warnings = ["avertissement 1"];
+    payload.accounts[0].notices = Array.from({ length: 11 }, (_, i) => `information ${i + 1}`);
+    await sync(payload);
+
+    const [run] = await listRecentRuns(database.db);
+
+    assert.deepEqual([run.status, run.errorsCount, run.errors.length], ["partial", 1, 1]);
+    assert.deepEqual([run.noticesCount, run.notices.length], [11, 10]);
+    assert.deepEqual(run.notices[0], { code: "agent_notice", message: "information 1" });
+  });
+
   test("un nom d'affichage personnalisé remplace le libellé par défaut", async () => {
     await sync(BASE);
     await database.db.update(t.wowAccounts).set({ displayName: "Compte principal" }).where(eq(t.wowAccounts.folderHint, "11…#1"));

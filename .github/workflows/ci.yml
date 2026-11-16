@@ -79,6 +79,29 @@ jobs:
       - run: dotnet test
       - name: Publication
         run: dotnet publish src/AltBoardSync -c Release -o ../dist
+      # L'exécutable publié (réduit, en un seul fichier) démarre, lit un dossier du jeu et construit son
+      # document : un défaut de réduction n'apparaît qu'ici (0.7.0), pas dans dotnet test. selfcheck est
+      # aussi ce que la mise à jour automatique exige d'une version avant de l'installer.
+      - name: Exécutable publié
+        env:
+          ALTBOARDSYNC_HOME: ${{ runner.temp }}\altboardsync
+        run: |
+          $exe = Resolve-Path ../dist/AltBoardSync.exe
+          $wow = Join-Path $env:RUNNER_TEMP 'wow'
+          $account = Join-Path $wow '_classic_\WTF\Account\123456789#1\SavedVariables'
+          New-Item -ItemType Directory -Force $account | Out-Null
+          Copy-Item ../tests/fixtures/account-two-characters.lua (Join-Path $account 'AltBoard.lua')
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          $reported = & $exe version
+          if ($LASTEXITCODE -ne 0 -or $reported -ne $version) { throw "version : « $reported » au lieu de $version" }
+          & $exe config set wowPath $wow
+          if ($LASTEXITCODE -ne 0) { throw 'config set wowPath' }
+          & $exe scan
+          if ($LASTEXITCODE -ne 0) { throw 'scan' }
+          $check = & $exe selfcheck
+          $check
+          if ($LASTEXITCODE -ne 0 -or $check[0] -ne $version) { throw 'selfcheck' }
+          if (-not ($check -match '^comptes : 1 lus')) { throw 'selfcheck : compte non lu' }
       - uses: actions/upload-artifact@v7
         with:
           name: AltBoardSync

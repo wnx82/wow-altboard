@@ -16,6 +16,16 @@ public sealed record AgentConfig
     public string WowPath { get; init; } = AccountScanner.DefaultWowPath;
 
     public string ServerUrl { get; init; } = DefaultServerUrl;
+
+    /// <summary>
+    /// Mise à jour automatique (agent 0.9.0 et suivants) ; absente, elle est active. Nullable plutôt
+    /// qu'un booléen à true : le générateur de sérialisation passe les propriétés init par l'initialiseur
+    /// d'objet, et une clé absente d'une configuration plus ancienne y vaudrait false.
+    /// </summary>
+    public bool? AutoUpdate { get; init; }
+
+    [JsonIgnore]
+    public bool UpdatesAutomatically => AutoUpdate ?? true;
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = true)]

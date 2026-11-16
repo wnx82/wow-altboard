@@ -291,6 +291,7 @@ export default async function MachinesPage() {
                 {runs.map((run) => {
                   const status = STATUS[run.status] ?? { label: run.status, tone: "warn" };
                   const hidden = run.errorsCount - run.errors.length;
+                  const hiddenNotices = run.noticesCount - run.notices.length;
                   return (
                     <Fragment key={run.id}>
                       <tr>
@@ -311,17 +312,25 @@ export default async function MachinesPage() {
                         <td className="num">{run.snapshotsCreated}</td>
                         <td className="num">{run.durationMs === null ? "—" : `${run.durationMs} ms`}</td>
                       </tr>
-                      {run.errors.length > 0 && (
+                      {(run.errors.length > 0 || run.notices.length > 0) && (
                         <tr>
                           <td colSpan={10} className="text-xs">
                             <ul className="space-y-1">
                               {run.errors.map((error, index) => (
-                                <li key={index}>
+                                <li key={`e${index}`}>
                                   <span className="font-semibold text-text">{ERROR_LABELS[error.code] ?? error.code}</span>{" "}
                                   <span className="break-words text-muted">{error.message}</span>
                                 </li>
                               ))}
                               {hidden > 0 && <li className="text-faint">et {hidden} de plus</li>}
+                              {/* Sans gravité : la synchronisation reste réussie. */}
+                              {run.notices.map((notice, index) => (
+                                <li key={`n${index}`}>
+                                  <span className="font-semibold text-muted">Information</span>{" "}
+                                  <span className="break-words text-faint">{notice.message}</span>
+                                </li>
+                              ))}
+                              {hiddenNotices > 0 && <li className="text-faint">et {hiddenNotices} de plus</li>}
                             </ul>
                           </td>
                         </tr>

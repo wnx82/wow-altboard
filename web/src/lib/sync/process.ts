@@ -7,12 +7,16 @@ import { sqlState } from "@/lib/errors";
 import { canonicalHash } from "@/lib/hash";
 import { readSettings } from "@/lib/settings/store";
 import { applyAuctionator, applyRecipes, emptyEconomyCounters, type EconomyCounters } from "./economy";
+import { AGENT_NOTICE, AGENT_WARNING } from "./codes";
 import { applyBaganator } from "./inventory";
 import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
 
 export type SyncResult = {
   runId: number;
-  /** « partial » : l'agent a signalé des avertissements, conservés dans sync_errors. */
+  /**
+   * « partial » : l'agent a signalé des avertissements, conservés dans sync_errors. Ses informations
+   * (agent_notice) y sont aussi, sans rendre la synchronisation partielle.
+   */
   status: "success" | "partial";
   accountsReceived: number;
   charactersReceived: number;
@@ -25,6 +29,16 @@ export type SyncResult = {
 } & EconomyCounters;
 
 export type SyncContext = { tokenId: number; requestId: string; now: Date } & SyncLockOptions;
+
+// Un agent antérieur à 0.9.0 envoie parmi ses avertissements les personnages que Baganator connaît
+// et qu'AltBoard n'a jamais vus : une information, que l'agent 0.9.0 range lui-même à part.
+const LEGACY_NOTICES = [/^Baganator : \d+ personnages? absents? d'AltBoard sur ce compte/];
+
+/** Sépare les avertissements reçus des informations, y compris celles d'un agent plus ancien. */
+export function classifyRemarks(warnings: string[], notices: string[]): { warnings: string[]; notices: string[] } {
+  const legacy = warnings.filter((message) => LEGACY_NOTICES.some((pattern) => pattern.test(message)));
+  return { warnings: warnings.filter((message) => !legacy.includes(message)), notices: [...legacy, ...notices] };
+}
 
 /** Le jeton présenté est déjà lié à une autre machine. */
 export class TokenMachineMismatchError extends Error {
@@ -202,10 +216,17 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       await recordAchievements(tx, received.map((row) => row.id), now);
     }
 
-    const warnings = payload.accounts.flatMap((account) =>
-      account.warnings.map((message) => ({ syncRunId: run.id, accountKey: account.accountKey, code: "agent_warning", message })),
-    );
-    if (warnings.length > 0) await tx.insert(t.syncErrors).values(warnings);
+    // Seuls les avertissements rendent la synchronisation partielle ; les informations sont gardées
+    // à côté, sous leur propre code.
+    const remarks = payload.accounts.flatMap((account) => {
+      const { warnings: kept, notices } = classifyRemarks(account.warnings, account.notices ?? []);
+      return [
+        ...kept.map((message) => ({ syncRunId: run.id, accountKey: account.accountKey, code: AGENT_WARNING, message })),
+        ...notices.map((message) => ({ syncRunId: run.id, accountKey: account.accountKey, code: AGENT_NOTICE, message })),
+      ];
+    });
+    if (remarks.length > 0) await tx.insert(t.syncErrors).values(remarks);
+    const warnings = remarks.filter((remark) => remark.code === AGENT_WARNING);
     const status = warnings.length > 0 ? "partial" : "success";
 
     await tx

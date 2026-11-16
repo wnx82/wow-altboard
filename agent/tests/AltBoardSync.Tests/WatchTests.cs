@@ -78,7 +78,8 @@ public class WatchTests
         /// <summary>Du plus ancien au plus récent.</summary>
         public IReadOnlyList<JournalEntry> Journal => [.. new SyncJournal(Home, () => DateTimeOffset.UtcNow).ReadLatest().Reverse()];
 
-        public void Start(HttpMessageHandler server, string? token = Token)
+        /// <param name="wowPathFromConfig">Dossier du jeu lu dans la configuration, comme le règle la fenêtre, au lieu de --wow-path.</param>
+        public void Start(HttpMessageHandler server, string? token = Token, bool wowPathFromConfig = false, IUpdateHost? updateHost = null)
         {
             var app = new AgentApp(new AgentEnvironment
             {
@@ -89,20 +90,33 @@ public class WatchTests
                 Hostname = "PC-TEST",
                 ReadOptions = new StableReadOptions { SettleDelay = TimeSpan.FromMilliseconds(10) },
                 GetEnvironmentVariable = name => name == "ALTBOARDSYNC_TOKEN" ? token : null,
-                // Seuls un événement de fichier, une demande ou un échec relancent un cycle.
+                // Seuls une modification relevée, une demande ou un échec relancent un cycle.
                 WatchOptions = new WatchOptions
                 {
                     Debounce = TimeSpan.FromMilliseconds(100),
+                    PollInterval = TimeSpan.FromMilliseconds(30),
                     CheckInterval = TimeSpan.FromHours(1),
                     FirstRetryDelay = TimeSpan.FromMilliseconds(100),
                     MaxRetryDelay = TimeSpan.FromMilliseconds(200),
+                    UpdateRetryDelay = TimeSpan.FromMilliseconds(50),
                 },
                 WatchControl = Control,
                 OnWatchEvent = Events.Enqueue,
+                UpdateHost = updateHost,
             });
             var stop = _cancellation.Token;
-            _running = Task.Run(() => app.RunAsync(["watch", "--wow-path", Flavor, "--server", "https://wow.example.test/api/sync"], stop));
+            string[] args = wowPathFromConfig
+                ? ["watch", "--server", "https://wow.example.test/api/sync"]
+                : ["watch", "--wow-path", Flavor, "--server", "https://wow.example.test/api/sync"];
+            _running = Task.Run(() => app.RunAsync(args, stop));
         }
+
+        /// <summary>Annule la surveillance de l'extérieur, comme le fait une nouvelle version qui prend sa place.</summary>
+        public void Cancel() => _cancellation.Cancel();
+
+        public Task<int> Running => _running!;
+
+        public AgentConfigStore ConfigStore => new(Home);
 
         /// <summary>Arrête la surveillance ; <see cref="Start"/> peut ensuite la relancer sur le même dossier.</summary>
         public async Task<int> StopAsync()
@@ -155,6 +169,8 @@ public class WatchTests
         Assert.Equal(1, server.Calls);
 
         File.Copy(Fixture.PathOf("account-two-characters.lua"), file, overwrite: true);
+        // Comme le jeu, qui réécrit le fichier : la copie garde la date de la fixture.
+        File.SetLastWriteTimeUtc(file, DateTime.UtcNow);
         await Eventually(() => server.Calls == 2, "l'envoi après la modification du fichier");
         await Quiet();
         Assert.Equal(2, server.Calls);
@@ -580,5 +596,217 @@ public class WatchTests
             "Document de synchronisation invalide. Champs en cause : accounts.0.baganator.mail (unrecognized_keys). Mettez l'agent à jour si le refus persiste.",
             failed.Error);
         Assert.Equal("99.0.0", Assert.Single(h.Events.OfType<WatchEvent.UpdateAvailable>()).Version);
+    }
+
+    [Fact]
+    public async Task An_unreadable_account_is_a_failure_while_the_others_are_still_sent()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var broken = h.Temp.AddAccount(h.Flavor, "222222222#1", fixture: null);
+        File.WriteAllBytes(broken, Fixture.Bytes("account-four-characters.lua").AsSpan(0, 5000).ToArray());
+        var server = new FakeServer(HttpStatusCode.OK);
+
+        h.Start(server);
+        await Eventually(() => h.Events.OfType<WatchEvent.Failed>().Any(), "l'échec du compte illisible");
+        await Eventually(() => h.Events.OfType<WatchEvent.Failed>().Count() >= 2, "un nouvel essai");
+        await h.StopAsync();
+
+        // Le compte lisible est parti une fois ; l'envoi est dit incomplet, puis l'échec nomme le compte.
+        Assert.Equal(1, server.Calls);
+        var synced = Assert.Single(h.Events.OfType<WatchEvent.Synced>());
+        Assert.False(synced.Complete);
+        var failed = h.Events.OfType<WatchEvent.Failed>().First();
+        Assert.StartsWith("compte 22…#1 illisible : ", failed.Error);
+        Assert.False(failed.TokenRejected);
+        // Une entrée au journal par panne, pas une à chaque nouvel essai.
+        Assert.Single(h.Journal, e => e.Kind == JournalEntry.Failed);
+
+        // Réparé par le jeu : le cycle suivant ne signale plus rien.
+        File.Copy(Fixture.PathOf("account-four-characters.lua"), broken, overwrite: true);
+        File.SetLastWriteTimeUtc(broken, DateTime.UtcNow);
+        var failures = h.Events.OfType<WatchEvent.Failed>().Count();
+        h.Start(server);
+        await Eventually(() => server.Calls == 2, "l'envoi du compte réparé");
+        await Quiet();
+        await h.StopAsync();
+        Assert.Equal(failures, h.Events.OfType<WatchEvent.Failed>().Count());
+        Assert.True(h.Events.OfType<WatchEvent.Synced>().Last().Complete);
+    }
+
+    [Fact]
+    public async Task A_game_folder_changed_in_the_configuration_is_used_from_the_next_cycle()
+    {
+        using var h = new Harness();
+        var other = h.Temp.Combine("autre", "World of Warcraft", "_forever_");
+        Directory.CreateDirectory(Path.Combine(other, "WTF", "Account"));
+        h.Temp.AddAccount(other, "111111111#1", "account-two-characters.lua");
+        h.ConfigStore.Save(h.ConfigStore.LoadOrCreate() with { WowPath = h.Flavor });
+        var server = new FakeServer(HttpStatusCode.OK);
+
+        h.Start(server, wowPathFromConfig: true);
+        await Quiet();
+        Assert.Equal(0, server.Calls);
+
+        // Comme la fenêtre : le nouveau dossier est enregistré, puis une synchronisation demandée.
+        h.ConfigStore.Save(h.ConfigStore.LoadOrCreate() with { WowPath = h.Temp.Combine("autre", "World of Warcraft") });
+        await RequestUntil(h, () => server.Calls == 1, "l'envoi depuis le nouveau dossier");
+        await h.StopAsync();
+        Assert.Contains("dossier du jeu changé", h.Log);
+    }
+
+    [Fact]
+    public async Task The_watch_keeps_no_folder_open_so_the_game_folder_can_be_renamed()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var server = new FakeServer(HttpStatusCode.OK);
+        h.Start(server);
+        await Eventually(() => server.Calls == 1, "l'envoi du démarrage");
+
+        // Une surveillance du système de fichiers tenait WTF\Account ouvert : Windows refusait ce renommage
+        // tant qu'elle tournait. Le relevé n'ouvre un dossier que le temps de le lister : au pire, un essai
+        // tombe pendant un relevé (toutes les 30 ms ici, 3 s en vrai) et le suivant passe.
+        var wtf = Path.Combine(h.Flavor, "WTF");
+        await MoveDirectory(wtf, wtf + "-déplacé");
+        await Quiet();
+        await MoveDirectory(wtf + "-déplacé", wtf);
+        await Quiet();
+
+        Assert.Equal(AgentApp.ExitOk, await h.StopAsync());
+        Assert.Equal(1, server.Calls);
+    }
+
+    /// <summary>Le site 0.29.0 : il propose la version 99.0.0 avec son empreinte, et sert son exécutable.</summary>
+    private sealed class UpdatingServer(byte[] executable, string? announcedSha256 = null) : HttpMessageHandler
+    {
+        private int _syncs, _downloads;
+
+        public int Syncs => Volatile.Read(ref _syncs);
+
+        public int Downloads => Volatile.Read(ref _downloads);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == "/api/sync/agent")
+            {
+                Interlocked.Increment(ref _downloads);
+                var download = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(executable) };
+                download.Headers.Add("X-Agent-Version", "99.0.0");
+                return Task.FromResult(download);
+            }
+
+            Interlocked.Increment(ref _syncs);
+            var body = SuccessBody.Replace("\"errors\":[]", $"\"errors\":[],\"latestAgentVersion\":\"99.0.0\",\"latestAgentSha256\":\"{announcedSha256 ?? UpdateTests.Sha256Of(executable)}\"");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+        }
+    }
+
+    [Fact]
+    public async Task A_newer_agent_with_its_checksum_is_installed_without_asking()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var executable = h.Temp.Combine("AltBoardSync.exe");
+        File.WriteAllText(executable, "0.9.0");
+        var host = new FakeUpdateHost(executable) { OnStart = _ =>
+        {
+            // La nouvelle version arrête celle-ci pour prendre sa place.
+            h.Cancel();
+            return new FakeStartedAgent();
+        } };
+        var server = new UpdatingServer("99.0.0"u8.ToArray());
+
+        h.Start(server, updateHost: host);
+
+        Assert.Equal(AgentApp.ExitOk, await h.Running.WaitAsync(TimeSpan.FromSeconds(15)));
+        Assert.Equal((1, 1), (server.Syncs, server.Downloads));
+        Assert.Equal("99.0.0", Assert.Single(h.Events.OfType<WatchEvent.Updating>()).Version);
+        // Installée d'elle-même : rien à télécharger à la main, donc rien à annoncer.
+        Assert.Empty(h.Events.OfType<WatchEvent.UpdateAvailable>());
+        Assert.Equal("99.0.0", File.ReadAllText(executable));
+        Assert.Contains(h.Journal, e => e.Message == "Mise à jour vers AltBoard Sync 99.0.0…");
+    }
+
+    [Fact]
+    public async Task With_automatic_updates_off_the_newer_agent_is_only_announced()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        h.ConfigStore.Save(h.ConfigStore.LoadOrCreate() with { AutoUpdate = false });
+        var host = new FakeUpdateHost(h.Temp.Combine("AltBoardSync.exe"));
+        var server = new UpdatingServer("99.0.0"u8.ToArray());
+
+        h.Start(server, updateHost: host);
+        await Eventually(() => h.Events.OfType<WatchEvent.UpdateAvailable>().Any(), "l'annonce de la mise à jour");
+        await Quiet();
+        await h.StopAsync();
+
+        Assert.Equal(0, server.Downloads);
+        Assert.Empty(h.Events.OfType<WatchEvent.Updating>());
+    }
+
+    [Fact]
+    public async Task A_version_that_fails_its_check_is_announced_once_and_never_retried()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var executable = h.Temp.Combine("AltBoardSync.exe");
+        File.WriteAllText(executable, "0.9.0");
+        var host = new FakeUpdateHost(executable) { SelfCheck = _ => new SelfCheckResult(1, "99.0.0\nErreur inattendue") };
+        var server = new UpdatingServer("99.0.0"u8.ToArray());
+
+        h.Start(server, updateHost: host);
+        await Eventually(() => h.Events.OfType<WatchEvent.UpdateFailed>().Any(), "l'échec de la mise à jour");
+        await RequestUntil(h, () => server.Syncs >= 3, "deux envois de plus");
+        await Quiet();
+        await h.StopAsync();
+
+        Assert.Equal(1, server.Downloads);
+        var failed = Assert.Single(h.Events.OfType<WatchEvent.UpdateFailed>());
+        Assert.False(failed.RetryLater);
+        Assert.Equal("99.0.0", Assert.Single(h.Events.OfType<WatchEvent.UpdateAvailable>()).Version);
+        Assert.Equal("0.9.0", File.ReadAllText(executable));
+        Assert.Contains("\"failedAgentUpdate\": \"99.0.0\"", File.ReadAllText(Path.Combine(h.Home, "state.json")));
+        Assert.Contains(h.Journal, e => e.Kind == JournalEntry.UpdateFailed && e.Message.StartsWith("Mise à jour vers AltBoard Sync 99.0.0 impossible"));
+    }
+
+    [Fact]
+    public async Task A_passing_download_failure_is_retried_but_journaled_once()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var executable = h.Temp.Combine("AltBoardSync.exe");
+        File.WriteAllText(executable, "0.9.0");
+        var host = new FakeUpdateHost(executable);
+        // Le site redéployé entre la synchronisation et le téléchargement : l'empreinte ne correspond pas.
+        var server = new UpdatingServer("99.0.0"u8.ToArray(), announcedSha256: new string('0', 64));
+
+        h.Start(server, updateHost: host);
+        await RequestUntil(h, () => server.Downloads >= 3, "trois essais de téléchargement");
+        await h.StopAsync();
+
+        Assert.All(h.Events.OfType<WatchEvent.UpdateFailed>(), failed => Assert.True(failed.RetryLater));
+        Assert.Single(h.Journal, e => e.Message == "Mise à jour vers AltBoard Sync 99.0.0…");
+        Assert.Single(h.Journal, e => e.Kind == JournalEntry.UpdateFailed);
+        Assert.Empty(h.Events.OfType<WatchEvent.UpdateAvailable>());
+        Assert.Empty(host.Checked);
+        Assert.Equal("0.9.0", File.ReadAllText(executable));
+    }
+
+    private static async Task MoveDirectory(string from, string to)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Move(from, to);
+                return;
+            }
+            catch (IOException) when (attempt < 10)
+            {
+                await Task.Delay(7);
+            }
+        }
     }
 }

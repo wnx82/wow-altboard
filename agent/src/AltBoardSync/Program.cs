@@ -51,6 +51,21 @@ if (wantsWindow && OperatingSystem.IsWindows())
     args = ["watch"];
 }
 
+// Mise à jour automatique : la version précédente vient de lancer celle-ci (« watch --takeover ») pour
+// lui céder la place. Elle s'arrête à la demande ; si elle ne quitte pas, celle-ci renonce et la
+// version précédente revient d'elle-même à son exécutable.
+var takeover = args is [var watchCommand, "--takeover"] && watchCommand.Equals("watch", StringComparison.OrdinalIgnoreCase);
+if (takeover)
+{
+    args = ["watch"];
+    if (OperatingSystem.IsWindows() && WatchHost.IsRunning())
+    {
+        WatchHost.RunningIsOlder(AgentApp.Version, out replacedVersion);
+        if (!WatchHost.StopRunningAndWait(TimeSpan.FromSeconds(30))) return AgentApp.ExitFailed;
+        replacing = true;
+    }
+}
+
 // « watch » sans terminal : tâche de fond. Elle quitte sa console, qui se ferme, et ne parle plus
 // que par sa fenêtre, la zone de notification et le journal.
 var watching = args.Length > 0 && args[0].Equals("watch", StringComparison.OrdinalIgnoreCase);
@@ -101,6 +116,9 @@ var environment = new AgentEnvironment
     Error = background ? TextWriter.Synchronized(backgroundErrors) : Console.Error,
     In = input,
     Autostart = autostart,
+    // Seule la surveillance d'arrière-plan se met à jour seule : lancée depuis un terminal, elle ne
+    // fait qu'annoncer la nouvelle version.
+    UpdateHost = background && OperatingSystem.IsWindows() ? new WindowsUpdateHost(AgentConfigStore.DefaultDirectory) : null,
 };
 
 WatchHost? host = null;
@@ -143,7 +161,25 @@ if (watching && OperatingSystem.IsWindows())
             // Inscription inchangée : l'interrupteur de la fenêtre permet de la refaire.
         }
 
-        host.ReportReplaced(replacedVersion, autostartCommand);
+        host.ReportReplaced(replacedVersion, autostartCommand, automatic: takeover);
+    }
+
+    // Restes d'une mise à jour : l'exécutable précédent, celui d'un essai retiré, les téléchargements.
+    if (Environment.ProcessPath is { } executable)
+    {
+        var home = environment.HomeDirectory;
+        var stopping = cancellation.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await AgentUpdater.CleanUpAsync(executable, home, stopping).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Arrêt de l'agent : le ménage reprendra au prochain démarrage.
+            }
+        });
     }
 }
 

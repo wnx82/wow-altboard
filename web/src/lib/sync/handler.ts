@@ -19,6 +19,11 @@ export type SyncDependencies = {
   gate?: SyncGate;
   /** Version de l'agent servie par le site, rendue aux agents authentifiés pour qu'ils signalent une mise à jour. */
   latestAgentVersion?: string | null;
+  /**
+   * Empreinte SHA-256 de l'exécutable de cette version servi par /api/sync/agent, null s'il n'y en a
+   * pas. Rendue avec la version : l'agent 0.9.0 et suivants s'en servent pour se mettre à jour seuls.
+   */
+  latestAgentSha256?: () => Promise<string | null>;
   /** Attente maximale du verrou de la base (tests). */
   lockTimeoutMs?: number;
 };
@@ -26,7 +31,8 @@ export type SyncDependencies = {
 // Les prix Auctionator pèsent l'essentiel du document : environ 500 Ko par compte et par mois de relevés.
 export const DEFAULT_MAX_BODY_BYTES = 24 * 1024 * 1024;
 const REQUESTS_PER_CLIENT = { max: 60, windowMs: 5 * 60_000 };
-const AUTH_FAILURES_PER_CLIENT = { max: 10, windowMs: 15 * 60_000 };
+/** Jetons refusés par client, comptés ensemble pour /api/sync et /api/sync/agent (clé « sync:auth: »). */
+export const AUTH_FAILURES_PER_CLIENT = { max: 10, windowMs: 15 * 60_000 };
 // Nouvel essai conseillé quand une autre synchronisation occupe la place : la plupart durent
 // quelques secondes. Après un délai dépassé, plus tard : la base est peut-être surchargée.
 const BUSY_RETRY_SECONDS = "30";
@@ -77,11 +83,13 @@ export async function handleSyncRequest(request: Request, deps: SyncDependencies
 
   // La dernière version de l'agent n'est dite qu'à un agent dont le jeton est valide.
   let authenticated = false;
+  let latestAgentSha256: string | null = null;
+  const latest = () => {
+    if (!authenticated || !deps.latestAgentVersion) return {};
+    return { latestAgentVersion: deps.latestAgentVersion, ...(latestAgentSha256 ? { latestAgentSha256 } : {}) };
+  };
   const respond = (status: number, body: Record<string, unknown>, extraHeaders: Record<string, string> = {}) =>
-    Response.json(
-      { ...body, ...(authenticated && deps.latestAgentVersion ? { latestAgentVersion: deps.latestAgentVersion } : {}), requestId },
-      { status, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...extraHeaders } },
-    );
+    Response.json({ ...body, ...latest(), requestId }, { status, headers: { "Cache-Control": "no-store", "X-Request-ID": requestId, ...extraHeaders } });
   const busy = () =>
     respond(503, { error: "Une autre synchronisation est en cours, nouvel essai dans un instant.", code: "sync_busy" }, { "Retry-After": BUSY_RETRY_SECONDS });
   const reject = (status: number, code: string, error: string, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) => {
@@ -110,6 +118,14 @@ export async function handleSyncRequest(request: Request, deps: SyncDependencies
     return reject(401, "unauthorized", "Jeton d'agent absent, invalide ou révoqué.", {}, { "WWW-Authenticate": "Bearer" });
   }
   authenticated = true;
+  if (deps.latestAgentVersion && deps.latestAgentSha256) {
+    try {
+      latestAgentSha256 = await deps.latestAgentSha256();
+    } catch (error) {
+      // Sans empreinte, l'agent annonce seulement la mise à jour, comme avant 0.9.0.
+      log({ event: "agent.digest_failed", requestId, error: describeError(error) });
+    }
+  }
 
   const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
   if (contentType !== "application/json") {

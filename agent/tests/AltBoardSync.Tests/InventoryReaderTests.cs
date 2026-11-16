@@ -102,8 +102,11 @@ public class BaganatorPayloadTests
 
         var payload = result.Payload!;
         var baganator = payload.Baganator!;
-        // « Inconnu Fictif » n'existe pas dans AltBoard : signalé, pas transmis.
-        Assert.Contains("1 personnage absent d'AltBoard", Assert.Single(payload.Warnings));
+        // « Inconnu Fictif » n'existe pas dans AltBoard : signalé par une information qui le nomme, pas transmis.
+        Assert.Empty(payload.Warnings);
+        Assert.Equal(
+            "Baganator : 1 personnage absent d'AltBoard sur ce compte (Inconnu Fictif) : son courrier et ses enchères ne sont pas transmis.",
+            Assert.Single(payload.Notices!));
         Assert.Equal(["Player-9999-00000001", "Player-9999-00000005"], baganator.Characters.Select(c => c.Guid));
         Assert.Equal(3, baganator.Characters[0].Mail.Count);
         Assert.Empty(baganator.Characters[1].Mail);

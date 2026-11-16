@@ -45,6 +45,12 @@ public sealed record AccountPayload(
 
     /// <summary>Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator du même compte ; absents sans l'addon.</summary>
     public BaganatorPayload? Baganator { get; init; }
+
+    /// <summary>
+    /// Informations sans gravité (site 0.29.0 et suivants) : gardées avec la synchronisation sans la
+    /// rendre partielle, contrairement à <see cref="Warnings"/>. Absentes quand il n'y en a pas.
+    /// </summary>
+    public IReadOnlyList<string>? Notices { get; init; }
 }
 
 /// <summary>
@@ -238,6 +244,12 @@ public sealed record SyncResponse
 
     /// <summary>Version de l'agent servie par le site (site 0.25.0 et suivants), rendue à un agent authentifié.</summary>
     public string? LatestAgentVersion { get; init; }
+
+    /// <summary>
+    /// Empreinte SHA-256 de l'exécutable de cette version, que le site sert à <c>/api/sync/agent</c>
+    /// (site 0.29.0 et suivants). Absente : la mise à jour est seulement annoncée.
+    /// </summary>
+    public string? LatestAgentSha256 { get; init; }
 }
 
 public sealed record SyncResponseError(string Code, string Message);

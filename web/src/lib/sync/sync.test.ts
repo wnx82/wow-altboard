@@ -40,6 +40,7 @@ type SendOptions = {
   now?: Date;
   gate?: SyncGate;
   latestAgentVersion?: string;
+  latestAgentSha256?: () => Promise<string | null>;
   lockTimeoutMs?: number;
 };
 /** Envoi fait `seconds` secondes après NOW : un relevé plus récent arrive plus tard. */
@@ -65,6 +66,7 @@ async function send(body: unknown, options: SendOptions = {}): Promise<{ status:
       maxBodyBytes: options.maxBodyBytes,
       gate: options.gate,
       latestAgentVersion: options.latestAgentVersion,
+      latestAgentSha256: options.latestAgentSha256,
       lockTimeoutMs: options.lockTimeoutMs,
     },
   );
@@ -1034,6 +1036,41 @@ describe("transactions et contraintes", () => {
     assert.deepEqual([result.status, run.status, run.errorsCount], ["partial", "partial", 1]);
   });
 
+  test("les informations de l'agent sont gardées sans rendre la synchronisation partielle", async () => {
+    const payload = clone();
+    payload.accounts[0].notices = ["Baganator : 2 personnages absents d'AltBoard sur ce compte (Alpha, Beta) : leur courrier et leurs enchères ne sont pas transmis."];
+
+    const result = await ok(payload);
+
+    const [notice] = await database.db.select().from(t.syncErrors);
+    assert.deepEqual([notice.syncRunId, notice.code], [result.runId, "agent_notice"]);
+    assert.match(notice.message, /\(Alpha, Beta\)/);
+    const [run] = await database.db.select().from(t.syncRuns);
+    assert.deepEqual([result.status, run.status, run.errorsCount], ["success", "success", 0]);
+  });
+
+  test("l'avertissement Baganator d'un agent 0.8 devient une information", async () => {
+    const payload = clone();
+    payload.accounts[0].warnings = [
+      "Baganator : 7 personnages absents d'AltBoard sur ce compte, leur courrier et leurs enchères ne sont pas transmis.",
+      "champ de personnage inconnu ignoré : talents",
+    ];
+    payload.accounts[1].warnings = ["Baganator : 1 personnage absent d'AltBoard sur ce compte, son courrier et ses enchères ne sont pas transmis."];
+
+    const result = await ok(payload);
+
+    const rows = await database.db.select().from(t.syncErrors).orderBy(asc(t.syncErrors.id));
+    assert.deepEqual(rows.map((row) => row.code).sort(), ["agent_notice", "agent_notice", "agent_warning"]);
+    assert.equal(rows.find((row) => row.code === "agent_warning")?.message, "champ de personnage inconnu ignoré : talents");
+    const [run] = await database.db.select().from(t.syncRuns);
+    // Le seul vrai avertissement compte : partielle, une erreur.
+    assert.deepEqual([result.status, run.status, run.errorsCount], ["partial", "partial", 1]);
+
+    const onlyBaganator = clone();
+    onlyBaganator.accounts[1].warnings = payload.accounts[1].warnings;
+    assert.equal((await ok(onlyBaganator, later(60))).status, "success");
+  });
+
   test("sans avertissement, la synchronisation est réussie et ne compte aucune erreur", async () => {
     const result = await ok(clone());
 
@@ -1147,5 +1184,36 @@ describe("version de l'agent servie par le site", () => {
     const anonymous = await send(clone(), { token: null, latestAgentVersion: "0.8.1" });
     assert.deepEqual([anonymous.status, anonymous.json.latestAgentVersion], [401, undefined]);
     assert.equal((await ok(clone())).latestAgentVersion, undefined);
+  });
+
+  test("avec l'empreinte de l'exécutable servi, que l'agent vérifie avant de se mettre à jour", async () => {
+    const sha = "a".repeat(64);
+    let digests = 0;
+    const latestAgentSha256 = async () => {
+      digests++;
+      return sha;
+    };
+    const json = await ok(clone(), { latestAgentVersion: "0.9.0", latestAgentSha256 });
+    assert.deepEqual([json.latestAgentVersion, json.latestAgentSha256], ["0.9.0", sha]);
+
+    // Sans jeton valide, ni version ni empreinte, et l'empreinte n'est même pas calculée.
+    const anonymous = await send(clone(), { token: null, latestAgentVersion: "0.9.0", latestAgentSha256 });
+    assert.equal(anonymous.json.latestAgentSha256, undefined);
+    assert.equal(digests, 1);
+
+    // Sans exécutable sur le serveur : la version seule, comme avant.
+    const none = await ok(clone(), { ...later(60), latestAgentVersion: "0.9.0", latestAgentSha256: async () => null });
+    assert.deepEqual([none.latestAgentVersion, none.latestAgentSha256], ["0.9.0", undefined]);
+
+    // Une empreinte impossible à calculer ne fait pas échouer la synchronisation.
+    const failing = await ok(clone(), {
+      ...later(120),
+      latestAgentVersion: "0.9.0",
+      latestAgentSha256: async () => {
+        throw new Error("disque illisible");
+      },
+    });
+    assert.deepEqual([failing.latestAgentVersion, failing.latestAgentSha256], ["0.9.0", undefined]);
+    assert.ok(logs.some((event) => event.event === "agent.digest_failed"));
   });
 });

@@ -81,7 +81,7 @@ les lit pas.
 |---|---|
 | `character_snapshots` | Un état daté par progression : niveau, expérience et expérience du niveau (`xp_max`), or, niveau d'objet + détail en `jsonb`. Unicité `(character_id, captured_at)` |
 | `sync_runs` | Une ligne par synchronisation : machine, statut, compteurs, durée, versions |
-| `sync_errors` | Erreurs et avertissements de l'agent rattachés à une synchronisation |
+| `sync_errors` | Erreurs, avertissements (`agent_warning`) et informations (`agent_notice`, hors `errors_count`) de l'agent rattachés à une synchronisation |
 
 ### Économie
 
@@ -314,6 +314,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0019_item_tooltips` | `item_tooltips` (ajout seul) |
 | `0020_perf_indexes` | neuf index (ajouts seuls, voir **Index**) |
 | `0021_notifications` | `notification_state`, colonnes `app_settings.notify_*` et `character_goals.notified_at` (ajouts seuls). Les objectifs déjà atteints reçoivent `notified_at = achieved_at` : rien n'est annoncé pour eux. Aucune ligne supprimée |
+| `0022_agent_notices` | données seulement : l'avertissement « Baganator : N personnages absents d'AltBoard » des agents 0.8.x passe de `agent_warning` à `agent_notice` dans `sync_errors`, puis `errors_count` et `status` des synchronisations partielles concernées sont recalculés (`success` s'il ne reste aucune autre erreur). Aucune ligne supprimée |
 
 ## Checkpoint B
 

@@ -56,9 +56,41 @@ avant ne voit pas les derniers changements.
 ## Mettre à jour
 
 Chaque réponse du serveur à un jeton valide donne la version de l'agent livrée avec le site
-(`latestAgentVersion`, voir [API](API.md)). Plus récente que la sienne, l'agent 0.8.1 l'annonce une
-fois par version : une bulle « Mise à jour disponible », une ligne au journal, et dans la fenêtre le
-lien **Mise à jour X disponible**, à côté de la version, qui ouvre la page Machines.
+(`latestAgentVersion`, voir [API](API.md)) et, depuis le site 0.29.0, son empreinte SHA-256
+(`latestAgentSha256`).
+
+### Mise à jour automatique (agent 0.9.0)
+
+Plus récente que la sienne, la surveillance d'arrière-plan l'installe d'elle-même, après la
+synchronisation :
+
+1. elle télécharge l'exécutable depuis le site (`GET /api/sync/agent`, même jeton) dans
+   `%APPDATA%\AltBoardSync\updates\` et vérifie que son SHA-256 est celui annoncé ;
+2. elle lance `AltBoardSync.exe selfcheck` sur le fichier téléchargé : il doit démarrer, lire la
+   configuration, l'état, le jeton et les comptes de ce PC, construire le document, et dire en
+   première ligne la version attendue. Un exécutable qui plante au démarrage (comme la 0.7.0)
+   n'est jamais installé ;
+3. elle renomme son propre exécutable en `AltBoardSync.exe.old` (caché), copie le nouveau à sa
+   place, au même endroit, et le lance avec `watch --takeover` ;
+4. la nouvelle version arrête l'ancienne, prend sa place et le dit par une bulle et au journal ;
+   au démarrage, elle supprime `.old` et les téléchargements.
+
+Si la nouvelle version s'arrête ou ne prend pas la relève en 90 secondes, l'ancienne l'arrête,
+reprend son exécutable (le nouveau devient `AltBoardSync.exe.failed`) et continue. Une version qui
+échoue à la vérification ou à la relève est notée dans `state.json` et n'est plus essayée : elle
+est annoncée comme ci-dessous. Un téléchargement manqué (site injoignable, empreinte fausse) est
+réessayé une heure plus tard. Le dossier de l'exécutable doit être modifiable par l'utilisateur
+(Bureau, Documents… mais pas `Program Files`) ; sinon la version est seulement annoncée.
+
+L'interrupteur **Mise à jour automatique** de **Réglages**, ou `config set autoUpdate off`, la
+désactive. Lancée depuis un terminal, `watch` ne se met pas à jour : elle annonce seulement.
+
+### Annonce et installation à la main
+
+Quand la mise à jour automatique est désactivée, impossible (agent antérieur à 0.9.0, site
+antérieur à 0.29.0) ou en échec pour cette version, l'agent l'annonce une fois par version : une
+bulle « Mise à jour disponible », une ligne au journal, et dans la fenêtre le lien **Mise à jour X
+disponible**, à côté de la version, qui ouvre la page Machines.
 
 Il suffit de télécharger le nouvel `AltBoardSync.exe` et de le lancer, d'où l'on veut. Si une
 version plus ancienne tourne dans la session, il lui demande de s'arrêter, attend 15 secondes au
@@ -81,8 +113,9 @@ Le remplacement ne supprime pas l'ancien exécutable : il peut être effacé une
 | `autostart` / `autostart on` / `autostart off` | affiche, active ou désactive le lancement de `watch` à l'ouverture de session ; `on` le lance aussi tout de suite, `off` arrête celui qui tourne |
 | `scan` | lit et affiche, **sans rien envoyer** (équivaut à `sync --dry-run`) |
 | `config` | affiche la configuration |
-| `config set <wowPath\|serverUrl\|machineName> <valeur>` | modifie la configuration |
+| `config set <wowPath\|serverUrl\|machineName\|autoUpdate> <valeur>` | modifie la configuration ; `autoUpdate` vaut `on` ou `off` |
 | `token set` / `token clear` | enregistre ou supprime le jeton |
+| `selfcheck` | affiche la version, puis lit configuration, état, jeton et comptes et construit le document, **sans rien envoyer** ; code `0` sauf erreur imprévue. Ce que la mise à jour automatique exige d'une nouvelle version |
 | `version` | affiche la version |
 
 Options de `sync`, `scan` et `watch` : `--wow-path <dossier>`, `--server <url>`. Pour `sync` et
@@ -127,9 +160,10 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 
 | Fichier | Contenu |
 |---|---|
-| `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl` — aucun secret |
+| `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl`, `autoUpdate` (absent : activée) — aucun secret |
 | `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant |
-| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; dernière version de l'agent annoncée par le serveur, et celle déjà signalée ; ni contenu ni nom réel de dossier de compte |
+| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; dernière version de l'agent annoncée par le serveur, celle déjà signalée, et celle dont la mise à jour automatique a échoué ; ni contenu ni nom réel de dossier de compte |
+| `updates\` | exécutable en cours de téléchargement ou de vérification par la mise à jour automatique ; vidé au démarrage |
 | `journal.jsonl` | journal affiché par la fenêtre : une entrée par envoi, panne ou événement, avec ce qui a changé par personnage ; les 200 dernières sont gardées |
 | `characters.json` | ce que l'agent retient de chaque personnage envoyé (niveau, or, métiers, empreintes) pour dire ce qui change à l'envoi suivant |
 | `logs\altboardsync.log` | journal technique ; ni jeton ni nom réel de dossier de compte ; rotation à 1 Mo |
@@ -165,7 +199,9 @@ réinitialisation ([DATABASE](DATABASE.md#réinitialisation-des-personnages)). A
 AltBoardSync.exe config set wowPath "C:\Program Files (x86)\World of Warcraft\_forever_"
 ```
 
-puis relancer l'agent : `watch` ne relit pas sa configuration en cours de route. Dans les deux cas,
+Depuis l'agent 0.9.0, `watch` relit sa configuration à chaque cycle : un dossier changé par
+`config set wowPath` ou par **Réglages** dans la fenêtre sert dès la synchronisation suivante, sans
+relancer l'agent (une option `--wow-path` reste prioritaire). Dans les deux cas,
 les addons AltBoard et Allemano Ledger doivent être installés dans ce client
 (`_forever_\Interface\AddOns`). Un compte sans AltBoard, le dossier technique `WTF\Account\SavedVariables` et les
 fichiers `.bak` sont ignorés. Zéro compte n'est pas une erreur.
@@ -237,7 +273,7 @@ ne s'ouvre que sur demande. Un double-clic sur l'exécutable lance la même surv
 ouverte.
 
 ```text
-AltBoard.lua, AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua ou Syndicator.lua modifié (FileSystemWatcher sur WTF\Account)
+AltBoard.lua, AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua ou Syndicator.lua modifié (taille ou date relevées toutes les 3 s)
         ↓
 anti-rebond : attendre 5 s sans nouvel événement (le jeu écrit en plusieurs fois)
         ↓
@@ -250,9 +286,16 @@ parser → document → POST /api/sync (idempotent)
 
 - **Au démarrage** : une vérification immédiate. Ce qui a changé pendant que l'agent ne tournait
   pas part aussitôt ; ce que le serveur a déjà n'est pas renvoyé.
-- **Filet de sécurité** : `FileSystemWatcher` peut manquer des événements (tampon saturé). Toutes les
-  10 minutes, les fichiers sont relus et comparés, et la découverte rejouée : un compte ou un
-  client apparu entre-temps est pris en charge.
+- **Relevé** (agent 0.9.0) : toutes les 3 secondes, la taille et la date de ces fichiers, compte
+  par compte ; un compte ou un client apparu est pris en charge au relevé suivant. Les dossiers ne
+  sont ouverts que le temps de les lister : le dossier du jeu peut être renommé ou déplacé pendant
+  que l'agent tourne, ce que la surveillance de fichiers de Windows (`FileSystemWatcher`, jusqu'à
+  0.8.1) empêchait.
+- **Filet de sécurité** : toutes les 10 minutes, les fichiers sont relus et comparés par leur
+  contenu, même si leur date n'a pas bougé.
+- **Compte illisible** (agent 0.9.0) : fichier tronqué ou en cours d'écriture au-delà de la
+  lecture stable. Les autres comptes partent quand même ; le compte illisible est un échec, nommé
+  au journal une fois et réessayé comme les autres échecs.
 - **État local** : la dernière empreinte envoyée par compte, dans `state.json`. Perdu, il ne coûte
   qu'un envoi de plus.
 - **Échecs** : nouvel essai après 1 minute, puis une attente doublée à chaque échec, jusqu'à
@@ -281,7 +324,11 @@ notification ouvrent la fenêtre de l'agent :
   session (voir [plus bas](#démarrage-à-louverture-de-session)) ;
 - **dernier envoi**, nombre de personnages, serveur et présence du jeton ;
 - **Synchroniser maintenant** (ou F5), **Jeton**, **Tableau de bord**, **Fichier journal** ;
-- **journal** : chaque envoi, chaque panne, et ce qui a changé par personnage.
+- **journal** : chaque envoi, chaque panne, et ce qui a changé par personnage ;
+- **Réglages** (pied de la fenêtre, agent 0.9.0) : le dossier du jeu, **Changer…** pour en choisir
+  un autre dans une boîte de dialogue de Windows (refusé sans `WTF\Account` ; le nombre de comptes
+  AltBoard trouvés s'affiche, et une synchronisation part aussitôt), et l'interrupteur **Mise à
+  jour automatique**.
 
 **Jeton** ouvre la saisie du jeton d'agent : champ masqué, **Coller** (ou Ctrl+V, ou le menu du
 clic droit), **Créer un jeton** qui ouvre la page Machines du tableau de bord, **Enregistrer** (ou
@@ -349,6 +396,6 @@ le jeton (DPAPI).
 
 ### Ce que l'agent ne fait jamais
 
-Il n'observe que le dossier `WTF\Account`, par les notifications de fichiers de Windows. Il
+Il n'observe que le dossier `WTF\Account`, par la taille et la date de ses fichiers. Il
 n'ouvre pas le processus du jeu, ne lit pas sa mémoire, n'y injecte rien, ne simule aucune saisie
 et n'écrit rien dans le dossier du jeu.

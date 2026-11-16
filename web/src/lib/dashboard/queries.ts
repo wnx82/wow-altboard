@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { AGENT_NOTICE } from "@/lib/sync/codes";
 import type { ActivitySnapshot } from "./activity";
 import type { LedgerDayRow } from "./finances";
 import type { MoneySnapshot } from "./gold-history";
@@ -508,13 +509,18 @@ export async function listRecentRuns(db: Database, limit = 15) {
           .from(t.syncErrors)
           .where(inArray(t.syncErrors.syncRunId, runs.map((run) => run.id)))
           .orderBy(asc(t.syncErrors.id));
-  const byRun = new Map<number, { code: string; message: string }[]>();
-  for (const { syncRunId, ...error } of errors) {
-    const list = byRun.get(syncRunId) ?? [];
-    if (list.length < RUN_ERRORS_SHOWN) list.push(error);
-    byRun.set(syncRunId, list);
+  // Les informations de l'agent (agent_notice) ne comptent pas dans errorsCount : listées à part.
+  type Remark = { code: string; message: string };
+  const byRun = new Map<number, { errors: Remark[]; notices: Remark[]; noticesCount: number }>();
+  for (const { syncRunId, ...remark } of errors) {
+    const entry = byRun.get(syncRunId) ?? { errors: [], notices: [], noticesCount: 0 };
+    const notice = remark.code === AGENT_NOTICE;
+    if (notice) entry.noticesCount++;
+    const list = notice ? entry.notices : entry.errors;
+    if (list.length < RUN_ERRORS_SHOWN) list.push(remark);
+    byRun.set(syncRunId, entry);
   }
-  return runs.map((run) => ({ ...run, errors: byRun.get(run.id) ?? [] }));
+  return runs.map((run) => ({ ...run, ...(byRun.get(run.id) ?? { errors: [], notices: [], noticesCount: 0 }) }));
 }
 
 export type ReputationCharacter = { id: number; name: string; class: string | null; level: number | null; accountId: number; account: string };

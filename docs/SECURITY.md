@@ -39,6 +39,7 @@ de l'agent.
 | Version | `schemaVersion` inconnu refusé |
 | Réponses et journaux | jamais de valeur reçue, jamais de jeton, jamais de détail technique. Une erreur n'est journalisée (journal, `sync_errors`) que par son type et son code PostgreSQL ou réseau (`web/src/lib/errors.ts`) : le message d'une requête Drizzle porte le SQL et ses paramètres, celui de PostgreSQL peut citer une valeur reçue. Une erreur non attrapée, que Next écrit lui-même, passe par un filtre qui masque les paramètres d'une requête Drizzle dans son message, sa pile et `params` (`web/src/lib/log-redaction.ts`, site 0.27.0) |
 | Horloge | un horodatage de personnage plus d'une heure après l'heure du serveur fait refuser le document (`future_timestamp`) : sinon tous les envois suivants de ce personnage seraient ignorés comme plus anciens, jusqu'à cette date |
+| Mise à jour automatique (agent 0.9.0, site 0.29.0) | l'agent ne télécharge un exécutable que du site auquel il synchronise (`GET /api/sync/agent`, même jeton, HTTPS), et ne l'installe que si son SHA-256 est celui que ce site annonce dans une réponse authentifiée de `/api/sync`, puis si `selfcheck` démarre et dit la version attendue. La route ne répond qu'à un jeton actif : 12 téléchargements / 15 min, échecs d'authentification partagés avec `/api/sync`. Le site est donc la source de confiance du code exécuté sur les PC : voir [Limites assumées](#limites-assumées) |
 
 Les données d'un fichier `AltBoard.lua` sont traitées comme **non fiables** de bout en bout : le
 fichier n'est jamais exécuté, le parser borne sa profondeur et sa taille, l'agent écarte les valeurs
@@ -48,7 +49,7 @@ hors limites, le serveur revalide tout.
 
 | Mesure | Détail |
 |---|---|
-| Accès | toutes les pages exigent une session ; seuls `/login`, `/api/sync` et `/api/health` répondent sans, ainsi que le manifeste du site installable (`/app.webmanifest`), ses icônes (`/icons/*`, `/apple-icon.png`) et son service worker (`/sw.js`, qui ne met rien en cache), fichiers fixes sans donnée. L'agent (`/api/agent`, `/api/agent/zip`) n'est servi qu'avec une session |
+| Accès | toutes les pages exigent une session ; seuls `/login`, `/api/sync`, `/api/sync/agent` (jeton d'agent) et `/api/health` répondent sans, ainsi que le manifeste du site installable (`/app.webmanifest`), ses icônes (`/icons/*`, `/apple-icon.png`) et son service worker (`/sw.js`, qui ne met rien en cache), fichiers fixes sans donnée. L'agent (`/api/agent`, `/api/agent/zip`) n'est servi qu'avec une session |
 | Double vérification | `src/proxy.ts` (présence du cookie) puis chaque page, action et route (session lue en base) ; le layout ne protège pas ses pages, un test refuse une page sans contrôle |
 | Mot de passe | scrypt (N=32768, r=8, p=1), sel aléatoire, comparaison à temps constant, 12 caractères minimum |
 | Session | identifiant aléatoire de 256 bits ; seule son empreinte est en base ; 30 jours ; supprimée à la déconnexion |
@@ -190,3 +191,4 @@ configurées, les sondes vers les serveurs de jeu et le webhook des notification
 | Pas de second facteur dans l'application | le tableau de bord est derrière Cloudflare Access (adresses autorisées) puis le mot de passe ; `/api/sync`, exclu d'Access, n'est protégé que par le jeton d'agent | TOTP si Access est retiré |
 | Identité du client derrière le proxy | `cf-connecting-ip`, posé par Cloudflare ; le port de l'origine restant joignable du réseau local, un poste de ce réseau peut falsifier l'en-tête | fermer l'origine au réseau local (cloudflared dans la pile) |
 | Un seul rôle de base | le rôle applicatif administre l'instance PostgreSQL de la pile, dédiée à l'application | séparer migration et application si le besoin apparaît |
+| Agent non signé, confiance dans le site | l'empreinte vient du même site que l'exécutable : qui contrôle l'image du site, ou la branche `main` qui la construit, fait exécuter son code par les agents dont la mise à jour automatique est active. Le jeton seul ne suffit pas : il ne change ni l'exécutable servi ni son empreinte | signature de l'exécutable (Authenticode, ou clé publique embarquée dans l'agent) si d'autres personnes contribuent au dépôt ; `config set autoUpdate off` sur un PC qui ne doit pas suivre |

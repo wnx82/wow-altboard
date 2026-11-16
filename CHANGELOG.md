@@ -4,6 +4,61 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.29.0 — 2026-11-16
+
+Pour la mise à jour automatique de l'agent 0.9.0. Migration `0022` : données seulement.
+
+### Ajouté
+
+- `GET /api/sync/agent` : l'exécutable de l'agent que le site sert, pour un jeton d'agent valide,
+  avec sa version et son SHA-256 en en-têtes. Même limite de débit et mêmes échecs
+  d'authentification comptés que `/api/sync`. Il passe par le même contournement de Cloudflare
+  Access que `/api/sync`.
+- La réponse de `/api/sync` donne `latestAgentSha256` à côté de `latestAgentVersion`, à un agent
+  authentifié seulement : l'agent ne remplace son exécutable que par un fichier de cette empreinte.
+- Informations d'un agent (`notices`, à partir de l'agent 0.9.0) : gardées au journal des
+  synchronisations avec le code `agent_notice`, affichées en gris sur la page **Machines**
+  (« Information »), sans rendre la synchronisation partielle.
+
+### Modifié
+
+- L'avertissement « Baganator : N personnages absents d'AltBoard sur ce compte » d'un agent 0.8.x
+  est rangé parmi les informations : il rendait chaque synchronisation partielle. La migration
+  `0022` fait de même pour l'historique et recalcule l'état des synchronisations concernées.
+
+## Agent 0.9.0 — 2026-11-16
+
+Cette version s'installe encore à la main (page **Machines**), une dernière fois : les suivantes
+s'installent seules.
+
+### Ajouté
+
+- **Mise à jour automatique** : quand le site sert une version plus récente, la surveillance la
+  télécharge depuis le site, vérifie son SHA-256, lance sa commande `selfcheck` et ne l'installe
+  que si elle démarre et dit la bonne version. Elle remplace l'exécutable au même endroit, la
+  lance, et la nouvelle version prend la relève ; une bulle le dit. Si la nouvelle version ne
+  prend pas la relève en 90 secondes, l'ancienne revient d'elle-même. Une version qui échoue
+  n'est plus essayée : elle est annoncée comme avant, à télécharger depuis la page Machines.
+  Un téléchargement manqué (site injoignable, empreinte fausse) est réessayé une heure plus tard.
+  - Désactivable dans **Réglages** ou par `config set autoUpdate off`. Seule la surveillance en
+    arrière-plan se met à jour ; lancée depuis un terminal, elle annonce seulement.
+- **Réglages** (pied de la fenêtre) : dossier du jeu, choisi dans une boîte de dialogue et vérifié
+  (nombre de comptes AltBoard trouvés), pris en compte dès la synchronisation suivante sans
+  redémarrer ; interrupteur de la mise à jour automatique.
+- Commande `selfcheck` : lit la configuration, l'état, le jeton et les comptes, construit le
+  document sans l'envoyer. La CI la lance sur l'exécutable publié.
+
+### Modifié
+
+- Un compte illisible (fichier en cours d'écriture par le jeu, corrompu) n'empêche plus l'envoi
+  des autres comptes : il est signalé comme un échec, une fois au journal, et réessayé.
+- La surveillance relève les dates des fichiers toutes les 3 secondes au lieu de garder
+  `WTF\Account` ouvert : le dossier du jeu peut être renommé ou déplacé pendant qu'elle tourne.
+- « Baganator : N personnages absents d'AltBoard » devient une information (`notices`), plus un
+  avertissement : la synchronisation n'est plus partielle pour autant.
+- Format du document : `5` (champ `notices`). Demande le site 0.29.0 : un site plus ancien refuse
+  le document dès qu'il porte une information (`unrecognized_keys`). Déployer le site d'abord.
+
 ## Site 0.28.0 — 2026-11-14
 
 Nouvelles fonctions (lot D de l'audit du 2026-11-13). Migration `0021` : ajouts seuls.

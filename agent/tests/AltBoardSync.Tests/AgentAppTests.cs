@@ -392,6 +392,58 @@ public class AgentAppTests
         var output = h.Out.ToString();
         Assert.Contains("machineName : PC-Gaming", output);
         Assert.Contains("serverUrl   : https://wow.ekreativ.be/api/sync", output);
+        Assert.Contains("autoUpdate  : on", output);
         Assert.Contains("jeton       : absent", output);
+    }
+
+    [Fact]
+    public async Task Automatic_update_is_on_for_an_older_configuration_and_can_be_turned_off()
+    {
+        using var h = new Harness();
+        Directory.CreateDirectory(h.Home);
+        // Configuration écrite par un agent antérieur à 0.9.0 : sans la clé autoUpdate.
+        File.WriteAllText(
+            Path.Combine(h.Home, "config.json"),
+            """{"machineUuid":"00000000-0000-4000-8000-000000000001","wowPath":"C:\\Jeux\\World of Warcraft","serverUrl":"https://wow.ekreativ.be/api/sync"}""");
+        var store = new AltBoardSync.Core.Config.AgentConfigStore(h.Home);
+        Assert.True(store.LoadOrCreate().UpdatesAutomatically);
+
+        var app = new AgentApp(new AgentEnvironment { HomeDirectory = h.Home, Out = h.Out, Error = h.Error, GetEnvironmentVariable = _ => null });
+        Assert.Equal(AgentApp.ExitOk, await app.RunAsync(["config", "set", "autoUpdate", "off"]));
+        Assert.False(store.LoadOrCreate().UpdatesAutomatically);
+        Assert.Contains("\"autoUpdate\": false", File.ReadAllText(store.ConfigPath));
+        Assert.Equal(AgentApp.ExitUsage, await app.RunAsync(["config", "set", "autoUpdate", "parfois"]));
+        Assert.Contains("on ou off", h.Error.ToString());
+        Assert.Equal(AgentApp.ExitOk, await app.RunAsync(["config", "set", "autoUpdate", "on"]));
+        Assert.True(store.LoadOrCreate().UpdatesAutomatically);
+    }
+
+    [Fact]
+    public async Task Selfcheck_says_its_version_first_reads_this_pc_and_sends_nothing()
+    {
+        using var h = new Harness();
+        h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua");
+        var store = new AltBoardSync.Core.Config.AgentConfigStore(h.Home);
+        store.Save(store.LoadOrCreate() with { WowPath = h.Flavor });
+        var server = new FakeServer(HttpStatusCode.OK, SuccessBody);
+        var app = new AgentApp(new AgentEnvironment
+        {
+            HomeDirectory = h.Home, Out = h.Out, Error = h.Error, HttpHandler = server,
+            ReadOptions = new StableReadOptions { SettleDelay = TimeSpan.Zero },
+            GetEnvironmentVariable = _ => Token,
+        });
+
+        Assert.Equal(AgentApp.ExitOk, await app.RunAsync(["selfcheck"]));
+
+        var lines = h.Out.ToString().Split(Environment.NewLine);
+        Assert.Equal(AgentApp.Version, lines[0]);
+        Assert.Contains("comptes : 1 lus, 0 déjà envoyés", h.Out.ToString());
+        Assert.Contains("jeton : lisible", h.Out.ToString());
+        Assert.Empty(server.Calls);
+
+        // Un dossier du jeu absent est un état du PC, pas un défaut de l'exécutable.
+        store.Save(store.LoadOrCreate() with { WowPath = h.Temp.Combine("absent") });
+        Assert.Equal(AgentApp.ExitOk, await app.RunAsync(["selfcheck"]));
+        Assert.Contains("introuvable", h.Out.ToString());
     }
 }

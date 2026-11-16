@@ -15,6 +15,12 @@ public sealed record WatchState
 
     /// <summary>Version déjà signalée par une notification : une seule bulle par version.</summary>
     public string? NotifiedAgentVersion { get; set; }
+
+    /// <summary>
+    /// Version dont la mise à jour automatique a échoué pour de bon (vérification, relève) : elle n'est
+    /// plus tentée, seulement proposée au téléchargement. Une version plus récente est de nouveau tentée.
+    /// </summary>
+    public string? FailedAgentUpdate { get; set; }
 }
 
 /// <summary>

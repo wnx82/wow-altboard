@@ -29,6 +29,7 @@ internal sealed class WatchHost : IDisposable
     private readonly TrayIcon _tray;
     private readonly MainWindow _window;
     private string? _lastError;
+    private string? _failedUpdate;
     private int _hiddenOnce;
 
     public WatchControl Control { get; } = new();
@@ -94,7 +95,12 @@ internal sealed class WatchHost : IDisposable
     }
 
     /// <summary>Dit dans la fenêtre que cette version a pris la place d'une plus ancienne.</summary>
-    public void ReportReplaced(string? previous, string? autostartCommand) => _window.ReportReplaced(previous, autostartCommand);
+    /// <param name="automatic">Par la mise à jour automatique : une bulle le dit aussi.</param>
+    public void ReportReplaced(string? previous, string? autostartCommand, bool automatic)
+    {
+        _window.ReportReplaced(previous, autostartCommand);
+        if (automatic) _tray.Notify("AltBoard Sync mis à jour", $"La version {AgentApp.Version} est installée et la synchronisation continue.", error: false);
+    }
 
     private static MemoryMappedFile? PublishInfo()
     {
@@ -171,10 +177,12 @@ internal sealed class WatchHost : IDisposable
     }
 
     /// <summary>Lance la surveillance dans un nouveau processus, sans console.</summary>
-    /// <param name="command">« watch » : en arrière-plan ; « ui » : avec sa fenêtre.</param>
-    public static void StartInBackground(string command = "watch")
+    /// <param name="command">« watch » : en arrière-plan ; « ui » : avec sa fenêtre ; « watch --takeover » : à la place de celle en cours.</param>
+    /// <param name="executable">Par défaut, cet exécutable.</param>
+    /// <returns>L'identifiant du processus lancé.</returns>
+    public static int StartInBackground(string command = "watch", string? executable = null)
     {
-        var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Emplacement de l'exécutable inconnu.");
+        executable ??= Environment.ProcessPath ?? throw new InvalidOperationException("Emplacement de l'exécutable inconnu.");
         // Par CreateProcess et non Process.Start, qui transmet toujours les handles hérités : la
         // surveillance garderait ouverte la sortie de cette commande, et un script qui la lit
         // (« AltBoardSync autostart on | … ») attendrait sans fin.
@@ -184,6 +192,7 @@ internal sealed class WatchHost : IDisposable
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         Win32.CloseHandle(created.hThread);
         Win32.CloseHandle(created.hProcess);
+        return (int)created.dwProcessId;
     }
 
     public void OnEvent(WatchEvent watchEvent)
@@ -192,7 +201,8 @@ internal sealed class WatchHost : IDisposable
         switch (watchEvent)
         {
             case WatchEvent.Synced synced:
-                _lastError = null;
+                // Un compte illisible n'a pas pu partir : son échec suit, inutile de le redire à chaque envoi.
+                if (synced.Complete) _lastError = null;
                 _tray.SetTooltip($"AltBoard Sync — synchronisé à {DateTime.Now:HH:mm}");
                 // La bulle dit aussi ce qui a changé, tant que cela tient en quelques lignes.
                 var lines = synced.Changes.Take(3).Select(change => $"{change.Name} : {string.Join(", ", change.Details)}");
@@ -204,11 +214,25 @@ internal sealed class WatchHost : IDisposable
                 if (failed.Error != _lastError) _tray.Notify(failed.TokenRejected ? "Jeton refusé" : "Échec de la synchronisation", failed.Error, error: true);
                 _lastError = failed.Error;
                 break;
-            case WatchEvent.UpdateAvailable update:
+            // Après un échec de la mise à jour automatique, sa bulle a déjà dit de télécharger cette version.
+            case WatchEvent.UpdateAvailable update when update.Version != _failedUpdate:
                 _tray.Notify(
                     "Mise à jour disponible",
                     $"AltBoard Sync {update.Version} est disponible. Téléchargez-le depuis la page Machines, puis lancez-le : il remplace cette version.",
                     error: false);
+                break;
+            case WatchEvent.Updating updating:
+                _tray.SetTooltip($"AltBoard Sync — mise à jour vers {updating.Version}…");
+                break;
+            case WatchEvent.UpdateFailed updateFailed:
+                _tray.SetTooltip($"AltBoard Sync {AgentApp.Version}");
+                // Passagère, elle sera retentée sans un mot.
+                if (updateFailed.RetryLater) break;
+                _failedUpdate = updateFailed.Version;
+                _tray.Notify(
+                    "Mise à jour impossible",
+                    $"AltBoard Sync {updateFailed.Version} : {updateFailed.Error}. La version {AgentApp.Version} reste en service ; la nouvelle se télécharge depuis la page Machines.",
+                    error: true);
                 break;
         }
     }

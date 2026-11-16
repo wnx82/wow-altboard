@@ -36,6 +36,9 @@ public sealed record AgentEnvironment
 
     /// <summary>Absent là où le démarrage automatique n'existe pas.</summary>
     public IAutostart? Autostart { get; init; }
+
+    /// <summary>Absent, la surveillance annonce les nouvelles versions sans les installer (terminal, tests).</summary>
+    public IUpdateHost? UpdateHost { get; init; }
 }
 
 /// <summary>
@@ -69,6 +72,7 @@ public sealed class AgentApp(AgentEnvironment env)
                 "config" => Config(rest),
                 "token" => Token(rest),
                 "version" or "--version" => Print(Version),
+                "selfcheck" => await SelfCheckAsync(cancellationToken).ConfigureAwait(false),
                 "watch" => await WatchAsync(rest, cancellationToken).ConfigureAwait(false),
                 "autostart" => Autostart(rest),
                 "help" or "--help" or "-h" => Help(),
@@ -108,10 +112,12 @@ public sealed class AgentApp(AgentEnvironment env)
               ui                        ouvre la fenêtre de l'agent (comme un double-clic)
               autostart [on|off]        lance watch à l'ouverture de session, ou l'arrête
               config                    affiche la configuration
-              config set <clé> <valeur> modifie wowPath, serverUrl ou machineName
+              config set <clé> <valeur> modifie wowPath, serverUrl, machineName ou autoUpdate (on|off)
               token set                 enregistre le jeton d'agent (lu sur l'entrée standard)
               token clear               supprime le jeton enregistré
               version                   affiche la version
+              selfcheck                 vérifie que cet exécutable démarre et lit ce PC, sans rien
+                                        envoyer (la mise à jour automatique s'en sert)
 
             Options de sync, scan et watch :
               --wow-path <dossier>      dossier World of Warcraft (remplace la configuration)
@@ -186,6 +192,7 @@ public sealed class AgentApp(AgentEnvironment env)
                         + $"{Plural(baganator.Guilds.Count, "banque de guilde", "banques de guilde")}");
                 }
                 foreach (var warning in payload.Warnings) env.Out.WriteLine($"  avertissement : {warning}");
+                foreach (var notice in payload.Notices ?? []) env.Out.WriteLine($"  information : {notice}");
                 _log.Info($"compte {payload.FolderHint} lu : {payload.Characters.Count} personnages, {payload.Warnings.Count} avertissements, fichier {payload.File.Hash[..12]}");
             }
             else
@@ -284,6 +291,52 @@ public sealed class AgentApp(AgentEnvironment env)
 
     internal static string Plural(int count, string singular, string plural) => $"{count} {(count > 1 ? plural : singular)}";
 
+    /// <summary>
+    /// Vérifie un exécutable avant qu'il remplace celui en service (mise à jour automatique) : il dit sa
+    /// version en première ligne, puis lit la configuration, l'état de la surveillance, le jeton et les
+    /// comptes comme « watch », et prépare le document, sans rien envoyer. Code 0 si rien n'a levé
+    /// d'exception ; un compte illisible ou un dossier absent sont des états du PC, pas des défauts.
+    /// </summary>
+    private async Task<int> SelfCheckAsync(CancellationToken cancellationToken)
+    {
+        env.Out.WriteLine(Version);
+        var config = _configStore.LoadOrCreate();
+        var state = new WatchStateStore(env.HomeDirectory).Load();
+        env.Out.WriteLine($"état : {state.Fingerprints.Count} comptes déjà envoyés, {state.ItemNameHashes.Count} caches de noms");
+        try
+        {
+            env.Out.WriteLine(_tokenStore.Read() is null ? "jeton : absent" : "jeton : lisible");
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            env.Out.WriteLine($"jeton : {e.Message}");
+        }
+
+        try
+        {
+            var builder = new PayloadBuilder(new StableFileReader(env.ReadOptions));
+            var accounts = new List<AccountPayload>();
+            var known = 0;
+            foreach (var source in AccountScanner.Scan(config.WowPath))
+            {
+                var result = await builder.ReadAccountAsync(source, cancellationToken).ConfigureAwait(false);
+                if (result.Payload is null) continue;
+                accounts.Add(result.Payload);
+                if (state.Fingerprints.ContainsKey($"{source.Flavor}/{result.Payload.AccountKey}")) known++;
+            }
+
+            var document = PayloadBuilder.Build(new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), accounts, Version, env.Now(), []);
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(document, SyncJsonContext.Default.SyncPayload).Length;
+            env.Out.WriteLine($"comptes : {accounts.Count} lus, {known} déjà envoyés, document de {bytes} octets");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            env.Out.WriteLine($"comptes : {e.Message}");
+        }
+
+        return ExitOk;
+    }
+
     // ---------------------------------------------------------------------------
     // watch / autostart
     // ---------------------------------------------------------------------------
@@ -315,7 +368,7 @@ public sealed class AgentApp(AgentEnvironment env)
 
         try
         {
-            await new WatchLoop(env, config, wowPath ?? config.WowPath, endpoint, _tokenStore, _log, _journal, Version).RunAsync(cancellationToken).ConfigureAwait(false);
+            await new WatchLoop(env, _configStore, config, wowPath, endpoint, _tokenStore, _log, _journal, Version).RunAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -364,11 +417,12 @@ public sealed class AgentApp(AgentEnvironment env)
             env.Out.WriteLine($"machineName : {config.MachineName ?? $"(nom d'hôte : {env.Hostname})"}");
             env.Out.WriteLine($"wowPath     : {config.WowPath}");
             env.Out.WriteLine($"serverUrl   : {config.ServerUrl}");
+            env.Out.WriteLine($"autoUpdate  : {(config.UpdatesAutomatically ? "on" : "off")}");
             env.Out.WriteLine($"jeton       : {(_tokenStore.Read() is null ? "absent" : "enregistré")}");
             return ExitOk;
         }
 
-        if (args.Length != 3 || args[0] != "set") return Usage("Usage : config set <wowPath|serverUrl|machineName> <valeur>");
+        if (args.Length != 3 || args[0] != "set") return Usage("Usage : config set <wowPath|serverUrl|machineName|autoUpdate> <valeur>");
         var value = args[2].Trim();
         switch (args[1].ToLowerInvariant())
         {
@@ -381,6 +435,14 @@ public sealed class AgentApp(AgentEnvironment env)
                 break;
             case "machinename":
                 config = config with { MachineName = value.Length > 0 ? value : null };
+                break;
+            case "autoupdate":
+                config = value.ToLowerInvariant() switch
+                {
+                    "on" or "true" => config with { AutoUpdate = true },
+                    "off" or "false" => config with { AutoUpdate = false },
+                    _ => throw new ArgumentException($"autoUpdate attend on ou off, pas « {value} »."),
+                };
                 break;
             default:
                 return Usage($"Clé inconnue : {args[1]}");

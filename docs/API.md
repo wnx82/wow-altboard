@@ -38,6 +38,7 @@ Reçoit l'état AltBoard d'une machine.
       "addonVersion": "0.8.3",
       "file": { "hash": "<SHA-256 du fichier>", "modifiedAt": "2026-10-04T13:10:03.26+00:00", "size": 90253 },
       "warnings": [],
+      "notices": ["Baganator : 1 personnage absent d'AltBoard sur ce compte (Nom) : son courrier et ses enchères ne sont pas transmis."],
       "items": [{ "key": "36", "itemId": 36, "name": "Vieille masse", "quality": 1, "icon": 133478, "link": "|cnIQ1:|Hitem:36:…" }],
       "characters": [
         {
@@ -202,14 +203,21 @@ Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miro
   "charactersStale": 0,
   "snapshotsCreated": 1,
   "errors": [],
-  "latestAgentVersion": "0.8.1",
+  "latestAgentVersion": "0.9.0",
+  "latestAgentSha256": "<SHA-256 de l'exécutable servi, 64 hexadécimaux>",
   "requestId": "c6ed9755-d086-4437-a6f1-66dcc97bfe0c"
 }
 ```
 
 `status` vaut `partial` quand l'agent a signalé des avertissements (`warnings` d'un compte) : ils
-sont conservés dans `sync_errors`, comptés dans `errors_count` et affichés sous la ligne du journal
-de la page **Machines**. Les données sont enregistrées de la même façon.
+sont conservés dans `sync_errors` (code `agent_warning`), comptés dans `errors_count` et affichés
+sous la ligne du journal de la page **Machines**. Les données sont enregistrées de la même façon.
+
+`notices` (facultatif, agent 0.9.0 et suivants, mêmes limites que `warnings`) : informations sans
+gravité, gardées dans `sync_errors` avec le code `agent_notice` et affichées en gris sur la page
+**Machines**. Elles ne comptent pas dans `errors_count` et ne rendent pas la synchronisation
+partielle. L'avertissement « Baganator : N personnages absents d'AltBoard » d'un agent 0.8.x est
+rangé de même.
 
 Au-delà de 50 avertissements pour un compte, le serveur garde les 49 premiers et les remplace par un
 dernier, « N autres avertissements non transmis » ; un avertissement de plus de 400 caractères, ou
@@ -220,6 +228,12 @@ refuser le document. L'agent 0.8.1 applique les mêmes limites avant l'envoi.
 construction). Elle accompagne toutes les réponses faites à un jeton valide, refus compris ; elle
 est absente si le jeton est refusé ou si la construction ne la connaissait pas. L'agent 0.8.1 la
 retient et annonce une version plus récente que la sienne une fois.
+
+`latestAgentSha256` (site 0.29.0) : SHA-256 de l'exécutable servi par `GET /api/sync/agent`, avec
+`latestAgentVersion`, à un agent authentifié seulement. L'agent 0.9.0 ne s'installe une nouvelle
+version que si le fichier téléchargé a cette empreinte. Absent si l'image ne contient pas d'agent ;
+une erreur de lecture du fichier est journalisée (`agent.digest_failed`) sans gêner la
+synchronisation.
 
 `charactersStale` : personnages dont ce PC détient un fichier plus ancien que l'état déjà connu,
 et personnages inconnus du serveur, non vus en jeu depuis la date limite de la dernière
@@ -257,6 +271,22 @@ tour en mémoire avant que son corps soit lu : quatre au plus, 20 secondes au pl
 suppression d'un compte) l'attendent 8 secondes au plus. Au-delà, la synchronisation reçoit
 `sync_busy` ; la réinitialisation ou la suppression affiche « Une synchronisation est en cours :
 réessayez dans quelques secondes. » Voir [DATABASE § Délais](DATABASE.md).
+
+## `GET /api/sync/agent`
+
+Mise à jour automatique de l'agent (site 0.29.0, agent 0.9.0). Jeton d'agent (`Authorization:
+Bearer wab_…`), pas de session : la route est sous `/api/sync`, que Cloudflare Access laisse passer.
+
+| Code HTTP | `code` | Cause |
+|---|---|---|
+| 200 | — | `application/octet-stream` : l'exécutable, avec `X-Agent-Version`, `X-Agent-Sha256` et `Cache-Control: no-store` |
+| 401 | `unauthorized` | jeton absent, mal formé, inconnu ou révoqué ; compte comme un échec d'authentification de `/api/sync` |
+| 404 | `agent_unavailable` | image sans agent, ou sans version connue |
+| 429 | `rate_limited` | plus de 12 téléchargements en 15 minutes, ou 10 échecs d'authentification en 15 minutes (partagés avec `/api/sync`) |
+| 503 | `service_unavailable` | base injoignable pour vérifier le jeton |
+
+Le jeton n'est pas lié à la machine ici : un téléchargement n'écrit rien. Chaque téléchargement est
+journalisé (`agent.update_download`, avec la version et l'identifiant du jeton).
 
 ## `GET /api/export/xlsx`
 

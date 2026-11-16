@@ -171,11 +171,16 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
 
 ### 1.5 Agent (V5 de la feuille de route)
 
-- [ ] **P2 · L** — Mise à jour automatique : la release GitHub publie déjà `AltBoardSync.exe` et
+- [x] **P2 · L** — Mise à jour automatique : la release GitHub publie déjà `AltBoardSync.exe` et
   son empreinte SHA-256 (`.github/workflows/release-agent.yml:34`). Reste à interroger la dernière
   release, télécharger, vérifier l'empreinte, remplacer l'exécutable et redémarrer. Fait en partie
   le 2026-11-14 (agent 0.8.1) : l'agent annonce la version servie par le site, et le nouvel
   exécutable lancé à la main remplace l'ancien. Restent le téléchargement et la vérification.
+  Fait le 2026-11-16 (site 0.29.0, agent 0.9.0) : l'agent télécharge l'exécutable servi par le site
+  (`GET /api/sync/agent`), vérifie l'empreinte annoncée par `/api/sync` et `selfcheck`, remplace
+  son exécutable et passe la main ; retour à l'ancien si le nouveau ne prend pas la relève. Le site
+  plutôt que la release GitHub : c'est l'exécutable qu'il sert et annonce, sans course entre la
+  release et le déploiement.
 
 ## 2. Sécurité du site
 
@@ -370,13 +375,16 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   muette après les en-têtes : plus aucun envoi jusqu'au redémarrage, la fenêtre affiche toujours
   « Synchronisation active ». Faire couvrir tout l'échange par le délai. Fait le 2026-11-08
   (`e328b01`, agent 0.5.1) : le délai couvre en-têtes et corps, une coupure devient un échec dit.
-- [ ] **P2 · S** — Un compte illisible n'est pas signalé : le cycle rend `null`
+- [x] **P2 · S** — Un compte illisible n'est pas signalé : le cycle rend `null`
   (`App/WatchLoop.cs:141`), sans événement d'échec ni bulle. `AltBoard.lua` devenu non analysable :
-  une ligne au journal, tableau de bord figé, pastille au vert.
-- [ ] **P2 · M** — La surveillance garde un handle ouvert sur `WTF\Account`
+  une ligne au journal, tableau de bord figé, pastille au vert. Fait le 2026-11-16 (agent 0.9.0) :
+  les autres comptes partent, le compte illisible est un échec (bulle, journal une fois, nouvel
+  essai).
+- [x] **P2 · M** — La surveillance garde un handle ouvert sur `WTF\Account`
   (`App/WatchLoop.cs:192`) : Windows refuse de renommer `WTF` ou de déplacer le dossier du jeu tant
   que l'agent tourne, sans le désigner. Un surveillant mort n'est jamais recréé (`:191`, `:203`).
-  Remplacer par un relevé périodique de la taille et de la date des fichiers connus.
+  Remplacer par un relevé périodique de la taille et de la date des fichiers connus. Fait le
+  2026-11-16 (agent 0.9.0) : relevé toutes les 3 secondes, plus de `FileSystemWatcher`.
 - [x] **P2 · S** — Trois champs dépassent les bornes du serveur, qui refuse alors tout le document
   en 422 à chaque essai : 51 avertissements possibles contre 50
   (`web/src/lib/sync/schema.ts:170`), `flavor` non borné contre 40, nom de machine non borné
@@ -410,19 +418,23 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   Fait le 2026-11-14 (agent 0.8.1) : un exécutable plus récent arrête l'ancien, prend sa place et
   réécrit le démarrage avec Windows. Une instance antérieure à 0.8.1, qui ne dit pas sa version,
   est remplacée de même.
-- [ ] **P2 · M** — Dossier du jeu fixé sur la bêta (`Discovery/AccountScanner.cs:16`,
+- [x] **P2 · M** — Dossier du jeu fixé sur la bêta (`Discovery/AccountScanner.cs:16`,
   `…\World of Warcraft\_classic_beta_`), sans choix dans la fenêtre : à la sortie officielle du
   4 novembre 2026, l'agent ne trouvera plus rien sans `config set wowPath`. Prendre par défaut la
   racine `World of Warcraft` et ajouter le choix du dossier à la fenêtre. Fait en partie le
   2026-10-29 (agent 0.4.1) : la racine est le défaut, et une configuration fixée sur
   `_classic_beta_` passe à la racine qui le contient (`Config/AgentConfig.cs`). Reste le choix du
-  dossier dans la fenêtre.
+  dossier dans la fenêtre. Fait le 2026-11-16 (agent 0.9.0) : **Réglages** dans la fenêtre, et
+  `watch` relit sa configuration à chaque cycle.
 - [ ] **P2 · M** — Exécutable publié non signé, et toute étiquette `agent-v*` publie une release,
   quel que soit le commit (`.github/workflows/release-agent.yml:7`). Signer, ajouter une
-  attestation de provenance, refuser une étiquette hors de `main`.
-- [ ] **P3 · S** — L'exécutable publié (rogné, fichier unique) n'est jamais exécuté en CI
+  attestation de provenance, refuser une étiquette hors de `main`. Fait en partie le 2026-11-16 :
+  une étiquette dont le commit n'est pas sur `main` est refusée. Restent signature et attestation,
+  plus utiles depuis la mise à jour automatique (voir SECURITY, Limites assumées).
+- [x] **P3 · S** — L'exécutable publié (rogné, fichier unique) n'est jamais exécuté en CI
   (`.github/workflows/ci.yml:81`) : y lancer `AltBoardSync.exe version` et un `scan` sur les
-  fixtures.
+  fixtures. Fait le 2026-11-16 : `version`, `config set wowPath`, `scan` et `selfcheck` sur une
+  fixture.
 
 ### Code et tests
 

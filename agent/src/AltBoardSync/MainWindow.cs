@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using AltBoardSync.Core.App;
 using AltBoardSync.Core.Config;
+using AltBoardSync.Core.Discovery;
 using AltBoardSync.Core.Sync;
 using static Win32;
 
@@ -32,6 +33,10 @@ internal sealed class MainWindow
         TokenMachines,
         TokenCancel,
         TokenSave,
+        Settings,
+        SettingsFolder,
+        SettingsAutoUpdate,
+        SettingsClose,
     }
 
     private enum TokenState
@@ -57,9 +62,10 @@ internal sealed class MainWindow
     private const string ClassName = "AltBoardSyncWindow";
 
     // Une zone absente de l'affichage (lien de mise à jour sans mise à jour) est sautée.
-    private static readonly Zone[] FocusOrder = [Zone.Update, Zone.Autostart, Zone.SyncNow, Zone.Token, Zone.Dashboard, Zone.LogFile, Zone.Quit];
+    private static readonly Zone[] FocusOrder = [Zone.Update, Zone.Autostart, Zone.SyncNow, Zone.Token, Zone.Dashboard, Zone.LogFile, Zone.Settings, Zone.Quit];
     // Dans le panneau du jeton, après le champ, qui ouvre la boucle.
     private static readonly Zone[] TokenFocusOrder = [Zone.TokenPaste, Zone.TokenMachines, Zone.TokenCancel, Zone.TokenSave];
+    private static readonly Zone[] SettingsFocusOrder = [Zone.SettingsFolder, Zone.SettingsAutoUpdate, Zone.SettingsClose];
     private static readonly string[] Days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     private static readonly string[] Months =
         ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -91,6 +97,16 @@ internal sealed class MainWindow
     private bool _syncRequested;
     // Version plus récente servie par le site, à proposer ; null s'il n'y en a pas.
     private string? _update;
+    // Version annoncée par la surveillance : elle ne s'installera pas seule.
+    private string? _announcedUpdate;
+    // Version en cours d'installation par la mise à jour automatique.
+    private string? _updating;
+
+    // Panneau des réglages : dossier du jeu, mise à jour automatique.
+    private bool _settingsOpen, _autoUpdateOn = true;
+    private string _wowPath = "";
+    private string _folderStatus = "";
+    private bool _folderOk;
     // Le serveur a refusé le jeton enregistré : la saisie s'ouvre une fois, jusqu'au prochain jeton.
     private bool _tokenRejected, _tokenRejectedAsked;
 
@@ -153,9 +169,21 @@ internal sealed class MainWindow
                 if (failed.TokenRejected) _tokenRejected = true;
                 break;
             case WatchEvent.UpdateAvailable update:
-                _update = update.Version;
+                _update = _announcedUpdate = update.Version;
                 // Une version annoncée ne relance pas de synchronisation : le bouton reste tel quel.
                 if (_window != 0 && IsWindowVisible(_window)) Invalidate();
+                return;
+            case WatchEvent.Updating updating:
+                _updating = updating.Version;
+                if (_window == 0 || !IsWindowVisible(_window)) return;
+                Reload();
+                Invalidate();
+                return;
+            case WatchEvent.UpdateFailed:
+                _updating = null;
+                if (_window == 0 || !IsWindowVisible(_window)) return;
+                Reload();
+                Invalidate();
                 return;
         }
 
@@ -263,7 +291,7 @@ internal sealed class MainWindow
         _entries = _journal.ReadLatest();
         _layoutWidth = -1;
         // Avant le premier signalement de la surveillance, l'état est celui de la dernière entrée.
-        _failing ??= _entries.FirstOrDefault(e => e.Kind != JournalEntry.Info)?.Kind == JournalEntry.Failed;
+        _failing ??= _entries.FirstOrDefault(e => e.Kind is JournalEntry.Synced or JournalEntry.Failed)?.Kind == JournalEntry.Failed;
 
         _autostartOn = _autostart.IsEnabled;
         // Hors d'un glissement en cours, l'interrupteur montre l'état lu : à la première lecture
@@ -274,6 +302,8 @@ internal sealed class MainWindow
         {
             var config = new AgentConfigStore(_homeDirectory).LoadOrCreate();
             _machine = string.IsNullOrWhiteSpace(config.MachineName) ? Environment.MachineName : config.MachineName;
+            _wowPath = config.WowPath;
+            _autoUpdateOn = config.UpdatesAutomatically;
             _server = new Uri(config.ServerUrl).Host;
         }
         catch (Exception e) when (e is InvalidDataException or UriFormatException or IOException or UnauthorizedAccessException)
@@ -281,8 +311,12 @@ internal sealed class MainWindow
             _server = "configuration illisible";
         }
 
-        var latest = new WatchStateStore(_homeDirectory).Load().LatestAgentVersion;
-        _update = AgentVersions.IsNewer(latest, AgentApp.Version) ? latest : null;
+        // Le lien vers la page Machines seulement pour une version à installer à la main : mise à jour
+        // automatique désactivée, en échec pour cette version, ou annoncée par la surveillance.
+        var state = new WatchStateStore(_homeDirectory).Load();
+        var latest = state.LatestAgentVersion;
+        var manual = !_autoUpdateOn || latest == state.FailedAgentUpdate || latest == _announcedUpdate;
+        _update = AgentVersions.IsNewer(latest, AgentApp.Version) && manual ? latest : null;
 
         try
         {
@@ -374,7 +408,7 @@ internal sealed class MainWindow
                     }
 
                     return 0;
-                case WmMouseWheel when !_tokenOpen:
+                case WmMouseWheel when !_tokenOpen && !_settingsOpen:
                     ScrollBy(-(short)(((long)wParam >> 16) & 0xFFFF) / 120f * S(60));
                     return 0;
                 // Seulement pour la fenêtre elle-même : le champ du jeton garde son curseur de texte.
@@ -390,6 +424,7 @@ internal sealed class MainWindow
                 case WmClose:
                     // Fermer la fenêtre ne quitte pas l'agent : il reste dans la zone de notification.
                     if (_tokenOpen) CloseTokenPanel();
+                    if (_settingsOpen) CloseSettings();
                     ShowWindow(window, SwHide);
                     KillTimer(window, RefreshTimer);
                     _onHidden();
@@ -489,6 +524,12 @@ internal sealed class MainWindow
         if (_tokenOpen)
         {
             OnTokenKey(key);
+            return;
+        }
+
+        if (_settingsOpen)
+        {
+            OnSettingsKey(key);
             return;
         }
 
@@ -610,6 +651,18 @@ internal sealed class MainWindow
             case Zone.Quit:
                 _commands.Quit();
                 break;
+            case Zone.Settings:
+                OpenSettings();
+                break;
+            case Zone.SettingsFolder:
+                ChooseFolder();
+                break;
+            case Zone.SettingsAutoUpdate:
+                ToggleAutoUpdate();
+                break;
+            case Zone.SettingsClose:
+                CloseSettings();
+                break;
         }
 
         Invalidate();
@@ -708,24 +761,39 @@ internal sealed class MainWindow
         canvas.Text("Chaque envoi, et ce qui a changé depuis le précédent", fonts.Small, Faint, new RectF(left + S(120), S(334), contentWidth - S(120), S(22)), TextLayout.Middle | TextLayout.Right | TextLayout.Ellipsis);
         PaintJournal(canvas, fonts, new RectF(left, S(364), contentWidth, height - S(364) - S(52)));
 
-        // Pied : fermer la fenêtre ne quitte pas l'agent.
-        var quitWidth = canvas.Measure("Quitter", fonts.SmallBold).Width + S(24);
-        var quit = new RectF(right - quitWidth, height - S(42), quitWidth, S(30));
-        _zones.Add((Zone.Quit, quit));
-        if (_hover == Zone.Quit) canvas.FillRound(quit, S(8), _pressed == Zone.Quit ? Raised : RaisedHover);
-        canvas.Text("Quitter", fonts.SmallBold, _hover == Zone.Quit ? Bright : Muted, quit, TextLayout.Middle | TextLayout.Center);
-        PaintFocus(canvas, Zone.Quit, quit, S(8));
+        // Pied : les réglages, et quitter. Fermer la fenêtre ne quitte pas l'agent.
+        var quit = PaintFooterButton(canvas, fonts, Zone.Quit, "Quitter", right, height);
+        var settings = PaintFooterButton(canvas, fonts, Zone.Settings, "Réglages", quit.X - S(4), height);
         canvas.Text(
             "Fermer cette fenêtre laisse la synchronisation active, dans la zone de notification.", fonts.Small, Faint,
-            new RectF(left, height - S(42), contentWidth - quitWidth - S(12), S(30)), TextLayout.Middle | TextLayout.Ellipsis);
+            new RectF(left, height - S(42), settings.X - left - S(12), S(30)), TextLayout.Middle | TextLayout.Ellipsis);
 
         if (_tokenOpen) PaintTokenPanel(canvas, fonts, width, height);
+        if (_settingsOpen) PaintSettingsPanel(canvas, fonts, width, height);
+    }
+
+    /// <summary>Bouton discret du pied de fenêtre, aligné à droite sur <paramref name="right"/>.</summary>
+    private RectF PaintFooterButton(Canvas canvas, Fonts fonts, Zone zone, string label, float right, float height)
+    {
+        var width = canvas.Measure(label, fonts.SmallBold).Width + S(24);
+        var button = new RectF(right - width, height - S(42), width, S(30));
+        _zones.Add((zone, button));
+        if (_hover == zone) canvas.FillRound(button, S(8), _pressed == zone ? Raised : RaisedHover);
+        canvas.Text(label, fonts.SmallBold, _hover == zone ? Bright : Muted, button, TextLayout.Middle | TextLayout.Center);
+        PaintFocus(canvas, zone, button, S(8));
+        return button;
     }
 
     /// <summary>Version et nom du PC ; s'il y a lieu, le lien vers la version plus récente.</summary>
     private void PaintSubtitle(Canvas canvas, Fonts fonts, RectF area)
     {
         var subtitle = $"Version {AgentApp.Version}  ·  {_machine}";
+        if (_updating is not null)
+        {
+            canvas.Text($"{subtitle}  ·  mise à jour vers {_updating}…", fonts.Small, Gold, area, TextLayout.Middle | TextLayout.Ellipsis);
+            return;
+        }
+
         if (_update is null)
         {
             canvas.Text(subtitle, fonts.Small, Muted, area, TextLayout.Middle | TextLayout.Ellipsis);
@@ -1071,6 +1139,199 @@ internal sealed class MainWindow
         return CallWindowProcW(_tokenEditPrevious, window, message, wParam, lParam);
     }
 
+    // ---------------------------------------------------------------------------
+    // Réglages
+    // ---------------------------------------------------------------------------
+
+    private void PaintSettingsPanel(Canvas canvas, Fonts fonts, float width, float height)
+    {
+        // Ce qui est derrière le voile cesse de répondre.
+        _zones.Clear();
+        canvas.Fill(new RectF(0, 0, width, height), WithAlpha(Ink, 0xC8));
+        float cardWidth = MathF.Min(S(560), width - S(48)), cardHeight = S(336);
+        var card = new RectF(MathF.Round((width - cardWidth) / 2), MathF.Max(S(16), MathF.Round((height - cardHeight) / 2) - S(16)), cardWidth, cardHeight);
+        canvas.FillRound(card, S(16), Surface);
+        canvas.StrokeRound(card, S(16), LineStrong);
+
+        float left = card.X + S(24), inner = card.Width - S(48), right = left + inner;
+        canvas.Text("Réglages", fonts.Heading, Bright, new RectF(left, card.Y + S(22), inner, S(24)), TextLayout.Middle);
+
+        // Dossier du jeu : la racine World of Warcraft, ou le dossier d'un client (_forever_…).
+        canvas.Text("DOSSIER DU JEU", fonts.Label, Faint, new RectF(left, card.Y + S(62), inner, S(16)), TextLayout.Middle);
+        var changeWidth = ButtonWidth(canvas, fonts, null, "Changer…");
+        var field = new RectF(left, card.Y + S(84), inner - changeWidth - S(10), S(40));
+        canvas.FillRound(field, S(10), Ink);
+        canvas.StrokeRound(field, S(10), Line);
+        var text = new RectF(field.X + S(14), field.Y, field.Width - S(28), field.Height);
+        canvas.Text(ShortenPath(canvas, fonts.Body, _wowPath, text.Width), fonts.Body, Bright, text, TextLayout.Middle | TextLayout.Ellipsis);
+        PaintButton(canvas, fonts, Zone.SettingsFolder, new RectF(right - changeWidth, field.Y + S(1), changeWidth, S(38)), null, "Changer…", primary: false);
+        canvas.Text(_folderStatus, fonts.Small, _folderOk ? Muted : Danger, new RectF(left, field.Bottom + S(8), inner, S(18)), TextLayout.Middle | TextLayout.Ellipsis);
+
+        canvas.Fill(new RectF(left, card.Y + S(168), inner, 1), Line);
+
+        // Mise à jour automatique : toute la ligne bascule l'interrupteur.
+        var row = new RectF(left - S(12), card.Y + S(180), inner + S(24), S(70));
+        _zones.Add((Zone.SettingsAutoUpdate, row));
+        if (_hover == Zone.SettingsAutoUpdate) canvas.FillRound(row, S(12), Raised);
+        var textWidth = inner - S(66);
+        canvas.Text("Mise à jour automatique", fonts.BodyBold, Bright, new RectF(left, row.Y + S(10), textWidth, S(22)), TextLayout.Middle | TextLayout.Ellipsis);
+        var description = _autoUpdateOn
+            ? "Activée : une version publiée par le site s'installe seule, vérifiée avant de remplacer celle-ci."
+            : "Désactivée : une nouvelle version est seulement annoncée, à télécharger depuis la page Machines.";
+        canvas.Text(description, fonts.Small, Muted, new RectF(left, row.Y + S(34), textWidth, S(32)), TextLayout.Wrap);
+        var track = new RectF(right - S(46), row.Y + (row.Height - S(26)) / 2, S(46), S(26));
+        canvas.FillRound(track, S(13), _autoUpdateOn ? Gold : 0xFF2A344B);
+        var knob = S(10);
+        canvas.FillCircle(_autoUpdateOn ? track.Right - S(3) - knob : track.X + S(3) + knob, track.Y + track.Height / 2, knob, _autoUpdateOn ? OnGold : 0xFFB4BED3);
+        PaintFocus(canvas, Zone.SettingsAutoUpdate, row, S(12));
+
+        var closeWidth = ButtonWidth(canvas, fonts, null, "Fermer");
+        PaintButton(canvas, fonts, Zone.SettingsClose, new RectF(right - closeWidth, card.Bottom - S(62), closeWidth, S(38)), null, "Fermer", primary: true);
+    }
+
+    /// <summary>Raccourcit un chemin par le début (« …\World of Warcraft\_forever_ ») pour qu'il tienne en largeur.</summary>
+    private static string ShortenPath(Canvas canvas, IntPtr font, string path, float maxWidth)
+    {
+        if (canvas.Measure(path, font).Width <= maxWidth) return path;
+        var parts = path.Split('\\');
+        for (var skip = 1; skip < parts.Length; skip++)
+        {
+            var shortened = "…\\" + string.Join('\\', parts[skip..]);
+            if (canvas.Measure(shortened, font).Width <= maxWidth) return shortened;
+        }
+
+        return path;
+    }
+
+    private void OpenSettings()
+    {
+        if (_window == 0) return;
+        Reload();
+        RefreshFolderStatus();
+        _settingsOpen = true;
+        _hover = _pressed = Zone.None;
+        _focus = Zone.None;
+        _focusVisible = false;
+        Invalidate();
+    }
+
+    private void CloseSettings()
+    {
+        _settingsOpen = false;
+        _focus = Zone.None;
+        _focusVisible = false;
+        Invalidate();
+    }
+
+    /// <summary>Ce que l'agent trouve dans le dossier du jeu enregistré.</summary>
+    private void RefreshFolderStatus()
+    {
+        try
+        {
+            var accounts = AccountScanner.Scan(_wowPath).Count;
+            _folderOk = accounts > 0;
+            _folderStatus = accounts switch
+            {
+                0 => "Aucun compte AltBoard ici : le jeu n'a pas encore écrit ses données, ou ce n'est pas le bon dossier.",
+                1 => "1 compte AltBoard trouvé.",
+                _ => $"{accounts} comptes AltBoard trouvés.",
+            };
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _folderOk = false;
+            _folderStatus = e is DirectoryNotFoundException ? "Dossier introuvable : choisissez celui de World of Warcraft." : e.Message;
+        }
+    }
+
+    private void ChooseFolder()
+    {
+        var chosen = FolderDialog.Pick(_window, "Dossier de World of Warcraft (ou d'un client comme _forever_)", _wowPath);
+        if (chosen is null) return;
+
+        // Un dossier sans WTF\Account n'est ni la racine du jeu ni un client : il n'est pas enregistré.
+        IReadOnlyList<string> roots;
+        try
+        {
+            roots = AccountScanner.AccountRoots(chosen);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            roots = [];
+        }
+
+        if (roots.Count == 0)
+        {
+            _folderOk = false;
+            _folderStatus = $"Pas de dossier WTF\\Account dans « {Path.GetFileName(chosen.TrimEnd('\\'))} » : choisissez le dossier World of Warcraft.";
+            Invalidate();
+            return;
+        }
+
+        try
+        {
+            var store = new AgentConfigStore(_homeDirectory);
+            store.Save(store.LoadOrCreate() with { WowPath = chosen });
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            _folderOk = false;
+            _folderStatus = $"Dossier non enregistré : {e.Message}";
+            Invalidate();
+            return;
+        }
+
+        _log.Info("dossier du jeu changé depuis la fenêtre");
+        _journal.Info($"Dossier du jeu : {chosen}.");
+        _wowPath = chosen;
+        RefreshFolderStatus();
+        _entries = _journal.ReadLatest();
+        _layoutWidth = -1;
+        // La surveillance relit la configuration à chaque cycle : celui-ci part tout de suite.
+        _commands.SyncNow();
+        Invalidate();
+    }
+
+    private void ToggleAutoUpdate()
+    {
+        try
+        {
+            var store = new AgentConfigStore(_homeDirectory);
+            var config = store.LoadOrCreate();
+            store.Save(config with { AutoUpdate = !config.UpdatesAutomatically });
+            _autoUpdateOn = !config.UpdatesAutomatically;
+            _log.Info(_autoUpdateOn ? "mise à jour automatique activée" : "mise à jour automatique désactivée");
+            _journal.Info(_autoUpdateOn ? "Mise à jour automatique activée." : "Mise à jour automatique désactivée.");
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            _journal.Info($"Mise à jour automatique inchangée : {e.Message}");
+        }
+
+        // Journal et lien de la version à télécharger suivent le réglage.
+        Reload();
+    }
+
+    private void OnSettingsKey(int key)
+    {
+        switch (key)
+        {
+            case VkEscape:
+                CloseSettings();
+                break;
+            case VkReturn or VkSpace when _focusVisible && _focus != Zone.None:
+                Activate(_focus);
+                break;
+            case VkTab:
+                var step = GetKeyState(VkShift) < 0 ? -1 : 1;
+                var index = Array.IndexOf(SettingsFocusOrder, _focus);
+                _focus = SettingsFocusOrder[index < 0 ? (step > 0 ? 0 : SettingsFocusOrder.Length - 1) : (index + step + SettingsFocusOrder.Length) % SettingsFocusOrder.Length];
+                _focusVisible = true;
+                Invalidate();
+                break;
+        }
+    }
+
     private void PaintFocus(Canvas canvas, Zone zone, RectF bounds, float radius)
     {
         // Visible seulement quand on navigue au clavier.
@@ -1179,6 +1440,7 @@ internal sealed class MainWindow
         {
             JournalEntry.Synced => ("Synchronisation réussie", Ok),
             JournalEntry.Failed => ("Échec de la synchronisation", Danger),
+            JournalEntry.UpdateFailed => ("Mise à jour impossible", Danger),
             _ => (entry.Message, Faint),
         };
         var textLeft = left + TextLeft;

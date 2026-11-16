@@ -16,6 +16,7 @@ const APP = path.join(SRC, "app");
 const PUBLIC_ROUTES = new Map([
   ["api/health/route.ts", "sonde de santé, sans donnée"],
   ["api/sync/route.ts", "agent : jeton d'agent, vérifié par handleSyncRequest"],
+  ["api/sync/agent/route.ts", "mise à jour de l'agent : jeton d'agent, vérifié par handleAgentUpdateRequest"],
   ["app.webmanifest/route.ts", "manifeste de l'application installable, statique"],
 ]);
 /** Actions appelées sans session : se connecter, se déconnecter. */
