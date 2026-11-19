@@ -713,6 +713,133 @@ export const vendorPrices = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Scans : relevés de chaque scan complet de l'hôtel des ventes par l'addon EZAuctioneer
+// (voir docs/EZAUCTIONEER-DATA-MODEL.md)
+// ---------------------------------------------------------------------------
+
+// Un marché tel qu'EZAuctioneer le nomme : région, royaume rendu par le jeu, HV de faction (avec
+// la faction) ou HV neutre. Distinct des marchés d'Auctionator, qui ne le nomment pas de la même
+// façon : les deux ne sont pas rapprochés ici.
+export const scanMarkets = pgTable(
+  "scan_markets",
+  {
+    id: id(),
+    flavor: text("flavor").notNull(),
+    marketKey: text("market_key").notNull(),
+    region: text("region").notNull(),
+    realm: text("realm").notNull(),
+    house: text("house").notNull(),
+    faction: text("faction"),
+    firstSeenAt: ts("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("scan_markets_flavor_market_key_key").on(t.flavor, t.marketKey),
+    check("scan_markets_house_check", sql`(${t.house} = 'faction' and ${t.faction} is not null) or (${t.house} = 'neutral' and ${t.faction} is null)`),
+  ],
+);
+
+const scanMarketId = () =>
+  bigint("scan_market_id", { mode: "number" })
+    .notNull()
+    .references(() => scanMarkets.id, { onDelete: "cascade" });
+
+// Une version des relevés d'un marché reçue d'un compte. Un contenu identique renvoyé n'est pas
+// réimporté. Supprimer le compte supprime ses imports ; les relevés restent, déjà fusionnés.
+export const scanImports = pgTable(
+  "scan_imports",
+  {
+    id: id(),
+    scanMarketId: scanMarketId(),
+    accountId: bigint("account_id", { mode: "number" })
+      .notNull()
+      .references(() => wowAccounts.id, { onDelete: "cascade" }),
+    machineId: bigint("machine_id", { mode: "number" }).references(() => machines.id),
+    syncRunId: bigint("sync_run_id", { mode: "number" }).references(() => syncRuns.id, { onDelete: "set null" }),
+    contentHash: text("content_hash").notNull(),
+    fileHash: text("file_hash").notNull(),
+    fileModifiedAt: ts("file_modified_at").notNull(),
+    itemsCount: integer("items_count").notNull(),
+    samplesCount: integer("samples_count").notNull(),
+    firstScanAt: ts("first_scan_at"),
+    lastScanAt: ts("last_scan_at"),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("scan_imports_market_account_content_key").on(t.scanMarketId, t.accountId, t.contentHash),
+    index("scan_imports_account_idx").on(t.accountId),
+    index("scan_imports_sync_run_idx").on(t.syncRunId),
+  ],
+);
+
+// Un scan d'un marché, daté à l'heure du serveur du jeu. auctions, listedItems et origin viennent
+// du rapport de l'addon (absent pour un scan trop ancien) ; sampledItems et units sont comptés sur
+// les relevés reçus de ce scan.
+export const marketScans = pgTable(
+  "market_scans",
+  {
+    scanMarketId: scanMarketId(),
+    scannedAt: ts("scanned_at").notNull(),
+    auctions: integer("auctions"),
+    listedItems: integer("listed_items"),
+    origin: text("origin"),
+    sampledItems: integer("sampled_items").notNull().default(0),
+    units: bigint("units", { mode: "number" }).notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scanMarketId, t.scannedAt] }),
+    check("market_scans_counts_check", sql`${t.auctions} >= 0 and ${t.listedItems} >= 0 and ${t.sampledItems} >= 0 and ${t.units} >= 0`),
+  ],
+);
+
+// Un objet, un scan : prix au 25e percentile pondéré par les unités en vente, à l'unité, en
+// pièces de cuivre, et unités en vente. item_key est la clé d'EZAuctioneer (« i:1234 », ou avec
+// son suffixe aléatoire « i:1234:s5 ») ; item_id son objet. Gardé 60 jours, puis résumé par jour
+// dans market_item_scan_days (lib/maintenance/retention.ts).
+export const marketItemScans = pgTable(
+  "market_item_scans",
+  {
+    scanMarketId: scanMarketId(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    scannedAt: ts("scanned_at").notNull(),
+    priceCopper: bigint("price_copper", { mode: "number" }).notNull(),
+    units: integer("units").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scanMarketId, t.itemKey, t.scannedAt] }),
+    // Comptes par scan, résumé et purge des vieux scans.
+    index("market_item_scans_market_scanned_idx").on(t.scanMarketId, t.scannedAt),
+    check("market_item_scans_values_check", sql`${t.priceCopper} > 0 and ${t.units} >= 0`),
+  ],
+);
+
+// Résumé, par jour (heure de Bruxelles), des scans de plus de 60 jours : plus bas, médiane et plus
+// haut des prix relevés ce jour-là, plus grand nombre d'unités en vente, nombre de scans.
+export const marketItemScanDays = pgTable(
+  "market_item_scan_days",
+  {
+    scanMarketId: scanMarketId(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    day: date("day", { mode: "string" }).notNull(),
+    lowCopper: bigint("low_copper", { mode: "number" }).notNull(),
+    medianCopper: bigint("median_copper", { mode: "number" }).notNull(),
+    highCopper: bigint("high_copper", { mode: "number" }).notNull(),
+    maxUnits: integer("max_units").notNull(),
+    scans: integer("scans").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scanMarketId, t.itemKey, t.day] }),
+    check(
+      "market_item_scan_days_values_check",
+      sql`${t.lowCopper} > 0 and ${t.lowCopper} <= ${t.medianCopper} and ${t.medianCopper} <= ${t.highCopper} and ${t.maxUnits} >= 0 and ${t.scans} > 0`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Recettes : relevées par l'addon NaowhForever (voir docs/PROFESSIONS-DATA-MODEL.md)
 // ---------------------------------------------------------------------------
 

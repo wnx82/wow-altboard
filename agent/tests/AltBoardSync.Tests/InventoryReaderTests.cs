@@ -111,7 +111,7 @@ public class BaganatorPayloadTests
         Assert.Equal(3, baganator.Characters[0].Mail.Count);
         Assert.Empty(baganator.Characters[1].Mail);
         Assert.Single(baganator.Guilds);
-        Assert.EndsWith($":{baganator.File.Hash}", result.Fingerprint);
+        Assert.EndsWith($":{baganator.File.Hash}:-", result.Fingerprint);
 
         // Objets du courrier inconnus d'AltBoard : ajoutés au référentiel ; ceux qu'AltBoard décrit gardent sa description.
         Assert.Contains(payload.Items, i => i.Key == "249428" && i.Name == "Peau immaculée");

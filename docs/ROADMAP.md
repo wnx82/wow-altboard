@@ -227,7 +227,8 @@ Branche `feat/economy` (site 0.3.0, agent 0.5.0) fusionnée et déployée le 202
 | Sessions de farm (po/h mesuré) | 🟡 | testées ; aucune session réelle en jeu |
 | Faits structurés et assistant facultatif | 🟡 | `GET /api/economy/facts` vérifié sur les données réelles ; assistant essayé avec un modèle local réel, pas encore depuis la page en production |
 | Audit du jour rédigé par l'assistant | 🟡 | conservé par marché et par jour, mêmes faits et même vérification ; essayé avec un modèle local réel sur la fixture (2026-11-08) ; en production depuis le 2026-11-08 (site 0.7.0), pas encore essayé depuis la page |
-| Nombre d'enchères, prix « 24 h », prix moyen pondéré | 🔴 | absents d'Auctionator, qui ne garde qu'un relevé par jour |
+| Scans de l'hôtel des ventes (EZAuctioneer) | 🟡 | site 0.31.0 et agent 0.10.0, lot E : chaque scan complet, à son heure ([EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md)). Fichiers réels chargés dans la base de test : 2 marchés, 71 772 relevés, identiques à une lecture indépendante du fichier ; second envoi sans effet. Pas encore en production |
+| Nombre d'enchères, prix « 24 h », prix moyen pondéré | 🟡 | nombre d'enchères et variation sur 24 h donnés par EZAuctioneer (page d'un objet, page Marché) ; pas encore utilisés par le moteur de prix (lot G : rapprocher les marchés des deux addons). Prix moyen pondéré : EZAuctioneer garde un 25e percentile, pas une moyenne |
 
 ## Reste à faire
 

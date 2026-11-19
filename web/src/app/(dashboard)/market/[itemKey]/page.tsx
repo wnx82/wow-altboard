@@ -16,9 +16,10 @@ import { DECISION_LABELS } from "@/lib/economy/craft";
 import { craftHistory, findPeriod, PERIODS, withinPeriod } from "@/lib/economy/history";
 import { itemLabel, itemQuality, loadEconomy, loadItemsHistory } from "@/lib/economy/load";
 import { formatMoneyInput, MONEY_INPUT_HINT } from "@/lib/economy/money-input";
+import { type ItemScanSeries, loadItemScanSeries, scanSeriesWithin } from "@/lib/economy/scans";
 import { holdingPlace } from "@/lib/economy/stock-view";
 import { formatChange, formatCopperShort, formatDay, formatPercent, formatShortDay, ITEM_KEY_PATTERN, itemHref, marketParam, marketQuery } from "@/lib/economy/view";
-import { classKey, formatInteger, QUALITY_LABELS } from "@/lib/wow/format";
+import { classKey, formatDateTime, formatInteger, QUALITY_LABELS } from "@/lib/wow/format";
 
 // La clé vient de l'URL : seules les formes d'Auctionator sont acceptées (« 1234 », « g:1234:60 »,
 // « p:1234 »). Chargement partagé, le temps de la requête, entre les métadonnées et la page.
@@ -55,8 +56,20 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
   const consuming = context.crafts.filter((craft) => craft.reagents.some((reagent) => reagent.itemKey === key));
   const holdings = context.holdings.get(key) ?? [];
   const vendor = context.vendor.get(key) ?? null;
+  // Inventaires cherche par identifiant (« 1234 » et ses variantes) ; une mascotte (« p:… ») n'y a pas d'entrée.
+  const inventoryId = /^(?:g:)?(\d{1,10})(?::|$)/.exec(key)?.[1] ?? null;
+  const now = new Date();
+  const scanSeries =
+    inventoryId === null
+      ? []
+      : await loadItemScanSeries(getDatabase(), {
+          itemId: Number(inventoryId),
+          flavor: context.market.flavor,
+          since: context.historyFrom === null ? null : new Date(`${context.historyFrom}T00:00:00Z`),
+          now,
+        });
   // Un objet ni relevé à l'hôtel des ventes, ni possédé, ni utilisé par une recette connue : inconnu ici.
-  if (!stats && producing.length === 0 && consuming.length === 0 && holdings.length === 0) notFound();
+  if (!stats && scanSeries.length === 0 && producing.length === 0 && consuming.length === 0 && holdings.length === 0) notFound();
 
   const period = findPeriod(query.period);
   const recipeKeys = new Set([key, ...producing.flatMap((craft) => craft.reagents.map((reagent) => reagent.itemKey))]);
@@ -71,8 +84,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
   const marketSuffix = marketQuery(context.market, context.markets, "&");
   const itemQuery = marketQuery(context.market, context.markets);
   const owned = context.stock.get(key) ?? 0;
-  // Inventaires cherche par identifiant (« 1234 » et ses variantes) ; une mascotte (« p:… ») n'y a pas d'entrée.
-  const inventoryId = /^(?:g:)?(\d{1,10})(?::|$)/.exec(key)?.[1] ?? null;
+  const scanFrom = period.days === null ? null : new Date(now.getTime() - period.days * 24 * 60 * 60_000);
 
   return (
     <>
@@ -202,6 +214,17 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
             }))}
           />
         </div>
+      )}
+
+      {scanSeries.length > 0 && (
+        <section aria-label="Scans EZAuctioneer" className="mt-8">
+          <SectionTitle aside="addon EZAuctioneer : chaque scan complet, à son heure">Scans EZAuctioneer</SectionTitle>
+          <div className="grid grid-cols-1 gap-6">
+            {scanSeries.map((series) => (
+              <ScanSeriesPanel key={series.market.id} series={series} within={scanSeriesWithin(series, scanFrom)} periodLabel={period.label} />
+            ))}
+          </div>
+        </section>
       )}
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -389,6 +412,69 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
         </section>
       )}
     </>
+  );
+}
+
+const SCAN_SERIES_MIN = 2;
+
+/**
+ * Un marché d'EZAuctioneer : dernier prix (25e percentile des unités en vente), variation sur 24 h,
+ * unités en vente, et courbe scan par scan ; les jours plus anciens que la fenêtre gardée y
+ * figurent par leur médiane.
+ */
+function ScanSeriesPanel({ series, within, periodLabel }: { series: ItemScanSeries; within: ReturnType<typeof scanSeriesWithin>; periodLabel: string }) {
+  const { latest } = series;
+  const points = [
+    ...within.days.map((day) => ({
+      at: `${day.day}T12:00:00Z`,
+      value: day.median / 10_000,
+      label: `${formatCopperShort(day.median)} (médiane de ${day.scans} scan${day.scans > 1 ? "s" : ""})`,
+      dateLabel: formatShortDay(day.day),
+    })),
+    ...within.points.map((point) => ({
+      at: point.at.toISOString(),
+      value: point.price / 10_000,
+      label: `${formatCopperShort(point.price)} · ${formatInteger(point.units)} en vente`,
+      dateLabel: formatDateTime(point.at),
+    })),
+  ];
+  return (
+    <div className="panel p-5">
+      <h3 className="font-semibold">{series.market.label}</h3>
+      {series.variants > 0 && (
+        <p className="mt-1 text-xs text-muted">
+          {series.variants} variante{series.variants > 1 ? "s" : ""} à suffixe aléatoire relevée{series.variants > 1 ? "s" : ""} à part, non comprise
+          {series.variants > 1 ? "s" : ""} ici.
+        </p>
+      )}
+      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile
+          label="Dernier prix"
+          value={<Money copper={latest?.price ?? null} />}
+          hint={
+            latest
+              ? `25e percentile, scan du ${formatDateTime(latest.at)}`
+              : series.days.length === 0 && series.variants > 0
+                ? "relevé seulement sous ses variantes à suffixe"
+                : "aucun scan dans les 60 derniers jours"
+          }
+        />
+        <StatTile label="Variation 24 h" value={<Change value={series.change24h} />} hint="face au scan d'au moins 24 h plus tôt" />
+        <StatTile label="En vente" value={formatInteger(latest?.units ?? null)} hint="unités au dernier scan" />
+        <StatTile
+          label="Scans"
+          value={formatInteger(within.points.length)}
+          hint={`${periodLabel}${within.days.length > 0 ? ` · plus ${within.days.length} jour${within.days.length > 1 ? "s" : ""} résumé${within.days.length > 1 ? "s" : ""}` : ""}`}
+        />
+      </div>
+      <div className="mt-4">
+        {points.length >= SCAN_SERIES_MIN ? (
+          <TrendChart title="Prix à chaque scan (25e percentile des unités en vente)" series="gold" points={points} />
+        ) : (
+          <p className="text-sm text-muted">Moins de deux scans sur cette période : pas de courbe.</p>
+        )}
+      </div>
+    </div>
   );
 }
 

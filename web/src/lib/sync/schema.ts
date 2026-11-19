@@ -234,6 +234,42 @@ const auctionator = z.strictObject({
   vendorPrices: z.array(z.strictObject({ key: marketItemKey, price: z.number().positive().max(10_000_000_000_000) })).max(100_000),
 });
 
+// EZAuctioneer (voir docs/EZAUCTIONEER-DATA-MODEL.md), envoyé depuis l'agent 0.10.0. Heures en
+// secondes Unix, à l'heure du serveur du jeu, du 2020-01-01 au 2100-01-01.
+const scanInstant = z.int().min(1_577_836_800).max(4_102_444_800);
+export const SCAN_ITEM_KEY_PATTERN = /^i:(\d{1,9})(?::s-?\d{1,9}(?::f\d{1,5})?)?$/;
+export const SCAN_MARKET_KEY_PATTERN = /^(\d{1,4}|\?):([^\u0000-\u001f]{1,80}):(?:([^:\u0000-\u001f]{1,40}):faction|neutral)$/;
+const scanCount = z.int().min(0).max(1_000_000_000);
+const scanMarket = z.strictObject({
+  key: z.string().max(120).regex(SCAN_MARKET_KEY_PATTERN),
+  contentHash: sha256,
+  scans: z
+    .array(
+      z.strictObject({
+        at: scanInstant,
+        auctions: scanCount.optional(),
+        items: scanCount.optional(),
+        origin: z.string().regex(/^[a-z][a-z0-9_-]{0,19}$/).optional(),
+      }),
+    )
+    .max(50),
+  items: z
+    .array(
+      z.strictObject({
+        key: z.string().regex(SCAN_ITEM_KEY_PATTERN),
+        // [heure, prix au 25e percentile pondéré par les unités, unités en vente]
+        samples: z.array(z.tuple([scanInstant, copper.min(1), scanCount])).min(1).max(50),
+      }),
+    )
+    .max(20_000),
+});
+
+const ezAuctioneer = z.strictObject({
+  file: sourceFile,
+  schema: z.int().min(0).max(1_000),
+  markets: z.array(scanMarket).max(20),
+});
+
 // NaowhForever (voir docs/PROFESSIONS-DATA-MODEL.md).
 const positiveId = z.int().min(1).max(2_147_483_647);
 const recipe = z.strictObject({
@@ -313,6 +349,8 @@ const account = z
     recipes: recipes.optional(),
     // Facultatif : un agent antérieur à 0.8.0 ne l'envoie pas.
     baganator: baganator.optional(),
+    // Facultatif : un agent antérieur à 0.10.0 ne l'envoie pas.
+    ezAuctioneer: ezAuctioneer.optional(),
   })
   .refine((a) => a.folderName === undefined || accountKeyOf(a.folderName) === a.accountKey, {
     message: "nom de dossier sans rapport avec l'empreinte du compte",
@@ -354,4 +392,6 @@ export type ItemPayload = AccountPayload["items"][number];
 export type AuctionatorPayload = NonNullable<AccountPayload["auctionator"]>;
 export type MarketPayload = AuctionatorPayload["markets"][number];
 export type RecipesPayload = NonNullable<AccountPayload["recipes"]>;
+export type EzAuctioneerPayload = NonNullable<AccountPayload["ezAuctioneer"]>;
+export type ScanMarketPayload = EzAuctioneerPayload["markets"][number];
 export type BaganatorPayload = NonNullable<AccountPayload["baganator"]>;

@@ -183,11 +183,40 @@ existe :
   ne change rien.
 - Compatibilité : un serveur antérieur au site 0.18.0 refuse ce bloc (schéma strict).
 
+### Scans EZAuctioneer (facultatif)
+
+Bloc facultatif par compte, ajouté par l'agent 0.10.0 quand `EZAuctioneer.lua` existe et contient
+au moins un relevé :
+
+```json
+"ezAuctioneer": {
+  "file": { "hash": "<SHA-256>", "modifiedAt": "2026-11-19T09:06:12.4+00:00", "size": 5302114 },
+  "schema": 5,
+  "markets": [
+    { "key": "3:Royaume Test PvE:Alliance:faction", "contentHash": "<SHA-256 des scans et des relevés>",
+      "scans": [{ "at": 1795079141, "auctions": 174284, "items": 6744, "origin": "own" }],
+      "items": [{ "key": "i:2589", "samples": [[1795009157, 12, 840], [1795079141, 15, 610]] }] }
+  ]
+}
+```
+
+- `samples` : `[heure, prix, unités]`, heure en secondes Unix, prix (25e percentile) en pièces de
+  cuivre, au moins 1. `key` d'un marché : `<région>:<royaume>:<faction>:faction` ou
+  `<région>:<royaume>:neutral` ; d'un objet : `i:<objet>`, avec suffixe facultatif. Une autre forme
+  fait refuser le document (422 `invalid_payload`). 20 marchés au plus, 50 scans par marché,
+  20 000 objets par marché, 1 à 50 relevés par objet. Format et sens des champs :
+  [EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md).
+- Un contenu déjà reçu (même marché, compte et `contentHash`) n'est pas réimporté ; un relevé déjà
+  connu (même marché, objet et heure) n'est pas doublé. La réponse ajoute `scanMarketsImported`,
+  `scanMarketsUnchanged` et `scanSamples` (relevés nouveaux).
+- Compatibilité : un serveur antérieur au site 0.31.0 refuse ce bloc (schéma strict).
+
 Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miroir côté agent est
 `agent/src/AltBoardSync.Core/Sync/SyncPayload.cs`. Le fichier
 `tests/fixtures/payloads/two-accounts.json`, produit par l'agent réel, sert de contrat aux tests de l'API ;
 `tests/fixtures/payloads/economy-account.json` fait de même pour les prix et les recettes, et
-`tests/fixtures/payloads/baganator-account.json` pour le courrier, les enchères et les banques de guilde.
+`tests/fixtures/payloads/baganator-account.json` pour le courrier, les enchères et les banques de guilde,
+`tests/fixtures/payloads/ezauctioneer-account.json` pour les scans EZAuctioneer.
 
 ### Réponse `200`
 
@@ -251,7 +280,7 @@ pas recréés.
 | 415 | `unsupported_media_type` | corps non JSON |
 | 422 | `unsupported_schema_version` | `schemaVersion` inconnu (`supported` liste les versions acceptées) |
 | 422 | `invalid_payload` | schéma non respecté (`issues` : chemins et codes, jamais les valeurs) |
-| 422 | `future_timestamp` | un horodatage d'un personnage (`lastSeen`, `statsAt`, sacs, banque, temps de jeu, sessions) dépasse de plus d'une heure l'heure du serveur : horloge du PC en avance (`issues` : chemins, vingt au plus) |
+| 422 | `future_timestamp` | un horodatage d'un personnage (`lastSeen`, `statsAt`, sacs, banque, temps de jeu, sessions) ou d'un scan EZAuctioneer dépasse de plus d'une heure l'heure du serveur : horloge du PC en avance (`issues` : chemins, vingt au plus) |
 | 429 | `rate_limited` | plus de 60 requêtes en 5 minutes, ou 10 échecs d'authentification en 15 minutes |
 | 500 | `internal_error` | erreur de traitement : la synchronisation entière est annulée ; `sync_errors` et le journal n'en gardent que le type et le code PostgreSQL ou réseau |
 | 503 | `service_unavailable` | base injoignable : réessayer plus tard |

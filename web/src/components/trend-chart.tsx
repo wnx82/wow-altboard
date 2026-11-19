@@ -13,16 +13,20 @@ type Props = {
 };
 
 const goldFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const TICK_FORMAT: Record<Props["series"], (value: number) => string> = {
+// Pièces d'or au cuivre près, pour des prix qui ne varient que de quelques cuivres.
+const goldFineFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 });
+const TICK_FORMAT: Record<Props["series"], (value: number, step: number) => string> = {
   level: (value) => String(Math.round(value)),
-  gold: (value) => `${goldFormat.format(value)} po`,
+  gold: (value, step) => `${(step < 0.01 ? goldFineFormat : goldFormat).format(value)} po`,
 };
+/** Plus petit pas des graduations : un cuivre pour l'or, exprimé en pièces d'or. */
+const MIN_STEP: Record<Props["series"], number> = { level: 0, gold: 0.0001 };
 
 const HEIGHT = 200;
 const MARGIN = { top: 16, right: 64, bottom: 28, left: 46 };
 
-/** Graduations « rondes » couvrant [min, max]. */
-export function niceTicks(min: number, max: number, integer: boolean): number[] {
+/** Graduations « rondes » couvrant [min, max], jamais plus serrées que minStep. */
+export function niceTicks(min: number, max: number, integer: boolean, minStep = 0): number[] {
   if (min === max) {
     if (integer) return [min - 1, min, min + 1];
     return min === 0 ? [0, 1] : [min * 0.9, min, min * 1.1];
@@ -31,6 +35,7 @@ export function niceTicks(min: number, max: number, integer: boolean): number[] 
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   let step = [1, 2, 2.5, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= rough) ?? rough;
   if (integer) step = Math.max(1, Math.round(step));
+  step = Math.max(step, minStep);
   const start = Math.floor(min / step) * step;
   const ticks: number[] = [];
   for (let tick = start; tick < max + step; tick += step) ticks.push(Number(tick.toFixed(10)));
@@ -43,7 +48,6 @@ export function niceTicks(min: number, max: number, integer: boolean): number[] 
  * l'historique affiché sous les courbes.
  */
 export function TrendChart({ title, points, series }: Props) {
-  const formatTick = TICK_FORMAT[series];
   const integer = series === "level";
   const titleId = useId();
   const frame = useRef<HTMLDivElement>(null);
@@ -61,7 +65,7 @@ export function TrendChart({ title, points, series }: Props) {
   const layout = useMemo(() => {
     const times = points.map((point) => Date.parse(point.at));
     const values = points.map((point) => point.value);
-    const ticks = niceTicks(Math.min(...values), Math.max(...values), integer);
+    const ticks = niceTicks(Math.min(...values), Math.max(...values), integer, MIN_STEP[series]);
     const [yMin, yMax] = [ticks[0], ticks[ticks.length - 1]];
     const [tMin, tMax] = [Math.min(...times), Math.max(...times)];
     const plotWidth = width - MARGIN.left - MARGIN.right;
@@ -69,9 +73,11 @@ export function TrendChart({ title, points, series }: Props) {
     const x = (time: number) => MARGIN.left + (tMax === tMin ? plotWidth / 2 : ((time - tMin) / (tMax - tMin)) * plotWidth);
     const y = (value: number) => MARGIN.top + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
     return { ticks, coordinates: points.map((point, index) => ({ x: x(times[index]), y: y(point.value) })), y, plotWidth, plotHeight };
-  }, [points, width, integer]);
+  }, [points, width, integer, series]);
 
   const { coordinates } = layout;
+  const tickStep = layout.ticks.length > 1 ? layout.ticks[1] - layout.ticks[0] : 1;
+  const formatTick = (value: number) => TICK_FORMAT[series](value, tickStep);
   const last = coordinates[coordinates.length - 1];
   const current = active === null ? null : { point: points[active], ...coordinates[active] };
 

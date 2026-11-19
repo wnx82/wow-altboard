@@ -34,9 +34,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// les empreintes enregistrées par l'agent précédent ne correspondent plus, et chaque compte est
     /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
     /// 3 : finances par jour d'Allemano Ledger (0.7.0). 4 : courrier, enchères et banques de guilde de
-    /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0).
+    /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0). 6 : scans d'EZAuctioneer (0.10.0).
     /// </summary>
-    public const string PayloadFormat = "5";
+    public const string PayloadFormat = "6";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -52,6 +52,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
             var recipes = await ReadRecipesAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
             var notices = new List<string>();
             var (baganator, baganatorItems) = await ReadBaganatorAsync(source, characters, economyWarnings, notices, cancellationToken).ConfigureAwait(false);
+            var ezAuctioneer = await ReadEzAuctioneerAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
             var payload = new AccountPayload(
                 AccountKey.Compute(source.AccountFolder),
                 AccountKey.Hint(source.AccountFolder),
@@ -67,11 +68,12 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 Auctionator = auctionator,
                 Recipes = recipes,
                 Baganator = baganator,
+                EzAuctioneer = ezAuctioneer,
                 Notices = notices.Count > 0 ? PayloadLimits.Warnings(notices) : null,
             };
             return new AccountReadResult(source, payload, null)
             {
-                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}:{baganator?.File.Hash ?? "-"}",
+                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}:{baganator?.File.Hash ?? "-"}:{ezAuctioneer?.File.Hash ?? "-"}",
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException or AltBoardFormatException)
@@ -113,7 +115,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
     }
 
     /// <summary>
-    /// Avertissements Auctionator, NaowhForever et Baganator retenus par compte, pour laisser de la place à
+    /// Avertissements Auctionator, NaowhForever, Baganator et EZAuctioneer retenus par compte, pour laisser de la place à
     /// ceux d'AltBoard ; le total reste borné par <see cref="PayloadLimits.Warnings"/>.
     /// </summary>
     private const int MaxEconomyWarnings = 10;
@@ -136,6 +138,26 @@ public sealed class PayloadBuilder(StableFileReader reader)
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
         {
             warnings.Add(Truncate($"Auctionator illisible, prix non transmis : {e.Message}"));
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Relevés de chaque scan de l'hôtel des ventes par EZAuctioneer. Source facultative, comme
+    /// Auctionator ; un fichier sans relevé (addon installé, aucun scan) n'envoie rien.
+    /// </summary>
+    private async Task<EzAuctioneerPayload?> ReadEzAuctioneerAsync(AccountSource source, List<string> warnings, CancellationToken cancellationToken)
+    {
+        if (source.EzAuctioneerFilePath is null) return null;
+        try
+        {
+            var snapshot = await reader.ReadAsync(source.EzAuctioneerFilePath, cancellationToken).ConfigureAwait(false);
+            var data = EzAuctioneerReader.Read(SavedVariablesParser.Parse(snapshot.Content), warnings);
+            return data is null ? null : new EzAuctioneerPayload(FileOf(snapshot), data.Schema, data.Markets);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
+        {
+            warnings.Add(Truncate($"EZAuctioneer illisible, scans non transmis : {e.Message}"));
             return null;
         }
     }

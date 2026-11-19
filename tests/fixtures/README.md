@@ -15,6 +15,8 @@ Aucun nom de dossier de compte réel n'y figure.
 | `payloads/economy-account.json` | document produit par l'agent à partir de `account-four-characters.lua`, `auctionator-multi-day.lua` et `naowh-recipes.lua` ; contrat des blocs `auctionator` et `recipes` |
 | `syndicator-small.lua` | écrit à la main sur le modèle d'un `Syndicator.lua` réel (Baganator) : personnages et guildes fictifs. Courrier en double du même objet, objet à suffixe, vente en cours, personnage vide, personnage inconnu d'AltBoard, banque de guilde avec un onglet et banque jamais ouverte |
 | `payloads/baganator-account.json` | document produit par l'agent 0.8.0 à partir de `account-four-characters.lua` et `syndicator-small.lua` ; contrat du bloc `baganator` |
+| `ezauctioneer-small.lua` | écrit à la main sur le modèle d'un `EZAuctioneer.lua` réel (base version 5) : royaume fictif. Relevés dans le désordre, objet à suffixe, relevé à prix nul, clé d'objet inconnue, marché neutre vide, rapport de scan en double, scan refusé, scan d'un autre addon, portefeuille d'un personnage fictif (jamais transmis) |
+| `payloads/ezauctioneer-account.json` | document produit par l'agent 0.10.0 à partir de `account-four-characters.lua` et `ezauctioneer-small.lua` ; contrat du bloc `ezAuctioneer` |
 
 ## Régénérer
 
@@ -50,3 +52,6 @@ Pour `payloads/baganator-account.json`, même démarche avec `account-four-chara
 `AltBoard.lua`) et `syndicator-small.lua` (renommé `Syndicator.lua`). Les noms des personnages de
 `syndicator-small.lua` doivent rester ceux de `account-four-characters.lua`, sans quoi l'agent ne
 les rattache à aucun GUID.
+
+Pour `payloads/ezauctioneer-account.json`, même démarche avec `account-four-characters.lua` (renommé
+`AltBoard.lua`) et `ezauctioneer-small.lua` (renommé `EZAuctioneer.lua`).

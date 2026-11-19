@@ -9,6 +9,7 @@ import { readSettings } from "@/lib/settings/store";
 import { applyAuctionator, applyRecipes, emptyEconomyCounters, type EconomyCounters } from "./economy";
 import { AGENT_NOTICE, AGENT_WARNING } from "./codes";
 import { applyBaganator } from "./inventory";
+import { applyEzAuctioneer } from "./scans";
 import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
 
 export type SyncResult = {
@@ -205,6 +206,7 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       await applyAuctionator(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
       await applyRecipes(tx, account, now, economy);
       await applyBaganator(tx, account, accountId, now);
+      await applyEzAuctioneer(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
     }
     if (payload.itemNames) economy.itemNamesStored = await storeClientNames(tx, payload.itemNames, now);
 

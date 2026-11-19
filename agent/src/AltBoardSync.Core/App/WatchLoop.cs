@@ -98,7 +98,7 @@ internal sealed class WatchLoop(
     private static readonly string[] WatchedFiles =
     [
         AccountScanner.SavedVariablesFile, AccountScanner.LedgerFile, AccountScanner.AuctionatorFile, AccountScanner.RecipesFile,
-        AccountScanner.SyndicatorFile,
+        AccountScanner.SyndicatorFile, AccountScanner.EzAuctioneerFile,
     ];
 
     private readonly WatchOptions _options = env.WatchOptions ?? new WatchOptions();

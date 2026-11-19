@@ -182,6 +182,11 @@ public sealed class AgentApp(AgentEnvironment env)
                 env.Out.WriteLine($"{label} : {Plural(payload.Characters.Count, "personnage", "personnages")}");
                 foreach (var market in payload.Auctionator?.Markets ?? [])
                     env.Out.WriteLine($"  Auctionator « {market.Key} » : {Plural(market.Items.Count, "objet", "objets")}");
+                foreach (var market in payload.EzAuctioneer?.Markets ?? [])
+                {
+                    var scans = market.Items.SelectMany(item => item.Samples.Select(sample => sample[0])).Distinct().Count();
+                    env.Out.WriteLine($"  EZAuctioneer « {market.Key} » : {Plural(market.Items.Count, "objet", "objets")}, {Plural(scans, "scan", "scans")}");
+                }
                 if (payload.Recipes is { } recipes)
                     env.Out.WriteLine($"  NaowhForever : {Plural(recipes.Characters.Sum(c => c.Recipes.Count), "recette", "recettes")}");
                 if (payload.Baganator is { } baganator)

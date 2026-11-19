@@ -14,6 +14,9 @@ public sealed record AccountSource(string AccountFolder, string Flavor, string F
 
     /// <summary>Fichier de Syndicator (données de l'addon Baganator) du même compte, s'il existe (courrier, enchères, banques de guilde).</summary>
     public string? SyndicatorFilePath { get; init; }
+
+    /// <summary>Fichier de l'addon EZAuctioneer du même compte, s'il existe (relevés de chaque scan de l'hôtel des ventes).</summary>
+    public string? EzAuctioneerFilePath { get; init; }
 }
 
 /// <summary>
@@ -35,6 +38,8 @@ public static class AccountScanner
 
     /// <summary>Baganator range ses données dans les SavedVariables de sa bibliothèque, Syndicator.</summary>
     public const string SyndicatorFile = "Syndicator.lua";
+
+    public const string EzAuctioneerFile = "EZAuctioneer.lua";
 
     private static string? Sibling(string accountPath, string fileName)
     {
@@ -64,6 +69,7 @@ public static class AccountScanner
                     AuctionatorFilePath = Sibling(accountPath, AuctionatorFile),
                     RecipesFilePath = Sibling(accountPath, RecipesFile),
                     SyndicatorFilePath = Sibling(accountPath, SyndicatorFile),
+                    EzAuctioneerFilePath = Sibling(accountPath, EzAuctioneerFile),
                 });
             }
         }

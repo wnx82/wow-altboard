@@ -16,9 +16,23 @@ export type EconomyCounters = {
   recipeCharacters: number;
   /** Noms d'objets du cache du jeu ajoutés ou modifiés (agent 0.7.0). */
   itemNamesStored: number;
+  /** Marchés d'EZAuctioneer importés, ou inchangés depuis le dernier envoi du compte (agent 0.10.0). */
+  scanMarketsImported: number;
+  scanMarketsUnchanged: number;
+  /** Relevés de scan nouveaux ; un relevé déjà reçu n'est pas compté. */
+  scanSamples: number;
 };
 
-export const emptyEconomyCounters = (): EconomyCounters => ({ marketsImported: 0, marketsUnchanged: 0, marketObservations: 0, recipeCharacters: 0, itemNamesStored: 0 });
+export const emptyEconomyCounters = (): EconomyCounters => ({
+  marketsImported: 0,
+  marketsUnchanged: 0,
+  marketObservations: 0,
+  recipeCharacters: 0,
+  itemNamesStored: 0,
+  scanMarketsImported: 0,
+  scanMarketsUnchanged: 0,
+  scanSamples: 0,
+});
 
 type Scope = { accountId: number; machineId: number; runId: number; now: Date };
 

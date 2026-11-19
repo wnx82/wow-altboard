@@ -4,6 +4,53 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.31.0 — 2026-11-19
+
+Pour les scans EZAuctioneer de l'agent 0.10.0. Migration `0023` : cinq tables ajoutées, rien de
+modifié.
+
+### Ajouté
+
+- `POST /api/sync` accepte le bloc `ezAuctioneer` d'un compte : les scans de l'hôtel des ventes de
+  l'addon EZAuctioneer ([EZAUCTIONEER-DATA-MODEL](docs/EZAUCTIONEER-DATA-MODEL.md)). L'addon ne
+  garde que les 12 derniers scans de chaque objet ; le serveur les accumule, sans doublon, d'un
+  envoi à l'autre et d'un compte à l'autre. Un contenu déjà reçu n'est pas réimporté. La réponse
+  ajoute `scanMarketsImported`, `scanMarketsUnchanged` et `scanSamples`.
+- **Page d'un objet**, section « Scans EZAuctioneer », par hôtel des ventes : dernier prix
+  (25e percentile) et heure du scan, variation sur 24 h, unités en vente, nombre de scans de la
+  période et courbe du prix scan par scan. Une variante à suffixe est signalée sans courbe.
+- **Page Marché** : taille de chaque hôtel des ventes vu par EZAuctioneer (dernier scan, enchères,
+  objets, scans des 7 derniers jours).
+- Purge quotidienne : au-delà de 60 jours, les relevés de chaque jour (heure de Bruxelles) sont
+  résumés (plus bas, médiane, plus haut, unités, nombre de scans) puis supprimés. Le prix de chaque
+  jour reste sur la courbe.
+
+### Modifié
+
+- Un scan EZAuctioneer daté de plus d'une heure dans le futur fait refuser le document
+  (`future_timestamp`), comme les horodatages des personnages.
+- Courbes en pièces d'or : graduations au cuivre près quand les prix ne varient que de quelques
+  cuivres, au lieu de cinq graduations identiques.
+
+Les prix d'EZAuctioneer ne changent pas encore les calculs de l'économie : ses marchés (nom du
+royaume donné par le jeu) restent séparés de ceux d'Auctionator (« PvE »).
+
+## Agent 0.10.0 — 2026-11-19
+
+S'installe seul depuis un agent 0.9.0 dès que le site 0.31.0 est déployé.
+
+### Ajouté
+
+- Lecture de `EZAuctioneer.lua` (addon EZAuctioneer, base version 3 à 5), à côté d'`AltBoard.lua` :
+  pour chaque hôtel des ventes, les relevés de chaque objet (heure, prix, unités) et les rapports
+  de scan (enchères, objets, origine), sans double. Document au format 6. Ne sont jamais
+  transmis : le portefeuille de revente, les noms des personnages, les bonnes affaires calculées
+  en jeu et les réglages de l'addon.
+- `scan` affiche, par hôtel des ventes, le nombre d'objets et de scans.
+- La surveillance réagit aussi à ce fichier.
+- Un fichier illisible, une version de base inconnue, une clé ou un relevé invalide donnent un
+  avertissement, sans bloquer la synchronisation.
+
 ## Site 0.30.0 — 2026-11-16
 
 ### Modifié

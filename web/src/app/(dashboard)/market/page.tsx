@@ -11,8 +11,9 @@ import { deleteAlertAction } from "@/lib/economy/actions";
 import { listAlerts, type AlertStatus } from "@/lib/economy/alerts";
 import { itemLabel, loadEconomy } from "@/lib/economy/load";
 import { buildMarketView, SORTS, type MarketRow, type MarketSort } from "@/lib/economy/market-view";
+import { listScanMarkets, type ScanMarketSummary } from "@/lib/economy/scans";
 import { formatCopperShort, formatDay, marketParam, marketQuery } from "@/lib/economy/view";
-import { formatInteger } from "@/lib/wow/format";
+import { formatDateTime, formatInteger, formatRelative } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Marché" };
 
@@ -42,7 +43,10 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
   const sort: MarketSort = SORTS.find((entry) => entry.key === params.sort)?.key ?? "held";
   const pageNumber = /^\d{1,4}$/.test(first(params.page)) ? Number(first(params.page)) : 1;
   const view = buildMarketView(context, { query, owned, sort, page: pageNumber });
-  const alerts = await listAlerts(getDatabase(), { marketId: context.market.id, historyFrom: context.historyFrom });
+  const [alerts, scanMarkets] = await Promise.all([
+    listAlerts(getDatabase(), { marketId: context.market.id, historyFrom: context.historyFrom }),
+    listScanMarkets(getDatabase(), { flavor: context.market.flavor, now: new Date() }),
+  ]);
   const alerted = new Set(alerts.filter((alert) => alert.triggered).map((alert) => alert.itemKey));
   const marketSuffix = marketQuery(context.market, context.markets, "&");
   const itemQuery = marketQuery(context.market, context.markets);
@@ -74,6 +78,8 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
         <MoverList title="Plus fortes baisses (7 j)" rows={view.falling} names={context.names} query={itemQuery} empty="Aucune baisse mesurable." />
         <MoverList title="Prix anormaux" rows={view.anomalies} names={context.names} query={itemQuery} empty="Aucun prix isolé." anomaly />
       </div>
+
+      {scanMarkets.length > 0 && <ScanMarketList markets={scanMarkets} />}
 
       {alerts.length > 0 && <AlertList alerts={alerts} names={context.names} query={itemQuery} />}
 
@@ -195,7 +201,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
         <p className="mt-3 text-xs text-faint">
           Dernier prix : le plus bas vu au dernier scan. Valeur de marché : médiane des plus bas journaliers sur 14 jours (30 à défaut, trois
           jours au moins). En vente : plus grande quantité vue le dernier jour relevé. Auctionator ne relève ni le nombre d&apos;enchères ni
-          l&apos;heure du scan.
+          l&apos;heure du scan ; EZAuctioneer les relève, et la page de chaque objet montre ses prix scan par scan.
         </p>
       </section>
     </>
@@ -254,6 +260,51 @@ function MoverList({
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/** Marchés relevés par EZAuctioneer : taille de l'hôtel des ventes au dernier scan qui l'a donnée. */
+function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
+  return (
+    <section aria-label="Scans EZAuctioneer" className="mt-8">
+      <SectionTitle aside="addon EZAuctioneer : chaque scan complet, à son heure">Scans EZAuctioneer</SectionTitle>
+      <div className="panel overflow-x-auto">
+        <table className="data-table min-w-[720px]">
+          <thead>
+            <tr>
+              <th scope="col">Marché</th>
+              <th scope="col">Dernier scan</th>
+              <th scope="col" className="num">
+                Enchères
+              </th>
+              <th scope="col" className="num">
+                Objets
+              </th>
+              <th scope="col" className="num">
+                Scans 7 j
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {markets.map((market) => (
+              <tr key={market.id}>
+                <td>{market.label}</td>
+                <td>
+                  {formatDateTime(market.lastScanAt)} <span className="text-xs text-faint">{formatRelative(market.lastScanAt)}</span>
+                </td>
+                <td className="num">{formatInteger(market.lastSized?.auctions ?? null)}</td>
+                <td className="num">{formatInteger(market.lastSized?.listedItems ?? null)}</td>
+                <td className="num">{formatInteger(market.scans7d)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-xs text-faint">
+        Enchères et objets : ceux du dernier scan dont l&apos;addon a gardé le rapport. Royaume : le nom que donne le jeu, qui peut différer de
+        celui de la liste des royaumes.
+      </p>
     </section>
   );
 }

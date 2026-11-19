@@ -35,6 +35,12 @@ export function futureTimestamps(payload: SyncPayload, now: Date, toleranceSecon
         check(`${at}.sessions.${s}.stoppedAt`, session.stoppedAt);
       });
     });
+    // Un scan daté dans le futur resterait « le dernier » de son marché jusqu'à cette date.
+    account.ezAuctioneer?.markets.forEach((market, m) => {
+      const at = `accounts.${a}.ezAuctioneer.markets.${m}`;
+      market.scans.forEach((scan, s) => check(`${at}.scans.${s}.at`, scan.at));
+      market.items.forEach((item, i) => item.samples.forEach(([time], s) => check(`${at}.items.${i}.samples.${s}.0`, time)));
+    });
   });
   return found;
 }

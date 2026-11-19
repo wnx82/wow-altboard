@@ -5,15 +5,21 @@ import * as t from "@/db/schema";
 // Durée de conservation des tables qui ne font que grossir. Seuls le journal des synchronisations
 // et les calculs d'opportunités sont purgés : ils se refont ou ne servent qu'au diagnostic.
 // L'historique des personnages (relevés, sessions, finances) et celui des prix ne sont jamais
-// touchés : ils n'existent nulle part ailleurs. Les relevés des serveurs de jeu et les sessions de
-// connexion ont déjà leur purge (lib/status/store.ts, lib/auth/session.ts).
+// perdus : ils n'existent nulle part ailleurs. Seuls les relevés de chaque scan d'EZAuctioneer,
+// plusieurs par jour, sont ramenés à un résumé par jour au-delà de 60 jours. Les relevés des
+// serveurs de jeu et les sessions de connexion ont déjà leur purge (lib/status/store.ts,
+// lib/auth/session.ts).
 
 /** Journal des synchronisations gardé 180 jours ; la dernière synchronisation de chaque PC reste. */
 export const SYNC_RUNS_KEPT_DAYS = 180;
 /** Calculs d'opportunités gardés par marché ; ceux d'un audit du jour restent. */
 export const OPPORTUNITY_RUNS_KEPT = 30;
+/** Relevés de scan gardés tels quels ; les jours plus anciens (heure de Bruxelles) sont résumés dans market_item_scan_days. */
+export const SCAN_SAMPLES_KEPT_DAYS = 60;
+/** Jours résumés au plus par passage : une requête par jour, chacune sous le délai du client. */
+const SCAN_DAYS_PER_PRUNE = 400;
 
-export type RetentionResult = { syncRuns: number; opportunityRuns: number };
+export type RetentionResult = { syncRuns: number; opportunityRuns: number; scanSamplesFolded: number };
 
 export async function pruneHistory(db: Database, now: Date): Promise<RetentionResult> {
   const before = new Date(now.getTime() - SYNC_RUNS_KEPT_DAYS * 24 * 60 * 60_000);
@@ -43,7 +49,64 @@ export async function pruneHistory(db: Database, now: Date): Promise<RetentionRe
   // Les opportunités de ces calculs suivent (cascade).
   const opportunityRuns = staleRuns.length > 0 ? ((await db.delete(t.opportunityRuns).where(inArray(t.opportunityRuns.id, staleRuns))).rowCount ?? 0) : 0;
 
-  return { syncRuns: syncRuns.rowCount ?? 0, opportunityRuns };
+  return { syncRuns: syncRuns.rowCount ?? 0, opportunityRuns, scanSamplesFolded: await foldOldScans(db, now) };
+}
+
+/** Fuseau des jours de résumé : celui des autres pages (Activité, Finances…). */
+export const SCAN_DAY_TIME_ZONE = "Europe/Brussels";
+
+/**
+ * Résume les relevés de scan des jours (heure de Bruxelles) antérieurs à la fenêtre gardée : plus
+ * bas, médiane et plus haut des prix, plus grand nombre d'unités, nombre de scans ; puis les
+ * supprime. Un jour par requête, déplacement et résumé dans la même. Un relevé arrivé plus tard
+ * pour un jour déjà résumé (PC resté longtemps hors ligne) s'y ajoute : bornes et comptes exacts,
+ * médiane de la partie la mieux relevée. Rend le nombre de relevés résumés.
+ */
+export async function foldOldScans(db: Database, now: Date): Promise<number> {
+  const zone = SCAN_DAY_TIME_ZONE;
+  // Minuit, heure de Bruxelles, il y a 60 jours : seuls des jours entiers sont résumés.
+  const keptFrom = sql`((((${now}::timestamptz) at time zone ${zone})::date - ${SCAN_SAMPLES_KEPT_DAYS}::int)::timestamp at time zone ${zone})`;
+  let folded = 0;
+  for (let pass = 0; pass < SCAN_DAYS_PER_PRUNE; pass++) {
+    const result = await db.execute<{ moved: number }>(sql`
+      with oldest as (
+        select (min(${t.marketItemScans.scannedAt}) at time zone ${zone})::date as day
+        from ${t.marketItemScans}
+        where ${t.marketItemScans.scannedAt} < ${keptFrom}
+      ),
+      bounds as (
+        select (day::timestamp at time zone ${zone}) as low, least(((day + 1)::timestamp at time zone ${zone}), ${keptFrom}) as high
+        from oldest
+        where day is not null
+      ),
+      moved as (
+        delete from ${t.marketItemScans}
+        using bounds
+        where ${t.marketItemScans.scannedAt} >= bounds.low and ${t.marketItemScans.scannedAt} < bounds.high
+        returning scan_market_id, item_key, item_id, scanned_at, price_copper, units
+      ),
+      summarized as (
+        insert into ${t.marketItemScanDays} (scan_market_id, item_key, item_id, day, low_copper, median_copper, high_copper, max_units, scans)
+        select scan_market_id, item_key, min(item_id), (scanned_at at time zone ${zone})::date,
+          min(price_copper), percentile_disc(0.5) within group (order by price_copper), max(price_copper), max(units), count(*)::int
+        from moved
+        -- Par position : le fuseau, passé en paramètre, ferait deux expressions distinctes.
+        group by 1, 2, 4
+        on conflict (scan_market_id, item_key, day) do update set
+          low_copper = least(${t.marketItemScanDays.lowCopper}, excluded.low_copper),
+          high_copper = greatest(${t.marketItemScanDays.highCopper}, excluded.high_copper),
+          median_copper = case when excluded.scans > ${t.marketItemScanDays.scans} then excluded.median_copper else ${t.marketItemScanDays.medianCopper} end,
+          max_units = greatest(${t.marketItemScanDays.maxUnits}, excluded.max_units),
+          scans = ${t.marketItemScanDays.scans} + excluded.scans
+        returning 1
+      )
+      select (select count(*) from moved)::int as moved
+    `);
+    const moved = Number(result.rows[0]?.moved ?? 0);
+    if (moved === 0) break;
+    folded += moved;
+  }
+  return folded;
 }
 
 /** Premier passage dix minutes après le démarrage, puis chaque jour. */

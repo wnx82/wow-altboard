@@ -189,6 +189,127 @@ public class AuctionatorReaderTests
     }
 }
 
+public class EzAuctioneerReaderTests
+{
+    private static EzAuctioneerData? Read(string lua, List<string>? warnings = null) =>
+        EzAuctioneerReader.Read(SavedVariablesParser.Parse(lua), warnings ?? []);
+
+    [Fact]
+    public void Scan_samples_are_read_per_market()
+    {
+        var warnings = new List<string>();
+        var data = EzAuctioneerReader.Read(Fixture.Parse("ezauctioneer-small.lua"), warnings)!;
+
+        Assert.Equal(5, data.Schema);
+        // Le marché neutre, sans historique, n'est pas transmis.
+        var market = Assert.Single(data.Markets);
+        Assert.Equal("3:Royaume Test PvE:Alliance:faction", market.Key);
+        Assert.Equal(["i:13133", "i:2589", "i:4306:s1019"], market.Items.Select(i => i.Key));
+        // Relevés remis dans l'ordre chronologique : [heure, prix p25, unités].
+        long[][] linen = [[1794915321, 10, 1200], [1795009157, 12, 840], [1795079141, 15, 610]];
+        Assert.Equal(linen, market.Items.Single(i => i.Key == "i:2589").Samples);
+        Assert.Equal([[1795079141L, 149900, 1]], market.Items.Single(i => i.Key == "i:13133").Samples);
+        Assert.Matches("^[0-9a-f]{64}$", market.ContentHash);
+        Assert.Contains(warnings, w => w.Contains("1 clés d'objet non reconnues"));
+        Assert.Contains(warnings, w => w.Contains("1 relevés invalides"));
+        Assert.Equal(2, warnings.Count);
+    }
+
+    [Fact]
+    public void Successful_scans_are_reported_once_each()
+    {
+        var market = EzAuctioneerReader.Read(Fixture.Parse("ezauctioneer-small.lua"), [])!.Markets.Single();
+
+        // Le résumé (à 1795079141) et le rapport (à 1795079142) du même scan n'en font qu'un ; le scan rejeté n'est pas repris.
+        Assert.Equal(
+            [new ScanPayload(1795009158, 241312, 5981, "external"), new ScanPayload(1795079141, 174284, 6744, "own")],
+            market.Scans);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void Earlier_schemas_with_the_same_history_format_are_read(int schema)
+    {
+        var data = Read(MinimalFile(schema, "{ [\"ts\"] = 1795079141, [\"p\"] = 5, [\"units\"] = 2 }"));
+
+        Assert.Equal(schema, data!.Schema);
+        Assert.Equal([[1795079141L, 5, 2]], data.Markets.Single().Items.Single().Samples);
+    }
+
+    [Theory]
+    [InlineData("2", "2")]
+    [InlineData("6", "6")]
+    [InlineData("nil", "inconnue")]
+    public void Unknown_schema_is_skipped_with_a_warning(string schema, string shown)
+    {
+        var warnings = new List<string>();
+
+        Assert.Null(Read($"EZAuctioneerDB = {{ [\"schema\"] = {schema}, [\"markets\"] = {{ }} }}", warnings));
+        Assert.Contains($"version de base {shown} non prise en charge", Assert.Single(warnings));
+    }
+
+    [Fact]
+    public void File_without_samples_sends_nothing_and_warns_nothing()
+    {
+        var warnings = new List<string>();
+
+        Assert.Null(Read("EZAuctioneerDB = { [\"schema\"] = 5, [\"markets\"] = { [\"3:R:neutral\"] = { [\"history\"] = { } } } }", warnings));
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    public void Only_the_most_recent_samples_are_kept()
+    {
+        var samples = string.Join(", ", Enumerable.Range(0, 60).Select(i => $"{{ [\"ts\"] = {1795000000 + i * 3600}, [\"p\"] = {100 + i}, [\"units\"] = 1 }}"));
+
+        var item = Read(MinimalFile(5, samples))!.Markets.Single().Items.Single();
+
+        Assert.Equal(EzAuctioneerReader.MaxSamplesPerItem, item.Samples.Count);
+        Assert.Equal(110L, item.Samples[0][1]);
+        Assert.Equal(159L, item.Samples[^1][1]);
+    }
+
+    [Fact]
+    public void Invalid_markets_and_values_are_ignored()
+    {
+        const string lua = """
+            EZAuctioneerDB = { ["schema"] = 5, ["markets"] = {
+            ["sans forme"] = { ["history"] = { ["i:1"] = { ["samples"] = { { ["ts"] = 1795079141, ["p"] = 5, ["units"] = 2 } } } } },
+            ["3:R:Horde:faction"] = { ["history"] = { ["i:2"] = { ["samples"] = {
+            { ["ts"] = 1500000000, ["p"] = 5, ["units"] = 2 },
+            { ["ts"] = 1795079141, ["p"] = 10000000000001, ["units"] = 2 },
+            { ["ts"] = 1795079142, ["p"] = 5, ["units"] = -1 },
+            { ["ts"] = 1795079143, ["p"] = 5 },
+            { ["ts"] = 1795079144, ["p"] = 7, ["units"] = 0 },
+            } } } },
+            } }
+            """;
+        var warnings = new List<string>();
+
+        var market = Read(lua, warnings)!.Markets.Single();
+
+        Assert.Equal("3:R:Horde:faction", market.Key);
+        Assert.Equal([[1795079144L, 7, 0]], market.Items.Single().Samples);
+        Assert.Contains(warnings, w => w.Contains("« sans forme » non reconnu"));
+        Assert.Contains(warnings, w => w.Contains("4 relevés invalides"));
+    }
+
+    [Fact]
+    public void Content_hash_follows_the_samples_only()
+    {
+        var first = Read(MinimalFile(5, "{ [\"ts\"] = 1795079141, [\"p\"] = 5, [\"units\"] = 2 }"))!.Markets.Single();
+        var reordered = Read(MinimalFile(5, "{ [\"units\"] = 2, [\"p\"] = 5, [\"ts\"] = 1795079141 }").Replace("[\"schema\"] = 5,", "[\"schema\"] = 5, [\"lastRequest\"] = 1,"))!.Markets.Single();
+        var changed = Read(MinimalFile(5, "{ [\"ts\"] = 1795079141, [\"p\"] = 6, [\"units\"] = 2 }"))!.Markets.Single();
+
+        Assert.Equal(first.ContentHash, reordered.ContentHash);
+        Assert.NotEqual(first.ContentHash, changed.ContentHash);
+    }
+
+    private static string MinimalFile(int schema, string samples) =>
+        $"EZAuctioneerDB = {{ [\"schema\"] = {schema}, [\"markets\"] = {{ [\"3:R:Alliance:faction\"] = {{ [\"history\"] = {{ [\"i:2589\"] = {{ [\"samples\"] = {{ {samples} }} }} }} }} }} }}";
+}
+
 public class RecipeReaderTests
 {
     [Fact]
@@ -261,8 +382,8 @@ public class EconomyPayloadTests
         Assert.Equal(40, payload.Auctionator!.Markets.Single().Items.Count);
         Assert.Equal(Fixture.Bytes("auctionator-multi-day.lua").LongLength, payload.Auctionator.File.Size);
         Assert.Equal(37, payload.Recipes!.Characters.Single().Recipes.Count);
-        // Le dernier champ, Baganator, est absent ici.
-        Assert.EndsWith($":{payload.Auctionator.File.Hash}:{payload.Recipes.File.Hash}:-", result.Fingerprint);
+        // Les deux derniers champs, Baganator et EZAuctioneer, sont absents ici.
+        Assert.EndsWith($":{payload.Auctionator.File.Hash}:{payload.Recipes.File.Hash}:-:-", result.Fingerprint);
         Assert.StartsWith($"{PayloadBuilder.PayloadFormat}:", result.Fingerprint);
 
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(payload, SyncJsonContext.Default.AccountPayload));
@@ -295,5 +416,50 @@ public class EconomyPayloadTests
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(result.Payload, SyncJsonContext.Default.AccountPayload));
         Assert.False(json.RootElement.TryGetProperty("auctionator", out _));
         Assert.False(json.RootElement.TryGetProperty("recipes", out _));
+    }
+
+    [Fact]
+    public async Task Scan_samples_are_attached_to_the_account_without_the_positions_journal()
+    {
+        using var temp = new TempDirectory();
+        var flavor = temp.Combine("_forever_");
+        var folder = Path.GetDirectoryName(temp.AddAccount(flavor, "111111111#1", "account-four-characters.lua"))!;
+        File.Copy(Fixture.PathOf("ezauctioneer-small.lua"), Path.Combine(folder, "EZAuctioneer.lua"));
+
+        var source = AccountScanner.Scan(flavor).Single();
+        Assert.Equal("EZAuctioneer.lua", Path.GetFileName(source.EzAuctioneerFilePath));
+        var result = await Builder().ReadAccountAsync(source);
+
+        var payload = result.Payload!;
+        var ez = payload.EzAuctioneer!;
+        Assert.Equal(5, ez.Schema);
+        Assert.Equal(Fixture.Bytes("ezauctioneer-small.lua").LongLength, ez.File.Size);
+        Assert.Equal(3, ez.Markets.Single().Items.Count);
+        Assert.EndsWith($":-:{ez.File.Hash}", result.Fingerprint);
+        Assert.Contains(payload.Warnings, w => w.StartsWith("EZAuctioneer : "));
+
+        var text = JsonSerializer.Serialize(payload, SyncJsonContext.Default.AccountPayload);
+        using var json = JsonDocument.Parse(text);
+        var market = json.RootElement.GetProperty("ezAuctioneer").GetProperty("markets")[0];
+        Assert.Equal(3, market.GetProperty("items")[0].GetProperty("samples")[0].GetArrayLength());
+        Assert.Equal("own", market.GetProperty("scans")[1].GetProperty("origin").GetString());
+        // Journal des positions, classement et noms d'objets restent sur le PC.
+        Assert.DoesNotContain("Testeur", text);
+        Assert.DoesNotContain("drakefeu", text);
+    }
+
+    [Fact]
+    public async Task Unreadable_ezauctioneer_file_never_blocks_the_sync()
+    {
+        using var temp = new TempDirectory();
+        var flavor = temp.Combine("_forever_");
+        var folder = Path.GetDirectoryName(temp.AddAccount(flavor, "222222222#1", "account-two-characters.lua"))!;
+        File.WriteAllText(Path.Combine(folder, "EZAuctioneer.lua"), "EZAuctioneerDB = {");
+
+        var result = await Builder().ReadAccountAsync(AccountScanner.Scan(flavor).Single());
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Payload!.EzAuctioneer);
+        Assert.Contains(result.Payload.Warnings, w => w.StartsWith("EZAuctioneer illisible"));
     }
 }

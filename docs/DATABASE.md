@@ -5,7 +5,8 @@
 > [LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md) pour le temps de jeu,
 > [AUCTIONATOR-DATA-MODEL](AUCTIONATOR-DATA-MODEL.md) pour les prix,
 > [PROFESSIONS-DATA-MODEL](PROFESSIONS-DATA-MODEL.md) pour les recettes,
-> [BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md) pour le courrier, les enchères et les banques de guilde.
+> [BAGANATOR-DATA-MODEL](BAGANATOR-DATA-MODEL.md) pour le courrier, les enchères et les banques de guilde,
+> [EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md) pour les scans de l'hôtel des ventes.
 
 ## État
 
@@ -27,7 +28,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (53)
+## Tables (58)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -110,6 +111,19 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_fa
 | `item_tooltips` | `item_key` | Bulle d'un objet relevée chez Wowhead (WoW Forever, en français) : `item_key` `1234` ou `1234:567` (suffixe aléatoire), `status` (`ok`, ou `missing` quand Wowhead ne connaît pas l'objet), `lines` (jsonb, lignes structurées de `lib/wow/wowhead-tooltip.ts` : texte et couleur, jamais de HTML), `fetched_at`. Remplie à la première demande de `/api/items/tooltip`, relue après 30 jours (3 pour `missing`) ; une bulle ancienne sert quand Wowhead ne répond pas |
 | `item_specs` | `item_id` | Objet du jeu (tous depuis `0017`) : classe (`item_class` : 2 arme, 4 armure, 0 consommable, 7 artisanat…), sous-classe (`subclass` : type d'armure, d'arme, de composant…), emplacement (`inventory_type`) de la table `Item` de WoW Forever ; niveau d'objet, niveau requis, classes autorisées (`allowable_class`, null pour toutes) et liaison (`bonding`, depuis `0018` : 0 aucune, 1 quand ramassé, 2 quand équipé, 3 quand utilisé, 4 et 5 objet de quête) de sa table `ItemSparse`, sinon de celle de WoW Classic Era (`level_source` `wowf` ou `era`, null sans niveau connu). `build` : « WoW Forever/Classic Era » ; un import supprime les lignes d'une autre version |
 
+### Scans EZAuctioneer
+
+Voir [EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md). Ajoutées par `0023_ezauctioneer_scans`.
+Séparées des tables d'Auctionator : les clés de marché des deux addons ne se correspondent pas.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `scan_markets` | `id` ; unique `(flavor, market_key)` | Un hôtel des ventes vu par EZAuctioneer : client, clé de l'addon, région, royaume (nom que donne le jeu), maison (`faction` ou `neutral`), faction (renseignée si et seulement si la maison est `faction`), première et dernière réception |
+| `scan_imports` | `id` ; unique `(scan_market_id, account_id, content_hash)` | Un contenu reçu : compte (supprimé avec lui), machine, synchronisation (null si purgée), empreinte et date du fichier, objets, relevés, premier et dernier scan. Un même contenu n'est importé qu'une fois |
+| `market_scans` | `(scan_market_id, scanned_at)` | Un scan : enchères, objets distincts et origine (`own`, `external`) quand l'addon en a gardé le rapport ; objets relevés et unités, recomptés à chaque import |
+| `market_item_scans` | `(scan_market_id, item_key, scanned_at)` | Un relevé : objet (`item_id`, tiré de la clé `i:<objet>[:s…]`), 25e percentile du prix (strictement positif), unités en vente. Jamais modifié une fois reçu ; résumé par jour au-delà de 60 jours |
+| `market_item_scan_days` | `(scan_market_id, item_key, day)` | Un objet, un jour (heure de Bruxelles) au-delà de 60 jours : plus bas, médiane, plus haut des prix (plus bas ≤ médiane ≤ plus haut), plus grand nombre d'unités, nombre de scans |
+
 ### Objectifs par personnage
 
 Sortes et règle d'atteinte : `web/src/lib/goals/evaluate.ts`. Un objectif automatique (niveau,
@@ -166,6 +180,7 @@ synchronisations :
 |---|---|
 | Personnages | ceux du compte, avec leurs tables filles et leurs snapshots |
 | Marché | les `market_imports` du compte ; `market_item_latest.import_id` passe à null. Les prix de `market_item_days` restent : fusionnés jour par jour avec ceux des autres comptes, ils ne s'en séparent plus |
+| Scans | les `scan_imports` du compte (cascade). Les relevés de `market_item_scans` restent : un même relevé peut venir de plusieurs comptes |
 | Liens | les lignes `machine_accounts` du compte, puis le compte lui-même |
 | Royaumes | un royaume resté sans personnage est supprimé |
 
@@ -257,6 +272,9 @@ remet à null ou supprime en cascade (`sync_run_id` de `character_snapshots`, `m
 liste, lancées ensemble, vérifié par test avec 1, 5 et 50 personnages). Au volume de novembre 2026
 (54 Mo), PostgreSQL peut encore préférer un parcours complet : ces index servent quand l'historique
 grossit.
+Depuis le site 0.31.0 (migration `0023`) : `market_item_scans(scan_market_id, scanned_at)` pour
+les scans d'une période et la purge, `scan_imports(account_id)` et `scan_imports(sync_run_id)`
+pour la suppression d'un compte et la purge du journal.
 
 ## Durée de conservation
 
@@ -269,9 +287,10 @@ chaque jour) ne touche que ce qui se refait ou ne sert qu'au diagnostic :
 | `opportunity_runs` (et `opportunities`, en cascade) | les 30 derniers calculs de chaque marché, plus ceux qu'un audit du jour cite |
 | `server_status_checks` | 8 jours ([SERVER-STATUS](SERVER-STATUS.md)) |
 | `sessions` | jusqu'à leur expiration |
+| `market_item_scans` | 60 jours entiers (heure de Bruxelles) ; les jours plus anciens sont résumés dans `market_item_scan_days`, puis supprimés. Un relevé arrivé après le résumé de son jour s'y ajoute (bornes et comptes exacts, médiane de la partie la mieux relevée) |
 
 L'historique des personnages (relevés, sessions, temps par niveau, finances) et celui des prix
-(`market_item_days`) ne sont jamais purgés : ils n'existent nulle part ailleurs.
+(`market_item_days`, `market_item_scan_days`) ne sont jamais purgés : ils n'existent nulle part ailleurs.
 
 ## Migrations
 
@@ -315,6 +334,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0020_perf_indexes` | neuf index (ajouts seuls, voir **Index**) |
 | `0021_notifications` | `notification_state`, colonnes `app_settings.notify_*` et `character_goals.notified_at` (ajouts seuls). Les objectifs déjà atteints reçoivent `notified_at = achieved_at` : rien n'est annoncé pour eux. Aucune ligne supprimée |
 | `0022_agent_notices` | données seulement : l'avertissement « Baganator : N personnages absents d'AltBoard » des agents 0.8.x passe de `agent_warning` à `agent_notice` dans `sync_errors`, puis `errors_count` et `status` des synchronisations partielles concernées sont recalculés (`success` s'il ne reste aucune autre erreur). Aucune ligne supprimée |
+| `0023_ezauctioneer_scans` | `scan_markets`, `scan_imports`, `market_scans`, `market_item_scans`, `market_item_scan_days` et leurs index (ajouts seuls) |
 
 ## Checkpoint B
 

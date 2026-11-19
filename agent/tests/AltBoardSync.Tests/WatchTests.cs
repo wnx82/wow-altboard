@@ -444,6 +444,7 @@ public class WatchTests
     [Theory]
     [InlineData("Auctionator.lua", "auctionator-small.lua")]
     [InlineData("NaowhForever.lua", "naowh-recipes.lua")]
+    [InlineData("EZAuctioneer.lua", "ezauctioneer-small.lua")]
     public async Task Sends_again_when_only_an_economy_file_changes(string fileName, string fixture)
     {
         using var h = new Harness();

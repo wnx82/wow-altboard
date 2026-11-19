@@ -46,6 +46,9 @@ public sealed record AccountPayload(
     /// <summary>Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator du même compte ; absents sans l'addon.</summary>
     public BaganatorPayload? Baganator { get; init; }
 
+    /// <summary>Relevés de chaque scan complet de l'hôtel des ventes par l'addon EZAuctioneer du même compte (agent 0.10.0) ; absents sans relevé.</summary>
+    public EzAuctioneerPayload? EzAuctioneer { get; init; }
+
     /// <summary>
     /// Informations sans gravité (site 0.29.0 et suivants) : gardées avec la synchronisation sans la
     /// rendre partielle, contrairement à <see cref="Warnings"/>. Absentes quand il n'y en a pas.
@@ -89,6 +92,30 @@ public sealed record MarketItemPayload(string Key, long? LastMin, IReadOnlyList<
 
 /// <summary>Prix d'achat chez un marchand, à l'unité, en pièces de cuivre (pas toujours entier).</summary>
 public sealed record VendorPricePayload(string Key, double Price);
+
+/// <summary>EZAuctioneer.lua : les relevés des derniers scans complets, par marché.</summary>
+public sealed record EzAuctioneerPayload(SourceFilePayload File, int Schema, IReadOnlyList<ScanMarketPayload> Markets);
+
+/// <summary>
+/// Un marché, sous la clé qu'EZAuctioneer lui donne : <c>région:royaume:faction:faction</c> pour un
+/// HV de faction, <c>région:royaume:neutral</c> pour l'HV neutre. Scans : résumé des derniers scans
+/// réussis connus de l'addon. ContentHash ne change que si les scans ou les relevés changent.
+/// </summary>
+public sealed record ScanMarketPayload(string Key, string ContentHash, IReadOnlyList<ScanPayload> Scans, IReadOnlyList<ScanItemPayload> Items);
+
+/// <summary>
+/// Un scan réussi. At : fin du scan, en secondes Unix (heure du serveur de jeu), la même que celle de
+/// ses relevés. Auctions : enchères lues ; Items : objets distincts ; Origin : « own » (scan
+/// d'EZAuctioneer) ou « external » (scan d'un autre addon, analysé par EZAuctioneer).
+/// </summary>
+public sealed record ScanPayload(long At, int? Auctions, int? Items, string? Origin);
+
+/// <summary>
+/// Un objet (<c>i:1234</c>, ou avec son suffixe aléatoire <c>i:1234:s5</c>). Samples : un tableau
+/// <c>[heure, prix, unités]</c> par scan, du plus ancien au plus récent ; prix au 25e percentile
+/// pondéré par les unités en vente, à l'unité, en pièces de cuivre ; unités en vente dans ce scan.
+/// </summary>
+public sealed record ScanItemPayload(string Key, IReadOnlyList<long[]> Samples);
 
 /// <summary>NaowhForever.lua : recettes apprises, par personnage.</summary>
 public sealed record RecipesPayload(SourceFilePayload File, IReadOnlyList<CharacterRecipesPayload> Characters);

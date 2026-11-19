@@ -108,7 +108,7 @@ Le remplacement ne supprime pas l'ancien exécutable : il peut être effacé une
 | aucune, par double-clic | ouvre la fenêtre (comme `ui`) |
 | aucune, depuis un terminal | affiche l'aide |
 | `ui` | ouvre la fenêtre de l'agent ; celle de la surveillance en cours s'il y en a une |
-| `sync` | lit tous les `AltBoard.lua` (et les `AllemanoLedger.lua`, `Auctionator.lua`, `NaowhForever.lua`, `Syndicator.lua` voisins) et envoie le document |
+| `sync` | lit tous les `AltBoard.lua` (et les `AllemanoLedger.lua`, `Auctionator.lua`, `EZAuctioneer.lua`, `NaowhForever.lua`, `Syndicator.lua` voisins) et envoie le document |
 | `watch` | synchronise à chaque écriture du jeu, jusqu'à l'arrêt |
 | `autostart` / `autostart on` / `autostart off` | affiche, active ou désactive le lancement de `watch` à l'ouverture de session ; `on` le lance aussi tout de suite, `off` arrête celui qui tourne |
 | `scan` | lit et affiche, **sans rien envoyer** (équivaut à `sync --dry-run`) |
@@ -226,6 +226,12 @@ Sacs et banque restent ceux d'AltBoard. Syndicator nomme les personnages sans GU
 d'AltBoard sur le compte n'est pas transmis, avec un avertissement. `scan` en affiche le résumé :
 `Baganator : 42 objets au courrier, 3 objets aux enchères, 1 banque de guilde`.
 
+Depuis 0.10.0, `EZAuctioneer.lua` (addon EZAuctioneer) apporte, avec la même règle, les **scans de
+l'hôtel des ventes** : le prix de chaque objet à chaque scan complet, et la taille du marché
+([EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md)). Le portefeuille de revente et les noms
+des personnages ne sont pas transmis. `scan` en affiche le résumé par marché :
+`EZAuctioneer « 3:CAMWOW EU5 Realm 5 PvE:Alliance:faction » : 6959 objets, 12 scans`.
+
 Depuis 0.7.0, l'agent lit aussi, une fois par client, le cache local du jeu
 `Cache\ADB\<langue>\DBCache.bin` (langue de `SET textLocale` dans `WTF\Config.wtf`, sinon le seul
 cache présent) : il n'en garde que les noms d'objets (table `ItemSparse`, environ 5 200 noms sur un
@@ -233,7 +239,8 @@ client joué), envoyés quand le fichier a changé depuis le dernier envoi accep
 ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests)). Format lu : « XFTH » version 9 ;
 une autre version donne un avertissement, sans bloquer la synchronisation.
 
-Pour des prix à jour : scan à l'hôtel des ventes avec Auctionator, `/reload`, puis synchroniser.
+Pour des prix à jour : scan à l'hôtel des ventes avec Auctionator ou EZAuctioneer, `/reload`, puis
+synchroniser.
 `scan --out <fichier>` montre ce qui serait envoyé, prix et recettes compris.
 
 ## Lecture pendant que le jeu écrit
@@ -273,7 +280,7 @@ ne s'ouvre que sur demande. Un double-clic sur l'exécutable lance la même surv
 ouverte.
 
 ```text
-AltBoard.lua, AllemanoLedger.lua, Auctionator.lua, NaowhForever.lua ou Syndicator.lua modifié (taille ou date relevées toutes les 3 s)
+AltBoard.lua, AllemanoLedger.lua, Auctionator.lua, EZAuctioneer.lua, NaowhForever.lua ou Syndicator.lua modifié (taille ou date relevées toutes les 3 s)
         ↓
 anti-rebond : attendre 5 s sans nouvel événement (le jeu écrit en plusieurs fois)
         ↓
