@@ -176,6 +176,13 @@
       "when": 1795459771160,
       "tag": "0024_notes_checklists",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795462337282,
+      "tag": "0025_price_alert_notices",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { Database } from "@/db/client";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import type { Database, DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 import { readSettings } from "@/lib/settings/store";
 import { freshestLatest, linkedIds, loadScanLatest, scanLinks } from "./feeds";
@@ -8,8 +8,9 @@ import { ITEM_KEY_PATTERN } from "./view";
 
 // Alertes de prix : un seuil bas (« prévenir sous 12 po ») et un seuil haut par objet et par marché,
 // comparés au dernier prix relevé : champ m d'Auctionator (table market_item_latest), ou dernier scan
-// d'EZAuctioneer d'un marché relié quand il est plus récent (feeds.ts). Aucun état : le résultat se
-// relit à chaque affichage (fiche de l'objet, Marché, accueil).
+// d'EZAuctioneer d'un marché relié quand il est plus récent (feeds.ts). Le résultat se relit à chaque
+// affichage (fiche de l'objet, Marché, accueil). Seule l'annonce d'un franchissement au webhook des
+// notifications est retenue (notified_at, noticeAlerts) : une fois par franchissement.
 
 export const ALERT_DIRECTIONS = ["below", "above"] as const;
 export type AlertDirection = (typeof ALERT_DIRECTIONS)[number];
@@ -116,7 +117,7 @@ export async function saveItemAlerts(
   if (input.below !== null && input.above !== null && input.below >= input.above) {
     return { ok: false, error: "Le seuil bas doit être inférieur au seuil haut." };
   }
-  return db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx): Promise<SaveAlertsResult> => {
     const [market] = await tx.select({ id: t.markets.id }).from(t.markets).where(eq(t.markets.id, input.marketId));
     if (!market) return { ok: false, error: "Marché introuvable." };
 
@@ -150,6 +151,37 @@ export async function saveItemAlerts(
     }
     return { ok: true, saved, removed };
   });
+  if (!result.ok) return result;
+  // Un seuil déjà franchi au moment où il est posé se voit sur la page : il n'est pas annoncé.
+  await noticeAlerts(db, await listAlerts(db, { marketId: input.marketId, itemKey: input.itemKey, now: input.now }), input.now);
+  return result;
+}
+
+/**
+ * Retient les franchissements : une alerte déclenchée et encore armée est datée (notified_at) et
+ * renvoyée, pour être annoncée ; une alerte qui ne l'est plus est réarmée. Les statuts viennent de
+ * listAlerts ; seule la mise à jour conditionnelle décide, deux passages n'annoncent donc pas deux fois.
+ */
+export async function noticeAlerts(db: DatabaseOrTransaction, statuses: readonly AlertStatus[], now: Date): Promise<AlertStatus[]> {
+  const triggered = statuses.filter((alert) => alert.triggered).map((alert) => alert.id);
+  const calm = statuses.filter((alert) => !alert.triggered).map((alert) => alert.id);
+  const [fresh] = await Promise.all([
+    triggered.length === 0
+      ? []
+      : db
+          .update(t.priceAlerts)
+          .set({ notifiedAt: now })
+          .where(and(inArray(t.priceAlerts.id, triggered), isNull(t.priceAlerts.notifiedAt)))
+          .returning({ id: t.priceAlerts.id }),
+    calm.length === 0
+      ? []
+      : db
+          .update(t.priceAlerts)
+          .set({ notifiedAt: null })
+          .where(and(inArray(t.priceAlerts.id, calm), isNotNull(t.priceAlerts.notifiedAt))),
+  ]);
+  const ids = new Set(fresh.map((row) => row.id));
+  return statuses.filter((alert) => ids.has(alert.id));
 }
 
 /** Retire une alerte ; renvoie l'objet et le marché qu'elle visait, null si elle n'existait plus. */

@@ -114,6 +114,33 @@ export function weeklyEvent(facts: WeeklyFacts): NotificationEvent {
   };
 }
 
+export type PriceAlertFacts = {
+  alertId: number;
+  marketId: number;
+  market: string;
+  itemKey: string;
+  item: string;
+  direction: "below" | "above";
+  thresholdCopper: number;
+  priceCopper: number;
+  /** Jour du prix (Bruxelles) et, quand on la connaît, heure du relevé. */
+  day: string;
+  observedAt: Date | null;
+  source: "auctionator" | "ezauctioneer";
+  /** Page de l'objet sur le site ; null si l'adresse publique du site n'est pas réglée. */
+  url: string | null;
+};
+
+export function priceEvent(alert: PriceAlertFacts): NotificationEvent {
+  const side = alert.direction === "below" ? "seuil bas" : "seuil haut";
+  return {
+    key: "price",
+    event: "price.alert",
+    text: `Alerte de prix : ${alert.item} à ${formatMoney(alert.priceCopper)}, ${side} ${formatMoney(alert.thresholdCopper)} (${alert.market}).`,
+    data: { ...alert, observedAt: alert.observedAt?.toISOString() ?? null },
+  };
+}
+
 export function testEvent(): NotificationEvent {
   return { key: "test", event: "test", text: "Essai de notification depuis WoW AltBoard : le webhook est bien joint.", data: {} };
 }

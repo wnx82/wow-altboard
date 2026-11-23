@@ -179,9 +179,12 @@ au-dessus de**, saisis en or (« 12,5 ») ou en unités (« 12 po 50 pa »), rel
 scan d'un marché EZAuctioneer relié s'il est plus récent) : un seuil bas se
 déclenche au prix égal ou inférieur, un seuil haut au prix égal ou supérieur. Un prix antérieur au
 début de l'historique ne compte pas. Le seuil bas doit rester sous le seuil haut ; 500 alertes au
-plus. Rien n'est conservé de l'état : il se recalcule à chaque affichage, sur la fiche de l'objet,
-dans la liste **Alertes de prix** de la page Marché (retrait sur place, badge « alerte » dans le
-tableau) et dans le bloc **À surveiller** de l'accueil. Aucune notification.
+plus. Le déclenchement se recalcule à chaque affichage, sur la fiche de l'objet, dans la liste
+**Alertes de prix** de la page Marché (retrait sur place, badge « alerte » dans le tableau) et
+dans le bloc **À surveiller** de l'accueil. Depuis le site 0.36.0, un seuil franchi part aussi au
+webhook des notifications (événement `price.alert`, [NOTIFICATIONS](NOTIFICATIONS.md)), une fois
+par franchissement : `price_alerts.notified_at` retient l'annonce, et l'alerte se réarme quand le
+prix repasse de l'autre côté du seuil. Un seuil déjà franchi quand il est posé n'est pas annoncé.
 
 ## Noms des objets (`item-names.ts`)
 

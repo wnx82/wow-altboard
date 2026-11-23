@@ -4,6 +4,19 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.36.0 — 2026-11-23
+
+Alertes de prix envoyées au webhook des notifications (n8n). Migration `0025_price_alert_notices` :
+une colonne ajoutée.
+
+### Ajouté
+
+- Événement `price.alert` (case « Alerte de prix déclenchée » dans **Paramètres → Notifications**,
+  cochée d'office) : quand le dernier prix d'un objet atteint un seuil posé sur sa fiche, le webhook
+  reçoit l'objet, le marché, le prix, le seuil, l'heure et la source du relevé, et le lien vers la
+  page de l'objet. Une fois par franchissement : l'alerte se réarme quand le prix repasse de l'autre
+  côté du seuil. Un seuil déjà franchi quand il est posé, ou avant le déploiement, n'est pas annoncé.
+
 ## Site 0.35.0 — 2026-11-23
 
 Scans d'EZAuctioneer dans le moteur de prix. Aucune migration.

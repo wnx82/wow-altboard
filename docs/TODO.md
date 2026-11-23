@@ -155,7 +155,8 @@ Ce qui reste après le moteur et les pages ([ECONOMY-ENGINE](ECONOMY-ENGINE.md))
   de wago.tools depuis **Paramètres**, complété par les noms du cache local du jeu
   (`Cache/ADB/frFR/DBCache.bin`) que l'agent 0.7.0 envoie (source `client`).
 - [x] **P2 · M** — Alertes de prix par objet, sous ou au-dessus d'un seuil. Fait le 2026-11-09
-  (site 0.10.0) : fiche de l'objet, page Marché et bloc **À surveiller**, sans notification.
+  (site 0.10.0) : fiche de l'objet, page Marché et bloc **À surveiller**. Annonce au webhook des
+  notifications (n8n) le 2026-11-23 (site 0.36.0), une fois par franchissement du seuil.
 - [ ] **P2 · S** — Revoir les index de `market_item_days` avec plusieurs semaines d'historique
   réel (environ 2 000 lignes par jour de scan sur le marché « PvE »).
 - [ ] **P3 · M** — Agréger les relevés de plus d'un an, par semaine, si le volume le demande.

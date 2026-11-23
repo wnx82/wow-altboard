@@ -3,15 +3,20 @@ import type { Database, DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 import { weekOf } from "@/lib/dashboard/playtime";
 import { machineLabel } from "@/lib/dashboard/queries";
+import { listAlerts, noticeAlerts, type AlertStatus } from "@/lib/economy/alerts";
 import { addDays } from "@/lib/economy/days";
+import { loadItemNames } from "@/lib/economy/item-names";
+import { itemLabel, listMarkets } from "@/lib/economy/load";
+import { itemHref } from "@/lib/economy/view";
 import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 import type { NotifyEventKey, NotifySettings } from "./config";
-import { goalEvent, levelEvent, serverEvent, silentEvent, silentMachines, weeklyEvent, type NotificationEvent, type WeeklyFacts } from "./events";
+import { goalEvent, levelEvent, priceEvent, serverEvent, silentEvent, silentMachines, weeklyEvent, type NotificationEvent, type WeeklyFacts } from "./events";
 
 // Ce qui s'est passé depuis le dernier passage : niveaux gagnés, objectifs atteints, serveur de jeu
-// revenu, PC muets, rapport de la semaine écoulée. L'état (notification_state) avance à chaque
-// passage, que l'événement soit envoyé ou non : activer un événement plus tard n'annonce pas le
-// passé. Au premier passage, l'état prend les valeurs du moment et rien n'est annoncé.
+// revenu, PC muets, alertes de prix franchies, rapport de la semaine écoulée. L'état
+// (notification_state, price_alerts.notified_at) avance à chaque passage, que l'événement soit
+// envoyé ou non : activer un événement plus tard n'annonce pas le passé. Au premier passage,
+// l'état prend les valeurs du moment et rien n'est annoncé.
 
 /** Relevés examinés par passage, au plus ; le reste attend le passage suivant. */
 export const SNAPSHOTS_PER_PASS = 500;
@@ -33,11 +38,15 @@ export function brusselsMidnight(day: string): Date {
 type State = typeof t.notificationState.$inferSelect;
 
 export async function collectEvents(db: Database, settings: NotifySettings, wanted: ReadonlySet<NotifyEventKey>, now: Date): Promise<NotificationEvent[]> {
-  return db.transaction(async (tx) => {
+  // Statuts lus hors de la transaction (moteur de prix, cache) ; l'annonce, elle, y est décidée.
+  const alerts = await listAlerts(db, { now });
+  const crossed = await db.transaction(async (tx) => {
     const [state] = await tx.select().from(t.notificationState).where(eq(t.notificationState.id, 1)).for("update");
     if (!state) {
       await initialize(tx, settings, now);
-      return [];
+      // Les seuils déjà franchis sont tenus pour connus, comme le reste.
+      await noticeAlerts(tx, alerts, now);
+      return null;
     }
 
     const events: NotificationEvent[] = [];
@@ -78,6 +87,9 @@ export async function collectEvents(db: Database, settings: NotifySettings, want
     );
     if (wanted.has("silent")) events.push(...silence.silent.map((machine) => silentEvent(machine, machine.days)));
 
+    // Toujours retenues, même sans webhook : un seuil franchi avant l'activation n'est pas annoncé.
+    const prices = await noticeAlerts(tx, alerts, now);
+
     const weekly = await weeklyReport(tx, state, wanted.has("weekly"), now);
     if (weekly.event) events.push(weekly.event);
 
@@ -85,8 +97,38 @@ export async function collectEvents(db: Database, settings: NotifySettings, want
       .update(t.notificationState)
       .set({ lastSnapshotId: levels.cursor, lastCheckId: server.cursor, silentMachines: silence.notified, lastWeeklyReport: weekly.week, updatedAt: now })
       .where(eq(t.notificationState.id, 1));
-    return events;
+    return { events, prices: wanted.has("price") ? prices : [] };
   });
+  if (crossed === null) return [];
+  // Le rapport de la semaine reste le dernier envoyé.
+  const priceEvents = await priceAlertEvents(db, crossed.prices);
+  const weekly = crossed.events.findIndex((event) => event.key === "weekly");
+  return weekly === -1 ? [...crossed.events, ...priceEvents] : [...crossed.events.slice(0, weekly), ...priceEvents, ...crossed.events.slice(weekly)];
+}
+
+/** Événements des alertes franchies : nom de l'objet, du marché, et lien vers la page de l'objet. */
+async function priceAlertEvents(db: Database, alerts: readonly AlertStatus[]): Promise<NotificationEvent[]> {
+  if (alerts.length === 0) return [];
+  const [names, markets] = await Promise.all([loadItemNames(db, alerts.map((alert) => alert.itemKey)), listMarkets(db)]);
+  const origin = (process.env.WOW_APP_ORIGIN ?? "").replace(/\/$/, "");
+  return alerts
+    .filter((alert) => alert.latest !== null)
+    .map((alert) =>
+      priceEvent({
+        alertId: alert.id,
+        marketId: alert.marketId,
+        market: markets.find((market) => market.id === alert.marketId)?.label ?? `marché ${alert.marketId}`,
+        itemKey: alert.itemKey,
+        item: itemLabel(names, alert.itemKey),
+        direction: alert.direction,
+        thresholdCopper: alert.thresholdCopper,
+        priceCopper: alert.latest!.minCopper,
+        day: alert.latest!.day,
+        observedAt: alert.latest!.at ?? null,
+        source: alert.latest!.source ?? "auctionator",
+        url: origin ? `${origin}${process.env.WOW_BASE_PATH ?? ""}${itemHref(alert.itemKey, `?market=${alert.marketId}`)}` : null,
+      }),
+    );
 }
 
 async function initialize(tx: DatabaseOrTransaction, settings: NotifySettings, now: Date): Promise<void> {

@@ -104,7 +104,7 @@ Voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md). Ajoutées par `0005_economy`, `0006_fa
 | `opportunity_runs` | `id` | Un calcul d'opportunités : marché, date, version du moteur, paramètres et base (`jsonb`), dernier import, jour des données |
 | `opportunities` | `(run_id, rank)` | Une recommandation : type, objet ou recette, valeur, confiance, horizon, raisons, entrées (`jsonb`) |
 | `economy_audits` | `(market_id, day)` | Audit du jour rédigé par l'assistant : jour (Europe/Brussels), calcul dont viennent ses faits (`run_id`, vidé si ce calcul disparaît), jour des données, modèle, texte, date de rédaction. Réécrit le même jour, il remplace le précédent |
-| `price_alerts` | `id` ; unique `(market_id, item_key, direction)` | Alerte de prix : marché, objet, sens (`below` ou `above`), seuil en pièces de cuivre (strictement positif). Supprimée avec son marché |
+| `price_alerts` | `id` ; unique `(market_id, item_key, direction)` | Alerte de prix : marché, objet, sens (`below` ou `above`), seuil en pièces de cuivre (strictement positif), `notified_at` : franchissement en cours déjà annoncé au webhook (null : alerte armée, [NOTIFICATIONS](NOTIFICATIONS.md)). Supprimée avec son marché |
 | `item_names` | `item_id` | Nom de repli d'un objet jamais possédé : nom, qualité, source (`wago` ou `client`), version du jeu (`build`). Un import `wago` ne remplace jamais une ligne `client` et supprime ses propres lignes d'une version précédente |
 | `icon_files` | `file_id` | Nom de fichier d'une icône du jeu (`inv_scroll_03`) sous l'identifiant que relève l'addon (`items.icon`), version du jeu (`build`). Importé de la table `ManifestInterfaceData` de wago.tools ; un import supprime les icônes d'une version précédente |
 | `item_icons` | `item_id` | Icône d'un objet (`file_id`, clé de `icon_files`), version du jeu (`build`). Importée de la table `Item` de wago.tools avec `icon_files`, dans la même transaction ; sert aux objets que l'addon n'a jamais relevés (catalogue, recettes, recherche) |
@@ -351,6 +351,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0022_agent_notices` | données seulement : l'avertissement « Baganator : N personnages absents d'AltBoard » des agents 0.8.x passe de `agent_warning` à `agent_notice` dans `sync_errors`, puis `errors_count` et `status` des synchronisations partielles concernées sont recalculés (`success` s'il ne reste aucune autre erreur). Aucune ligne supprimée |
 | `0023_ezauctioneer_scans` | `scan_markets`, `scan_imports`, `market_scans`, `market_item_scans`, `market_item_scan_days` et leurs index (ajouts seuls) |
 | `0024_notes_checklists` | `character_notes`, `character_tags`, `checklist_items`, `checklist_item_characters`, `checklist_checks` et leurs index, colonnes `app_settings.reset_hour` et `reset_weekday` (ajouts seuls) |
+| `0025_price_alert_notices` | colonne `price_alerts.notified_at` (ajout seul). Les alertes existantes la reçoivent à l'heure de la migration : aucun seuil déjà franchi n'est annoncé. `price` ajouté à `app_settings.notify_events` quand une liste y est enregistrée. Aucune ligne supprimée |
 
 ## Checkpoint B
 

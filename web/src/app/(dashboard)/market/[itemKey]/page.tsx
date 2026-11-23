@@ -169,7 +169,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
             itemKey={key}
             below={alertOf("below") ? formatMoneyInput(alertOf("below")!.thresholdCopper) : ""}
             above={alertOf("above") ? formatMoneyInput(alertOf("above")!.thresholdCopper) : ""}
-            hint={`Comparé au dernier prix relevé (${MONEY_INPUT_HINT}). Champ vide : pas de seuil. Une alerte déclenchée s'affiche sur l'accueil et la page Marché, sans notification.`}
+            hint={`Comparé au dernier prix relevé (${MONEY_INPUT_HINT}). Champ vide : pas de seuil. Une alerte déclenchée s'affiche sur l'accueil et la page Marché, et part au webhook des notifications s'il est réglé (Paramètres), une fois par franchissement du seuil.`}
           />
         </div>
       </section>

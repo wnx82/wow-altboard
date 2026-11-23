@@ -65,8 +65,8 @@ export default async function SettingsPage() {
           <div className="panel p-5">
             <p className="mb-4 text-sm text-muted">
               Le serveur envoie un document JSON en POST à un webhook (un nœud Webhook de n8n, par exemple), qui le relaie où vous voulez :
-              niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet, et un rapport chaque lundi matin. Seuls les
-              événements postérieurs à l&apos;enregistrement sont envoyés.
+              niveau gagné, objectif atteint, serveur de jeu de nouveau en ligne, PC muet, alerte de prix franchie, et un rapport chaque
+              lundi matin. Seuls les événements postérieurs à l&apos;enregistrement sont envoyés.
             </p>
             <NotifySettingsForm
               action={saveNotifySettingsAction}

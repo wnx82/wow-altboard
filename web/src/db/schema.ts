@@ -1005,8 +1005,9 @@ export const economyAudits = pgTable(
 );
 
 // Alerte de prix posée sur un objet d'un marché (web/src/lib/economy/alerts.ts) : déclenchée quand
-// le dernier prix relevé (market_item_latest) passe sous le seuil (below) ou au-dessus (above).
-// Aucun état n'est conservé : l'alerte se relit à chaque affichage, sans notification.
+// le dernier prix relevé (market_item_latest, ou scan EZAuctioneer plus récent) passe sous le seuil
+// (below) ou au-dessus (above). Le déclenchement se relit à chaque affichage ; notified_at retient
+// seulement qu'il a été annoncé (web/src/lib/notify), pour ne l'annoncer qu'une fois par franchissement.
 export const priceAlerts = pgTable(
   "price_alerts",
   {
@@ -1015,6 +1016,8 @@ export const priceAlerts = pgTable(
     itemKey: text("item_key").notNull(),
     direction: text("direction").notNull(),
     thresholdCopper: bigint("threshold_copper", { mode: "number" }).notNull(),
+    // Franchissement en cours déjà annoncé (ou tenu pour connu) ; null : l'alerte est armée.
+    notifiedAt: ts("notified_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

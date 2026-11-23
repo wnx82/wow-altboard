@@ -5,7 +5,7 @@ import { appSettings } from "@/db/schema";
 // Réglages des notifications sortantes (page Paramètres) : webhook, jeton, événements envoyés et
 // délai au-delà duquel un PC muet est signalé. Rangés dans la ligne des réglages du site.
 
-export const NOTIFY_EVENTS = ["level", "goal", "server", "silent", "weekly"] as const;
+export const NOTIFY_EVENTS = ["level", "goal", "server", "silent", "price", "weekly"] as const;
 export type NotifyEventKey = (typeof NOTIFY_EVENTS)[number];
 
 export const NOTIFY_EVENT_LABELS: Record<NotifyEventKey, string> = {
@@ -13,6 +13,7 @@ export const NOTIFY_EVENT_LABELS: Record<NotifyEventKey, string> = {
   goal: "Objectif atteint",
   server: "Serveur de jeu de nouveau en ligne",
   silent: "PC muet depuis plusieurs jours",
+  price: "Alerte de prix déclenchée",
   weekly: "Rapport hebdomadaire (lundi matin)",
 };
 

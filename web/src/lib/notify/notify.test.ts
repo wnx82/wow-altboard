@@ -2,17 +2,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { openTestDatabase, type TestDatabase } from "@/db/testing";
 import { createAgentToken } from "@/lib/agent-tokens";
+import { saveItemAlerts } from "@/lib/economy/alerts";
 import { setManualGoal } from "@/lib/goals/store";
 import { processSync } from "@/lib/sync/process";
 import type { SyncPayload } from "@/lib/sync/schema";
 import { brusselsMidnight, MIN_DOWN_CHECKS } from "./collect";
 import { maskUrl, parseSilentDays, parseToken, parseWebhookUrl, readNotifySettings, writeNotifySettings } from "./config";
 import { deliver } from "./deliver";
-import { levelEvent, silentMachines, weeklyEvent } from "./events";
+import { levelEvent, priceEvent, silentMachines, weeklyEvent } from "./events";
 import { notifyPass } from "./runtime";
 
 describe("notifications : réglages et textes", () => {
@@ -67,6 +68,28 @@ describe("notifications : réglages et textes", () => {
     });
     assert.equal(report.event, "report.weekly");
     assert.match(report.text, /^Semaine du 2 novembre : 2 niveaux gagnés \(Ada 10 → 12\) ; or : \+2 po 50 pa 0 pc \(total 3 po 50 pa 0 pc\) ; temps joué : .* en 2 sessions ; aucun objectif atteint\.$/);
+  });
+
+  test("texte d'une alerte de prix", () => {
+    const event = priceEvent({
+      alertId: 4,
+      marketId: 2,
+      market: "PvE · WoW Forever",
+      itemKey: "2589",
+      item: "Étoffe de lin",
+      direction: "below",
+      thresholdCopper: 30,
+      priceCopper: 27,
+      day: "2026-11-19",
+      observedAt: new Date("2026-11-19T09:05:00Z"),
+      source: "ezauctioneer",
+      url: null,
+    });
+    assert.equal(event.event, "price.alert");
+    assert.equal(event.text, "Alerte de prix : Étoffe de lin à 27 pc, seuil bas 30 pc (PvE · WoW Forever).");
+    assert.equal(event.data.observedAt, "2026-11-19T09:05:00.000Z");
+    const above = priceEvent({ ...event.data, direction: "above", thresholdCopper: 15_000, priceCopper: 20_050, observedAt: null } as never);
+    assert.equal(above.text, "Alerte de prix : Étoffe de lin à 2 po 0 pa 50 pc, seuil haut 1 po 50 pa 0 pc (PvE · WoW Forever).");
   });
 
   test("minuit à Bruxelles, heure d'hiver comme d'été", () => {
@@ -237,5 +260,107 @@ describe("notifications : passage en base", () => {
     assert.equal(sent[0].data.week, "2026-11-09");
     assert.equal(sent[0].data.playedSeconds, 3_600);
     assert.deepEqual(sent[0].data.levels, [{ name: character.name, from: character.level, to: character.level! + 1 }]);
+  });
+});
+
+describe("notifications : alertes de prix", () => {
+  // Fixture : l'objet 2576 a pour dernier prix 100 pc, relevé le 2026-11-06.
+  const BASE: SyncPayload = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "../../../../tests/fixtures/payloads/economy-account.json"), "utf8"));
+  const NOW = new Date("2026-11-06T18:00:00Z");
+  let database: TestDatabase;
+  let marketId: number;
+  let sent: { event: string; text: string; data: Record<string, unknown> }[];
+  const webhook = (async (_url: string, init: RequestInit) => {
+    sent.push(JSON.parse(String(init.body)));
+    return new Response(null, { status: 204 });
+  }) as unknown as typeof fetch;
+  const later = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000);
+  const pass = (minutes: number) => notifyPass(database.db, later(minutes), webhook);
+  const price = (minCopper: number) =>
+    database.db
+      .update(t.marketItemLatest)
+      .set({ minCopper })
+      .where(and(eq(t.marketItemLatest.marketId, marketId), eq(t.marketItemLatest.itemKey, "2576")));
+  const alert = (below: number | null, above: number | null, minutes = 0) => saveItemAlerts(database.db, { marketId, itemKey: "2576", below, above, now: later(minutes) });
+
+  before(async () => {
+    database = await openTestDatabase();
+  });
+  after(async () => {
+    await database.close();
+  });
+  beforeEach(async () => {
+    await database.reset();
+    sent = [];
+    const { id } = await createAgentToken(database.db, "PC de test");
+    await processSync(database.db, structuredClone(BASE), { tokenId: id, requestId: "test", now: NOW });
+    [{ id: marketId }] = await database.db.select({ id: t.markets.id }).from(t.markets);
+  });
+
+  test("une fois par franchissement : réarmée quand le prix repasse de l'autre côté du seuil", async () => {
+    await writeNotifySettings(database.db, { url: "https://n8n.exemple/w", events: ["price"] }, NOW);
+    await pass(0);
+    await alert(90, null);
+
+    await pass(1);
+    assert.equal(sent.length, 0, "100 pc : au-dessus du seuil bas");
+
+    await price(80);
+    await pass(2);
+    await pass(3);
+    assert.deepEqual(
+      sent.map((event) => [event.event, event.text]),
+      [["price.alert", "Alerte de prix : Objet 2576 à 80 pc, seuil bas 90 pc (PvE · WoW Forever)."]],
+    );
+    assert.equal(sent[0].data.priceCopper, 80);
+    assert.equal(sent[0].data.direction, "below");
+    assert.equal(sent[0].data.source, "auctionator");
+
+    // Le prix remonte : l'alerte se réarme ; il redescend : nouvelle annonce.
+    sent = [];
+    await price(120);
+    await pass(4);
+    await price(85);
+    await pass(5);
+    assert.deepEqual(
+      sent.map((event) => event.data.priceCopper),
+      [85],
+    );
+  });
+
+  test("un seuil déjà franchi quand il est posé, ou avant l'activation, n'est pas annoncé", async () => {
+    await pass(0);
+    // Posé alors que le prix (100 pc) est déjà au-dessus du seuil haut.
+    await alert(null, 95, 1);
+    await writeNotifySettings(database.db, { url: "https://n8n.exemple/w" }, NOW);
+    await pass(2);
+    assert.equal(sent.length, 0);
+
+    // Franchi sans webhook : retenu quand même, pas rattrapé à l'activation.
+    await writeNotifySettings(database.db, { url: null }, NOW);
+    await alert(90, null, 3);
+    await price(80);
+    await pass(4);
+    await writeNotifySettings(database.db, { url: "https://n8n.exemple/w" }, NOW);
+    await pass(5);
+    assert.equal(sent.length, 0);
+
+    // Événement décoché : retenu, pas annoncé.
+    await writeNotifySettings(database.db, { events: ["level"] }, NOW);
+    await price(200);
+    await pass(6);
+    assert.equal(sent.length, 0);
+    await writeNotifySettings(database.db, { events: ["price"] }, NOW);
+    await pass(7);
+    assert.equal(sent.length, 0, "le seuil haut franchi pendant que l'événement était décoché n'est pas rattrapé");
+  });
+
+  test("premier passage : les seuils déjà franchis sont tenus pour connus", async () => {
+    await alert(150, null);
+    await database.db.update(t.priceAlerts).set({ notifiedAt: null });
+    await writeNotifySettings(database.db, { url: "https://n8n.exemple/w" }, NOW);
+    await pass(0);
+    await pass(1);
+    assert.equal(sent.length, 0);
   });
 });

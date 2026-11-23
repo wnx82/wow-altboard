@@ -2,12 +2,12 @@
 
 Le site peut prévenir un outil extérieur, n8n par exemple, quand quelque chose arrive : un niveau
 gagné, un objectif atteint, le serveur de jeu qui répond de nouveau, un PC qui ne synchronise plus,
-et chaque lundi un rapport de la semaine écoulée. Il envoie chaque événement en JSON, par une
+une alerte de prix franchie, et chaque lundi un rapport de la semaine écoulée. Il envoie chaque événement en JSON, par une
 requête `POST` vers une adresse réglée dans **Paramètres → Notifications**. Le site n'envoie ni
 e-mail ni message lui-même : n8n s'en charge (Discord, Telegram, e-mail…).
 
-Code : `web/src/lib/notify/`. Tables : `app_settings` (réglages) et `notification_state`
-([DATABASE](DATABASE.md)). Sécurité : [SECURITY § Notifications](SECURITY.md#notifications-webhook-sortant).
+Code : `web/src/lib/notify/`. Tables : `app_settings` (réglages), `notification_state` et
+`price_alerts.notified_at` ([DATABASE](DATABASE.md)). Sécurité : [SECURITY § Notifications](SECURITY.md#notifications-webhook-sortant).
 
 ## Réglages
 
@@ -56,8 +56,11 @@ En-têtes : `content-type: application/json`, `user-agent: WoW-AltBoard`, et
 | Objectif atteint | `goal.reached` | un objectif est daté comme atteint, automatiquement à la synchronisation ou coché à la main ; une fois par atteinte : un objectif à cocher décoché puis recoché est annoncé de nouveau | `goalId`, `goal`, `characterId`, `character`, `achievedAt` |
 | Serveur de jeu de nouveau en ligne | `server.online` | le service « jeu » répond (en ligne ou en partie) après au moins deux contrôles hors ligne d'affilée ; les contrôles « inconnu » ne comptent pas | `status` (`online`, `degraded`), `latencyMs`, `checkedAt`, `downSince` |
 | PC muet depuis plusieurs jours | `machine.silent` | un PC n'a rien synchronisé depuis le délai réglé ; une fois par silence : il sera de nouveau signalé seulement après une synchronisation puis un nouveau silence | `machineId`, `machine`, `lastSeenAt`, `days` |
+| Alerte de prix déclenchée | `price.alert` | le dernier prix d'un objet atteint un seuil posé sur sa fiche ([ECONOMY-ENGINE § Alertes](ECONOMY-ENGINE.md#alertes-de-prix-alertsts)) ; une fois par franchissement : l'alerte se réarme quand le prix repasse de l'autre côté du seuil. Un seuil déjà franchi quand il est posé n'est pas annoncé. Le prix change à chaque relevé reçu (Auctionator, ou scan EZAuctioneer d'un marché relié) | `alertId`, `marketId`, `market`, `itemKey`, `item`, `direction` (`below`, `above`), `thresholdCopper`, `priceCopper`, `day`, `observedAt` (heure du scan, ou `null`), `source` (`auctionator`, `ezauctioneer`), `url` (page de l'objet ; `null` sans `WOW_APP_ORIGIN`) |
 | Rapport hebdomadaire | `report.weekly` | le lundi à partir de 9 h (heure de Bruxelles), pour la semaine du lundi au dimanche précédents | `week`, `levels` (`name`, `from`, `to`), `levelsGained`, `goldStart`, `goldEnd`, `goldDelta` (cuivre), `playedSeconds`, `sessions`, `goals` (`character`, `label`) |
 | — | `test` | bouton **Envoyer un essai** | `{}` |
+
+Exemple d'alerte : « Alerte de prix : Étoffe de lin à 27 pc, seuil bas 30 pc (PvE · WoW Forever). »
 
 Exemple de rapport : « Semaine du 9 novembre : 2 niveaux gagnés (Élodie Brisefer 24 → 26) ; or :
 +2 po 50 pa 0 pc (total 3 po 50 pa 0 pc) ; temps joué : 3 h 50 en 2 sessions ; aucun objectif
