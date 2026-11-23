@@ -160,7 +160,7 @@ export default async function SettingsPage() {
             <p className="text-sm text-muted">
               L&apos;addon ne nomme que les objets que vos personnages ont eus en main. Les autres, cités par l&apos;hôtel des ventes et les
               recettes, prennent leur nom dans la table des objets du jeu que publie wago.tools pour chaque version du client WoW Forever, en
-              français. L&apos;agent 0.7.0 y ajoute les noms du cache de votre client de jeu, plus récents : ils remplacent ceux de wago.tools.
+              français. L&apos;agent 0.7.1 y ajoute les noms du cache de votre client de jeu, plus récents : ils remplacent ceux de wago.tools.
               Le nom relevé par l&apos;addon reste prioritaire.
             </p>
             <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">

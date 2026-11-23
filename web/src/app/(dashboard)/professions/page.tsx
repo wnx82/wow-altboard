@@ -55,7 +55,7 @@ export default async function ProfessionsPage({ searchParams }: PageProps<"/prof
       {primary.length === 0 && secondary.length === 0 && openSlots.length === 0 ? (
         <div className="mt-6">
           {known ? (
-            <EmptyState title="Aucun métier ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+            <EmptyState title="Aucun métier ne correspond" action={{ href: "/professions", label: "Tout afficher" }}>Élargissez les filtres, ou affichez tout.</EmptyState>
           ) : (
             <EmptyState title="Aucun métier connu">
               Les métiers apparaissent après une synchronisation d&apos;un personnage qui en a appris au moins un.

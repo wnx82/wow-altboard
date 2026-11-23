@@ -282,6 +282,20 @@ body {
   .page-hero[data-art] h1 { text-shadow: 0 2px 22px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.6); }
   .page-hero[data-art] p { text-shadow: 0 1px 10px rgb(0 0 0 / 0.9); }
   .page-hero[data-art] .page-sigil { backdrop-filter: blur(6px); }
+  /* Commandes posées sur l'illustration (périodes, boutons, listes) : fond sombre voilé, lisibles
+     quelle que soit la clarté de la peinture derrière elles. */
+  .page-hero[data-art] :is(.segmented, .button:not([data-variant="primary"]), .field) {
+    background-color: rgb(7 10 18 / 0.76);
+    border-color: rgb(255 255 255 / 0.18);
+    backdrop-filter: blur(8px);
+  }
+  .page-hero[data-art] .button:not([data-variant="primary"]):hover { background-color: rgb(26 31 46 / 0.88); }
+  .page-hero[data-art] :is(.button[aria-pressed="true"], .button[aria-current="true"], .button[data-active]) {
+    border-color: var(--gold);
+    background-image: linear-gradient(rgb(227 189 106 / 0.16), rgb(227 189 106 / 0.16));
+  }
+  .page-hero[data-art] .segmented > a:not([aria-current="true"]) { color: #d3d9e6; }
+  .page-hero[data-art] .segmented > a:not([aria-current="true"]):hover { color: var(--text); }
   @media (min-width: 640px) {
     .page-hero[data-art] { min-height: 14.5rem; padding: 3rem 2rem 1.75rem; }
     .page-hero[data-art]::before {

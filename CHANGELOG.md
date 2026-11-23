@@ -4,6 +4,44 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.32.0 — 2026-11-23
+
+Interface : accessibilité, préférences d'affichage, finitions et dette de code. Aucune migration.
+
+### Ajouté
+
+- Les pages vides proposent la prochaine étape : « Ajouter un PC », « Instructions de
+  synchronisation », « Tout afficher » quand un filtre écarte tout, « Voir depuis le début » sur
+  les Finances. La page **Machines** gagne les ancres `#ajouter-un-pc` et `#instructions`.
+
+### Modifié
+
+- **Graphiques** : un seul arrêt de tabulation par graphique, au lieu d'un par point ou par
+  colonne. Les flèches passent d'un point à l'autre (Début et Fin pour les extrémités, Échap pour
+  quitter), la valeur est annoncée aux lecteurs d'écran, un contour doré marque le focus.
+- **Tableaux** : une légende pour les lecteurs d'écran, la première cellule de chaque ligne en
+  en-tête de ligne, et un conteneur focalisable et nommé quand le tableau défile en largeur.
+- **Accueil** : la vue cartes ou tableau et les comptes repliés sont gardés dans des cookies lus
+  au rendu : la page arrive dans la vue choisie, sans basculer après l'affichage. Les préférences
+  gardées dans le navigateur par les versions précédentes sont reprises une fois.
+- Les commandes posées sur l'illustration d'un en-tête (périodes des **Finances**, boutons) ont un
+  fond sombre voilé : lisibles même sur une peinture claire.
+- Sur téléphone, le bouton du menu porte une icône de menu et le nom de la page en cours, tronqué
+  si la place manque.
+- Les durées s'écrivent partout de la même façon : « 45 s », « 12 min », « 3 h 05 », « 2 j 4 h »,
+  sans zéros de queue (« 1 h », « 1 j »).
+- Les textes citent l'agent 0.7.1, et non plus 0.7.0, retiré.
+
+### Code
+
+- Le fuseau `Europe/Brussels` n'est plus écrit qu'une fois (`PLAYER_TIME_ZONE`), avec des
+  formateurs communs dans `web/src/lib/wow/format.ts`.
+- Échelles, graduations, infobulle, grille et clavier des cinq graphiques mis en commun
+  (`web/src/lib/chart/scale.ts`, `web/src/components/chart-parts.tsx`).
+- Fichiers découpés sans changement de comportement : fiche personnage (729 lignes ramenées à
+  233), accueil (filtre et tri testés à part), **Inventaires** (908 à 394), import
+  `lib/sync/process.ts` (799 à 490, outils de lots communs).
+
 ## Site 0.31.0 — 2026-11-19
 
 Pour les scans EZAuctioneer de l'agent 0.10.0. Migration `0023` : cinq tables ajoutées, rien de

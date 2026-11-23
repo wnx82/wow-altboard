@@ -59,7 +59,7 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
 
       {progress.series.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun relevé">
+          <EmptyState title="Aucun relevé" action={{ href: "/machines#ajouter-un-pc", label: "Ajouter un PC" }}>
             Les niveaux se lisent dans les relevés des personnages : ils apparaissent dès la première synchronisation.
           </EmptyState>
         </div>

@@ -82,7 +82,7 @@ export default async function MachinesPage() {
 
       <section className="mt-6" aria-label="Machines connues">
         {machines.length === 0 ? (
-          <EmptyState title="Aucune machine n'a encore synchronisé">Créez un jeton ci-dessous, puis suivez les instructions.</EmptyState>
+          <EmptyState title="Aucune machine n'a encore synchronisé" action={{ href: "#ajouter-un-pc", label: "Créer un jeton" }}>Créez un jeton ci-dessous, puis suivez les instructions.</EmptyState>
         ) : (
           <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {machines.map((machine) => (
@@ -175,7 +175,7 @@ export default async function MachinesPage() {
       </section>
 
       <section className="mt-10 grid grid-cols-1 gap-6 xl:grid-cols-2" aria-label="Ajouter un PC">
-        <div>
+        <div id="ajouter-un-pc" className="scroll-mt-24">
           <SectionTitle>Ajouter un PC</SectionTitle>
           <div className="panel p-5">
             <TokenForm action={createTokenAction} />
@@ -209,7 +209,7 @@ export default async function MachinesPage() {
           </div>
         </div>
 
-        <div>
+        <div id="instructions" className="scroll-mt-24">
           <SectionTitle>Instructions de synchronisation</SectionTitle>
           <ol className="panel list-decimal space-y-3 p-5 pl-9 text-sm marker:text-gold">
             <li>

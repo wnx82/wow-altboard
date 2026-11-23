@@ -256,10 +256,11 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
   « Échouée » ne dit pas pourquoi. Afficher les erreurs sous la ligne du journal ; compter les
   avertissements dans `errors_count` ; écrire `partial` quand il y en a. Fait le 2026-11-08
   (`127aaf1`) : dix erreurs au plus sous chaque ligne de **Machines**, puis leur nombre restant.
-- [ ] **P2 · S** — Vue cartes ou tableau et comptes repliés : lus dans `localStorage` après le
+- [x] **P2 · S** — Vue cartes ou tableau et comptes repliés : lus dans `localStorage` après le
   rendu (`web/src/components/character-browser.tsx:107`), le serveur rend toujours le défaut. Qui
   préfère le tableau voit les cartes, puis le basculement. Porter ces préférences dans un cookie lu
-  au rendu.
+  au rendu. Fait le 2026-11-23 (site 0.32.0, `web/src/lib/dashboard/view-prefs.ts`) : cookies
+  `wab_view` et `wab_collapsed` ; vérifié dans un navigateur, y compris au retour arrière.
 - [x] **P2 · M** — Recherche, filtres et tri de l'accueil en état local
   (`character-browser.tsx:102`) : ouvrir une fiche puis revenir remet la liste à zéro. Les porter
   dans les paramètres d'URL. Fait le 2026-11-11 (site 0.15.0, `web/src/lib/dashboard/browser-state.ts`) :
@@ -279,12 +280,15 @@ signalait pour `next` et `zod`, corrigées le même jour (`c7b3b7f`, Next.js 16.
 - [x] **P2 · S** — Aucun lien « Aller au contenu » : dix éléments focalisables précèdent `<main>`
   sur chaque page (`web/src/app/(dashboard)/layout.tsx:22`). Fait le 2026-11-14 (site 0.26.0) :
   premier arrêt du clavier, visible au focus, vers `<main id="contenu">`.
-- [ ] **P2 · M** — Graphiques : chaque point et chaque colonne est un arrêt de tabulation
+- [x] **P2 · M** — Graphiques : chaque point et chaque colonne est un arrêt de tabulation
   (`web/src/components/trend-chart.tsx:124`, `column-chart.tsx:149`), soit plusieurs centaines
-  sur une fiche. Un seul arrêt par graphique, les flèches pour passer d'un point à l'autre.
-- [ ] **P3 · S** — Les tableaux n'ont ni `<caption>` ni en-tête de ligne (`scope="row"`), et leurs
+  sur une fiche. Un seul arrêt par graphique, les flèches pour passer d'un point à l'autre. Fait
+  le 2026-11-23 (site 0.32.0, `web/src/components/chart-parts.tsx`) : un arrêt, flèches, Début,
+  Fin, Échap, valeur annoncée ; vérifié au clavier dans un navigateur, pas avec un lecteur d'écran.
+- [x] **P3 · S** — Les tableaux n'ont ni `<caption>` ni en-tête de ligne (`scope="row"`), et leurs
   conteneurs à défilement horizontal ne sont pas focalisables. Au 2026-11-08, seul le tableau de
-  la page **Objets** a les deux, sur 18.
+  la page **Objets** a les deux, sur 18. Fait le 2026-11-23 (site 0.32.0) pour 30 tableaux,
+  sauf ceux de **Craft**, refaits avec la page ; conteneurs : `web/src/components/scroll-region.tsx`.
 
 ### Performance
 
@@ -330,16 +334,19 @@ l'historique grossit.
 
 ### Code
 
-- [ ] **P3 · M** — Trois graphiques répètent l'observation de largeur, les graduations, l'infobulle
+- [x] **P3 · M** — Trois graphiques répètent l'observation de largeur, les graduations, l'infobulle
   et la grille (`column-chart.tsx`, `trend-chart.tsx`, `levels-chart.tsx`) : en extraire un crochet
-  et un module d'échelle.
-- [ ] **P3 · S** — Le fuseau `Europe/Brussels` est écrit en dur dans quatorze fichiers (2026-11-08), avec des
+  et un module d'échelle. Fait le 2026-11-23 (site 0.32.0) : `web/src/lib/chart/scale.ts`,
+  `web/src/components/chart-parts.tsx`, pour les cinq graphiques.
+- [x] **P3 · S** — Le fuseau `Europe/Brussels` est écrit en dur dans quatorze fichiers (2026-11-08), avec des
   formateurs de date redéclarés à l'identique : une constante et des formateurs nommés dans
   `web/src/lib/wow/format.ts`. Même traitement pour les deux `formatDuration` qui n'écrivent pas
-  les durées de la même façon (`server-status.tsx:86`, `level-times.ts:134`).
-- [ ] **P3 · M** — Fichiers à découper : `characters/[id]/page.tsx` (600 lignes, un composant par
+  les durées de la même façon (`server-status.tsx:86`, `level-times.ts:134`). Fait le 2026-11-23
+  (site 0.32.0) : `PLAYER_TIME_ZONE`, `brusselsDay` et un seul `formatDuration`.
+- [x] **P3 · M** — Fichiers à découper : `characters/[id]/page.tsx` (600 lignes, un composant par
   section), `character-browser.tsx` (530 lignes : préférences, filtre, carte, tableau),
-  `sync/process.ts` (650 lignes : empreintes, tables filles, Ledger, relevés).
+  `sync/process.ts` (650 lignes : empreintes, tables filles, Ledger, relevés). Fait le 2026-11-23
+  (site 0.32.0), avec `inventory-browser.tsx` : aucun des quatre ne dépasse 500 lignes.
 
 ### Dépendances
 

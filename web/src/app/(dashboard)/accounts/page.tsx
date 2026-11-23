@@ -27,7 +27,9 @@ export default async function AccountsPage() {
 
       {accounts.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun compte synchronisé" />
+          <EmptyState title="Aucun compte synchronisé" action={{ href: "/machines#ajouter-un-pc", label: "Ajouter un PC" }}>
+            Un compte apparaît à la première synchronisation d&apos;un PC où il est connecté en jeu.
+          </EmptyState>
         </div>
       ) : (
         <ul className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

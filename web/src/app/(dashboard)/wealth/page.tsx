@@ -28,7 +28,7 @@ export default async function WealthPage() {
 
       {wealth.lines.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun personnage synchronisé">Le patrimoine apparaît après la première synchronisation de l&apos;agent.</EmptyState>
+          <EmptyState title="Aucun personnage synchronisé" action={{ href: "/machines#ajouter-un-pc", label: "Ajouter un PC" }}>Le patrimoine apparaît après la première synchronisation de l&apos;agent.</EmptyState>
         </div>
       ) : (
         <div className="mt-6 space-y-10">

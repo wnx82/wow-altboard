@@ -51,11 +51,11 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
       {/* Sans aucun changement, les filtres (alors masqués) n'y sont pour rien. */}
       {days.length === 0 && active && all.length > 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun changement ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+          <EmptyState title="Aucun changement ne correspond" action={{ href: "/activity", label: "Tout afficher" }}>Élargissez les filtres, ou affichez tout.</EmptyState>
         </div>
       ) : days.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun changement sur la période">
+          <EmptyState title="Aucun changement sur la période" action={{ href: "/machines", label: "Voir les synchronisations" }}>
             L&apos;activité se lit en comparant deux relevés d&apos;un même personnage : elle apparaît à partir de la deuxième synchronisation
             faite après une session de jeu.
           </EmptyState>

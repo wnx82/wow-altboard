@@ -1,4 +1,5 @@
 import { getImageProps } from "next/image";
+import Link from "next/link";
 import type { ArtKey } from "@/lib/wow/art";
 import { classKey, formatMoney, progressPercent, splitMoney } from "@/lib/wow/format";
 import { classIconUrl, professionIconUrl } from "@/lib/wow/icons";
@@ -160,7 +161,8 @@ export function SectionTitle({ children, aside }: { children: React.ReactNode; a
 }
 
 /** Rien à montrer : un sceau, le titre, puis ce qu'il faut faire pour que des données arrivent. */
-export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
+/** Page ou liste vide : ce qui manque, d'où viendront les données et, si possible, la prochaine étape. */
+export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: { href: string; label: string } }) {
   return (
     <div className="panel empty-state px-6 py-12 text-center">
       <span className="empty-sigil" aria-hidden="true">
@@ -171,6 +173,11 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
       </span>
       <p className="display mt-4 text-lg font-bold text-gold">{title}</p>
       {children && <div className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted">{children}</div>}
+      {action && (
+        <Link href={action.href} prefetch={false} className="button mt-5">
+          {action.label}
+        </Link>
+      )}
     </div>
   );
 }

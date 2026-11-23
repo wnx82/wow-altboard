@@ -36,7 +36,7 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
       <>
         <Header />
         <div className="mt-6">
-          <EmptyState title="Aucun prix reçu">
+          <EmptyState title="Aucun prix reçu" action={{ href: "/machines#instructions", label: "Instructions de synchronisation" }}>
             Le classement attend un premier scan Auctionator : scannez l&apos;hôtel des ventes, /reload, puis lancez l&apos;agent.
           </EmptyState>
         </div>

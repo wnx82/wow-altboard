@@ -42,7 +42,7 @@ export default async function ReputationsPage({ searchParams }: PageProps<"/repu
       {groups.length === 0 ? (
         <div className="mt-6">
           {active && rows.length > 0 ? (
-            <EmptyState title="Aucune réputation ne correspond">Élargissez les filtres, ou affichez tout.</EmptyState>
+            <EmptyState title="Aucune réputation ne correspond" action={{ href: "/reputations", label: "Tout afficher" }}>Élargissez les filtres, ou affichez tout.</EmptyState>
           ) : (
             <EmptyState title="Aucune réputation connue">
               Les réputations apparaissent après une synchronisation d&apos;un personnage relevé par l&apos;addon.

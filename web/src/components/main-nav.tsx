@@ -20,7 +20,7 @@ function Chevron({ open }: { open: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className={`transition-transform ${open ? "rotate-180" : ""}`}
+      className={`flex-none transition-transform ${open ? "rotate-180" : ""}`}
     >
       <path d="m6 9 6 6 6-6" />
     </svg>
@@ -94,11 +94,21 @@ export function MainNav() {
         if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpened(null);
       }}
     >
-      {/* Téléphone : un bouton, nommé d'après la page en cours. La liste prend toute la largeur de l'en-tête. */}
-      <div className="md:hidden">
-        <button type="button" className={button(false)} aria-expanded={open === ALL} aria-controls={`nav-${ALL}`} onClick={() => toggle(ALL)}>
-          {current?.item.label ?? "Menu"}
-          <Chevron open={open === ALL} />
+      {/* Téléphone : un bouton de menu, bordé comme ses voisins de l'en-tête, qui rappelle la page en
+          cours (tronquée si la place manque). La liste prend toute la largeur de l'en-tête. */}
+      <div className="flex min-w-0 md:hidden">
+        <button
+          type="button"
+          className="button min-w-0 max-w-full gap-1.5 px-2"
+          aria-expanded={open === ALL}
+          aria-controls={`nav-${ALL}`}
+          aria-label={current ? `Menu, page en cours : ${current.item.label}` : "Menu"}
+          onClick={() => toggle(ALL)}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className="flex-none">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+          <span className="min-w-0 truncate">{current?.item.label ?? "Menu"}</span>
         </button>
         {open === ALL && (
           <div id={`nav-${ALL}`} className="nav-panel absolute inset-x-0 top-full grid gap-4 px-4 py-4 sm:grid-cols-3 sm:px-6">

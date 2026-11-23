@@ -22,7 +22,7 @@ export default async function GoalsPage() {
 
       {matrices.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun modèle d'objectifs">
+          <EmptyState title="Aucun modèle d'objectifs" action={{ href: "/", label: "Choisir un personnage" }}>
             Ouvrez la fiche d&apos;un personnage, ajoutez-lui des objectifs, puis enregistrez-les comme modèle pour les appliquer aux autres.
           </EmptyState>
         </div>

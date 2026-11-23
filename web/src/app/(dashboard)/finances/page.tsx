@@ -65,8 +65,8 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
           {intro}
         </PageHeader>
         <div className="mt-6">
-          <EmptyState title="Aucune finance connue">
-            Les finances viennent de l&apos;addon Allemano Ledger, transmises par l&apos;agent 0.7.0 ou plus récent : elles apparaissent après la
+          <EmptyState title="Aucune finance connue" action={{ href: "/machines#instructions", label: "Instructions de synchronisation" }}>
+            Les finances viennent de l&apos;addon Allemano Ledger, transmises par l&apos;agent 0.7.1 ou plus récent : elles apparaissent après la
             synchronisation suivante.
           </EmptyState>
         </div>
@@ -107,7 +107,7 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
       <>
         {header}
         <div className="mt-6">
-          <EmptyState title="Aucune journée jouée sur la période">Choisissez une période plus longue pour retrouver vos dernières sessions.</EmptyState>
+          <EmptyState title="Aucune journée jouée sur la période" action={{ href: "/finances?period=all", label: "Voir depuis le début" }}>Choisissez une période plus longue pour retrouver vos dernières sessions.</EmptyState>
         </div>
       </>
     );

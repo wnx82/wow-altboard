@@ -42,7 +42,7 @@ export default async function PlaytimePage() {
 
       {measured === 0 && sessions.length === 0 ? (
         <div className="mt-6">
-          <EmptyState title="Aucun temps de jeu connu">
+          <EmptyState title="Aucun temps de jeu connu" action={{ href: "/machines#instructions", label: "Installer les addons" }}>
             Installez l&apos;addon Allemano Ledger en jeu : le temps de jeu apparaît après la synchronisation suivante.
           </EmptyState>
         </div>

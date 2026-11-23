@@ -31,7 +31,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
       <>
         <Header />
         <div className="mt-6">
-          <EmptyState title="Aucun prix reçu">L&apos;audit détaille les relevés Auctionator reçus : il attend le premier.</EmptyState>
+          <EmptyState title="Aucun prix reçu" action={{ href: "/machines#instructions", label: "Instructions de synchronisation" }}>L&apos;audit détaille les relevés Auctionator reçus : il attend le premier.</EmptyState>
         </div>
       </>
     );

@@ -141,7 +141,7 @@ export function InventoryBrowser({ data, now: nowIso, exportPath }: { data: Inve
 
   if (data.characters.length === 0) {
     return (
-      <EmptyState title="Aucun personnage synchronisé">
+      <EmptyState title="Aucun personnage synchronisé" action={{ href: "/machines#ajouter-un-pc", label: "Ajouter un PC" }}>
         Les inventaires apparaissent après la première synchronisation de l&apos;agent.
       </EmptyState>
     );

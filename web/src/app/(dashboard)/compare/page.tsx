@@ -68,7 +68,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
       <>
         {header}
         <div className="mt-6">
-          <EmptyState title="Aucun personnage synchronisé">Les personnages apparaissent après la première synchronisation de l&apos;agent.</EmptyState>
+          <EmptyState title="Aucun personnage synchronisé" action={{ href: "/machines#ajouter-un-pc", label: "Ajouter un PC" }}>Les personnages apparaissent après la première synchronisation de l&apos;agent.</EmptyState>
         </div>
       </>
     );

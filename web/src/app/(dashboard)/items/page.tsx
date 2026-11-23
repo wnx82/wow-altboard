@@ -45,7 +45,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
       <div className="mt-8">
         {typed && !query && <p className="text-sm text-muted">Tapez au moins deux lettres du nom, ou l&apos;identifiant de l&apos;objet.</p>}
         {result && result.items.length === 0 && (
-          <EmptyState title="Aucun objet ne correspond">
+          <EmptyState title="Aucun objet ne correspond" action={{ href: "/inventory", label: "Parcourir les inventaires" }}>
             Seuls les objets déjà vus dans un inventaire synchronisé sont connus. Essayez une partie du nom, sans accent si besoin.
           </EmptyState>
         )}

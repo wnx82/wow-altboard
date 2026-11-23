@@ -30,7 +30,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
       <>
         <Header />
         <div className="mt-6">
-          <EmptyState title="Aucun prix reçu">
+          <EmptyState title="Aucun prix reçu" action={{ href: "/machines#instructions", label: "Instructions de synchronisation" }}>
             Les prix viennent de l&apos;addon Auctionator : faites un scan à l&apos;hôtel des ventes, /reload ou déconnectez-vous, puis lancez
             l&apos;agent.
           </EmptyState>
