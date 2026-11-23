@@ -1,12 +1,12 @@
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
 import { ScrollRegion } from "@/components/scroll-region";
-import { SectionTitle } from "@/components/ui";
+import { Money, SectionTitle } from "@/components/ui";
 import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes } from "@/lib/dashboard/level-times";
-import { SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
+import { RUNS_SHOWN, SESSIONS_SHOWN, type CharacterDetail } from "@/lib/dashboard/queries";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
-import { formatDateTime, formatDuration, formatDurationToMinute, formatInteger } from "@/lib/wow/format";
+import { formatDateTime, formatDuration, formatDurationToMinute, formatInteger, formatMoney } from "@/lib/wow/format";
 
-// Sections relevées par l'addon Allemano Ledger : temps par niveau et sessions de jeu.
+// Sections relevées par l'addon Allemano Ledger : temps par niveau, sessions de jeu et donjons.
 
 export function LevelTimesSection({ character }: { character: CharacterDetail }) {
   const levelTimes = buildLevelTimes(character.levelTimes, character.playtime, character.level);
@@ -140,6 +140,89 @@ export function SessionsSection({ character }: { character: CharacterDetail }) {
             </ScrollRegion>
           </details>
         </>
+      )}
+    </section>
+  );
+}
+
+/** Montant signé en texte : « −3 pa 20 pc ». */
+const signedMoney = (copper: number) => `${copper < 0 ? "−" : ""}${formatMoney(Math.abs(copper))}`;
+
+/** Donjons et autres runs d'instance d'Allemano Ledger : durée, expérience, or et butin de chacun. */
+export function RunsSection({ character }: { character: CharacterDetail }) {
+  const runs = character.runs;
+  const net = runs.reduce((total, run) => total + (run.netCopper ?? 0), 0);
+  const loot = runs.reduce((total, run) => total + (run.lootValueCopper ?? 0), 0);
+  return (
+    <section aria-labelledby="runs" className="mt-8">
+      <SectionTitle
+        aside={
+          runs.length === 0
+            ? "Source : addon Allemano Ledger"
+            : `${runs.length >= RUNS_SHOWN ? `${RUNS_SHOWN} derniers` : `${runs.length} run${runs.length > 1 ? "s" : ""}`} · or net ${signedMoney(net)} · butin ${signedMoney(loot)}`
+        }
+      >
+        <span id="runs">Donjons</span>
+      </SectionTitle>
+      {runs.length === 0 ? (
+        <div className="panel p-5 text-sm text-muted">
+          Aucun donjon relevé pour ce personnage. Allemano Ledger enregistre chaque passage en instance (durée, expérience, or et butin) ;
+          l&apos;agent 0.11.0 les envoie au site.
+        </div>
+      ) : (
+        <ScrollRegion className="panel overflow-x-auto" label="Donjons">
+          <table className="data-table min-w-[760px]">
+            <caption className="sr-only">Donjons et autres runs</caption>
+            <thead>
+              <tr>
+                <th scope="col">Début</th>
+                <th scope="col">Instance</th>
+                <th scope="col" className="num">
+                  Durée
+                </th>
+                <th scope="col" className="num">
+                  XP gagnée
+                </th>
+                <th scope="col" className="num">
+                  Or net
+                </th>
+                <th scope="col" className="num">
+                  Butin estimé
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr key={run.startedAt.getTime()}>
+                  <th scope="row" className="whitespace-nowrap">
+                    {formatDateTime(run.startedAt)}
+                  </th>
+                  <td>
+                    {run.zone ?? "—"}
+                    {run.tag && <span className="ml-2 text-xs text-muted">{sessionTagLabel(run.tag)}</span>}
+                  </td>
+                  <td className="num">{formatDuration(run.durationSeconds)}</td>
+                  <td className="num">
+                    {formatInteger(run.xpGained)}
+                    {run.levels ? <span className="ml-1 text-xs text-muted">(+{run.levels} niv.)</span> : null}
+                  </td>
+                  <td className="num">
+                    <Money copper={run.netCopper} />
+                  </td>
+                  <td className="num">
+                    <Money copper={run.lootValueCopper} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollRegion>
+      )}
+      {runs.length > 0 && (
+        <p className="mt-3 text-xs text-faint">
+          Or net : or gagné moins or dépensé pendant le run. Butin estimé : valeur des objets ramassés selon l&apos;addon. Un run recoupe la
+          session de jeu qui le contient : il n&apos;est pas compté deux fois dans le temps de jeu.
+        </p>
       )}
     </section>
   );

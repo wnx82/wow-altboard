@@ -336,6 +336,94 @@ public class AltBoardReaderTests
         Assert.False(json.RootElement.GetProperty("stats").TryGetProperty("dodge", out _));
     }
 
+    [Fact]
+    public void Addon_errors_are_cleaned_shortened_and_sorted_oldest_first()
+    {
+        var longMessage = new string('m', 450);
+        var longVersion = new string('v', 50);
+        var document = AltBoardReader.Read(SavedVariablesParser.Parse($$"""
+            AltBoardDB = { schema = 2, errors = {
+              { t = 1795000200, where = "  OnEvent\tBAG_UPDATE ", msg = "Bags.lua:42: attempt to index nil\nstack traceback:\n\t[C]: ?\0", v = "0.8.3-beta" },
+              { t = 1795000100, where = "Collect", msg = "{{longMessage}}", v = "{{longVersion}}" },
+              { where = "sans date", msg = "x" },
+              { t = 1500000000, where = "trop ancienne", msg = "x" },
+              { t = 1795000300, where = "  ", msg = "x" },
+              { t = 1795000400, where = "Vide", msg = "\n\t" },
+              "pas une table",
+            } }
+            """));
+
+        Assert.Equal(
+            [
+                new AddonErrorPayload(1795000100, "Collect", new string('m', 400), new string('v', 40)),
+                // Sauts de ligne, tabulations et octet nul : une espace chacun, ou par suite.
+                new AddonErrorPayload(1795000200, "OnEvent BAG_UPDATE", "Bags.lua:42: attempt to index nil stack traceback: [C]: ?", "0.8.3-beta"),
+            ],
+            document.AddonErrors);
+        Assert.Equal("erreurs de l'addon : 5 entrées invalides ignorées", Assert.Single(document.Warnings));
+    }
+
+    [Fact]
+    public void Only_the_ten_most_recent_addon_errors_are_kept()
+    {
+        var entries = string.Join(", ", Enumerable.Range(0, 12).Select(i => $"{{ t = {1795000000 + i}, where = \"Endroit {i}\", msg = \"erreur\" }}"));
+
+        var errors = AltBoardReader.Read(SavedVariablesParser.Parse($"AltBoardDB = {{ schema = 2, errors = {{ {entries} }} }}")).AddonErrors!;
+
+        Assert.Equal(10, errors.Count);
+        Assert.Equal(("Endroit 2", "Endroit 11"), (errors[0].Where, errors[^1].Where));
+        Assert.All(errors, error => Assert.Null(error.Version));
+    }
+
+    [Fact]
+    public void Empty_error_list_is_sent_so_that_old_errors_are_cleared()
+    {
+        // Fichier réel : l'addon garde une liste vide.
+        var document = Fixture.Read("account-four-characters.lua");
+        Assert.NotNull(document.AddonErrors);
+        Assert.Empty(document.AddonErrors);
+
+        using var json = JsonDocument.Parse(AccountJson(document));
+        Assert.Equal(JsonValueKind.Array, json.RootElement.GetProperty("addonErrors").ValueKind);
+        Assert.Equal(0, json.RootElement.GetProperty("addonErrors").GetArrayLength());
+    }
+
+    [Fact]
+    public void Missing_error_list_is_left_out()
+    {
+        var document = AltBoardReader.Read(SavedVariablesParser.Parse("AltBoardDB = { schema = 2, chars = {} }"));
+        Assert.Null(document.AddonErrors);
+        using var json = JsonDocument.Parse(AccountJson(document));
+        Assert.False(json.RootElement.TryGetProperty("addonErrors", out _));
+
+        var mistyped = AltBoardReader.Read(SavedVariablesParser.Parse("AltBoardDB = { schema = 2, errors = \"aucune\" }"));
+        Assert.Null(mistyped.AddonErrors);
+        Assert.Contains(mistyped.Warnings, w => w.Contains("errors n'est pas une table"));
+    }
+
+    [Fact]
+    public void Addon_errors_use_the_server_field_names()
+    {
+        var document = AltBoardReader.Read(SavedVariablesParser.Parse("""
+            AltBoardDB = { schema = 2, errors = { { t = 1795000100, where = "Collect", msg = "erreur", v = "0.8.3" }, { t = 1795000200, where = "Bags", msg = "autre" } } }
+            """));
+
+        using var json = JsonDocument.Parse(AccountJson(document));
+        var errors = json.RootElement.GetProperty("addonErrors");
+        Assert.Equal(
+            (1795000100L, "Collect", "erreur", "0.8.3"),
+            (errors[0].GetProperty("at").GetInt64(), errors[0].GetProperty("where").GetString(), errors[0].GetProperty("message").GetString(), errors[0].GetProperty("version").GetString()));
+        Assert.False(errors[1].TryGetProperty("version", out _));
+    }
+
+    private static string AccountJson(AltBoardDocument document) =>
+        JsonSerializer.Serialize(
+            new AccountPayload("cle", "11…#1", "_forever_", document.Schema, null, new SourceFilePayload("hash", DateTimeOffset.UnixEpoch, 1), document.Characters, document.Items, document.Warnings)
+            {
+                AddonErrors = document.AddonErrors,
+            },
+            SyncJsonContext.Default.AccountPayload);
+
     private static string Json(CharacterPayload character) =>
         JsonSerializer.Serialize(character, SyncJsonContext.Default.CharacterPayload);
 }

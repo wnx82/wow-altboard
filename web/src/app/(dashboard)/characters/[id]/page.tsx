@@ -23,7 +23,7 @@ import { loadNotebook, usedTags } from "@/lib/notebook/store";
 import { classKey, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
 import { CharacterHero, OverviewTiles } from "./hero";
 import { HistorySection } from "./history";
-import { LevelTimesSection, SessionsSection } from "./ledger";
+import { LevelTimesSection, RunsSection, SessionsSection } from "./ledger";
 import { CurrenciesSection, ProfessionsSection, ReputationsSection, StatsSection } from "./sections";
 
 // L'identifiant vient de l'URL : seul un entier positif est accepté. Mis en cache le temps de la
@@ -55,6 +55,7 @@ const SECTIONS: SectionLink[] = [
   { id: "inventory", label: "Inventaire" },
   { id: "level-times", label: "Temps par niveau" },
   { id: "sessions", label: "Sessions" },
+  { id: "runs", label: "Donjons" },
   { id: "history", label: "Progression" },
 ];
 
@@ -223,6 +224,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       <LevelTimesSection character={character} />
 
       <SessionsSection character={character} />
+
+      <RunsSection character={character} />
 
       <HistorySection character={character} />
     </div>

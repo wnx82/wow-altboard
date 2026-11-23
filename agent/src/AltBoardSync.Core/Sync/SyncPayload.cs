@@ -46,8 +46,19 @@ public sealed record AccountPayload(
     /// <summary>Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator du même compte ; absents sans l'addon.</summary>
     public BaganatorPayload? Baganator { get; init; }
 
-    /// <summary>Relevés de chaque scan complet de l'hôtel des ventes par l'addon EZAuctioneer du même compte (agent 0.10.0) ; absents sans relevé.</summary>
+    /// <summary>
+    /// Relevés de chaque scan complet de l'hôtel des ventes par l'addon EZAuctioneer du même compte
+    /// (agent 0.10.0), portefeuilles de revente et bonnes affaires (agent 0.11.0) ; absents sans
+    /// aucun des trois.
+    /// </summary>
     public EzAuctioneerPayload? EzAuctioneer { get; init; }
+
+    /// <summary>
+    /// Dernières erreurs Lua de l'addon AltBoard (<c>AltBoardDB.errors</c>, agent 0.11.0). Liste vide
+    /// quand l'addon n'en garde aucune, pour effacer celles déjà reçues ; absente quand le fichier
+    /// n'a pas de liste d'erreurs.
+    /// </summary>
+    public IReadOnlyList<AddonErrorPayload>? AddonErrors { get; init; }
 
     /// <summary>
     /// Informations sans gravité (site 0.29.0 et suivants) : gardées avec la synchronisation sans la
@@ -93,8 +104,68 @@ public sealed record MarketItemPayload(string Key, long? LastMin, IReadOnlyList<
 /// <summary>Prix d'achat chez un marchand, à l'unité, en pièces de cuivre (pas toujours entier).</summary>
 public sealed record VendorPricePayload(string Key, double Price);
 
-/// <summary>EZAuctioneer.lua : les relevés des derniers scans complets, par marché.</summary>
-public sealed record EzAuctioneerPayload(SourceFilePayload File, int Schema, IReadOnlyList<ScanMarketPayload> Markets);
+/// <summary>
+/// EZAuctioneer.lua : les relevés des derniers scans complets, par marché (liste vide quand seuls
+/// des portefeuilles ou des bonnes affaires sont transmis). Portfolios : toujours présent depuis 0.11.0,
+/// vide quand aucun portefeuille n'a de contenu ; Deals : absent sans contenu.
+/// </summary>
+public sealed record EzAuctioneerPayload(SourceFilePayload File, int Schema, IReadOnlyList<ScanMarketPayload> Markets)
+{
+    /// <summary>Journal de revente de chaque personnage (agent 0.11.0), trié par clé.</summary>
+    public IReadOnlyList<PortfolioPayload>? Portfolios { get; init; }
+
+    /// <summary>Classement des bonnes affaires du dernier scan de chaque marché (agent 0.11.0), trié par marché.</summary>
+    public IReadOnlyList<MarketDealsPayload>? Deals { get; init; }
+}
+
+/// <summary>
+/// Portefeuille d'un personnage, sous la clé qu'EZAuctioneer lui donne : <c>région:royaume:personnage</c>
+/// (royaume vide s'il était inconnu). Ni nom ni lien d'objet : les clés d'objet suffisent.
+/// </summary>
+public sealed record PortfolioPayload(
+    string Key,
+    PortfolioStatsPayload Stats,
+    IReadOnlyList<PortfolioPositionPayload> Positions,
+    IReadOnlyList<PortfolioAuctionPayload> Auctions,
+    IReadOnlyList<PortfolioLogEntryPayload> Log);
+
+/// <summary>
+/// Bilan réalisé, en pièces de cuivre : gain net des ventes (dépôts perdus déduits), commissions
+/// payées, dépôts perdus ; et nombre de ventes, d'annonces expirées ou annulées, d'annonces à l'issue inconnue.
+/// </summary>
+public sealed record PortfolioStatsPayload(long Realized, long Sales, long Cuts, long Expired, long DepositsLost, long Unknown);
+
+/// <summary>Stock d'un objet : unités détenues (en vente comprises), leur coût d'achat total, unités en vente suivies, date d'ouverture.</summary>
+public sealed record PortfolioPositionPayload(string Key, long Qty, long Cost, long Listed, long? OpenedAt);
+
+/// <summary>
+/// Annonce suivie, sous son identifiant d'enchère : unités encore en vente, prix unitaire, part du
+/// dépôt encore engagée, commission (fraction de 0 à 1), marché et date de mise en vente.
+/// </summary>
+public sealed record PortfolioAuctionPayload(long Id, string Key, long Qty, long Unit, long? Deposit, double? Cut, string? Market, long? PostedAt);
+
+/// <summary>
+/// Une opération du journal : achat (<c>buy</c>), mise en vente (<c>post</c>), vente (<c>sale</c>),
+/// vente annoncée sans quantité (<c>pending</c>), expiration, annulation, issue inconnue, retrait.
+/// Amount : prix total payé ou encaissé ; Gain : gain net d'une vente ; Source : origine d'un achat.
+/// </summary>
+public sealed record PortfolioLogEntryPayload(
+    long At, string Kind, string Key, long Qty, long? Amount, long? Fee, long? Gain, long? Unit, long? Deposit, string? Source);
+
+/// <summary>Bonnes affaires d'un marché, dans l'ordre du classement de l'addon. At : fin du scan qui les a produites.</summary>
+public sealed record MarketDealsPayload(string Market, long? At, IReadOnlyList<DealPayload> Entries);
+
+/// <summary>
+/// Une bonne affaire : revente à l'HV (<c>resale</c>) ou au marchand (<c>vendor</c>). Cost : prix
+/// total du lot ; Resale : prix de revente unitaire retenu ; Profit : gain net estimé ; Roi : gain
+/// rapporté au coût. Listings : annonces de l'objet dans le scan ; Thin : marché étroit ; Live :
+/// dernière vérification en direct (<c>live</c>, <c>gone</c> ou <c>checking</c>).
+/// </summary>
+public sealed record DealPayload(
+    string Key, string Kind, string? Source, long Qty, long Cost, long Resale, long Profit, double Roi, long? Listings, bool? Thin, string? Live);
+
+/// <summary>Une erreur Lua gardée par AltBoard : heure (secondes Unix), endroit, message et version de l'addon.</summary>
+public sealed record AddonErrorPayload(long At, string Where, string Message, string? Version);
 
 /// <summary>
 /// Un marché, sous la clé qu'EZAuctioneer lui donne : <c>région:royaume:faction:faction</c> pour un
@@ -162,6 +233,9 @@ public sealed record CharacterPayload
 
     /// <summary>Or gagné et dépensé par jour et par source, relevé par Allemano Ledger ; absent sans jour enregistré.</summary>
     public IReadOnlyList<LedgerDayPayload>? Finances { get; init; }
+
+    /// <summary>Runs d'instance enregistrés par Allemano Ledger (agent 0.11.0), du plus ancien au plus récent ; absents sans run.</summary>
+    public IReadOnlyList<RunPayload>? Runs { get; init; }
 }
 
 public sealed record StatsPayload
@@ -220,6 +294,23 @@ public sealed record LevelTimePayload(int Level, int? PlayedSeconds, int? WallSe
 /// InProgress : session encore ouverte quand le jeu a écrit le fichier, donc valeurs provisoires.
 /// </summary>
 public sealed record SessionPayload(long StartedAt, long? StoppedAt, int? DurationSeconds, int? XpGained, int? Levels, string? Zone, string? Tag, bool InProgress);
+
+/// <summary>
+/// Un run d'instance, identifié par son début. Il recoupe la session qui le contient : il n'est
+/// jamais compté parmi les sessions. MoneyCopper et NetCopper : or gagné moins or dépensé pendant
+/// le run ; LootValueCopper : valeur marchande des objets ramassés.
+/// </summary>
+public sealed record RunPayload(
+    long StartedAt,
+    long? StoppedAt,
+    int? DurationSeconds,
+    string? Zone,
+    string? Tag,
+    int? XpGained,
+    int? Levels,
+    long? MoneyCopper,
+    long? NetCopper,
+    long? LootValueCopper);
 
 /// <summary>
 /// Une journée d'Allemano Ledger sur ce PC, datée à l'heure locale du jeu (AAAA-MM-JJ). Montants en

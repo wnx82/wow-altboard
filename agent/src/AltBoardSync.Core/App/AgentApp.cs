@@ -465,6 +465,8 @@ public sealed class AgentApp(AgentEnvironment env)
             case "set":
                 var token = env.In.ReadLine()?.Trim();
                 if (string.IsNullOrEmpty(token)) return Usage("Jeton vide : rien n'a été enregistré.");
+                // Le texte refusé n'est jamais répété : ce peut être un mot de passe collé par erreur.
+                if (!TokenStore.IsWellFormed(token)) return Usage($"{TokenStore.MalformedMessage} Rien n'a été enregistré.");
                 _tokenStore.Save(token);
                 env.Out.WriteLine("Jeton enregistré (chiffré pour l'utilisateur Windows courant).");
                 _log.Info("jeton d'agent enregistré");

@@ -4,7 +4,7 @@ import * as t from "@/db/schema";
 import { chunks, fromUnix, uniqueBy } from "./helpers";
 import type { CharacterPayload } from "./schema";
 
-// Données de l'addon Allemano Ledger : finances par jour, temps de jeu par niveau et sessions.
+// Données de l'addon Allemano Ledger : finances par jour, temps de jeu par niveau, sessions et donjons.
 
 const BATCH = 1_000;
 
@@ -15,6 +15,7 @@ type LedgerScope = { machineId: number; now: Date };
 export async function applyLedger(tx: DatabaseOrTransaction, characterId: number, character: CharacterPayload, scope: LedgerScope): Promise<void> {
   await applyPlaytime(tx, characterId, character);
   await applySessions(tx, characterId, character);
+  await applyRuns(tx, characterId, character);
   await applyFinances(tx, characterId, character, scope);
 }
 
@@ -165,5 +166,47 @@ async function applySessions(tx: DatabaseOrTransaction, characterId: number, cha
         inProgress: sql`excluded.in_progress`,
       },
       setWhere: sql`not excluded.in_progress or (${stored.inProgress} and (${stored.stoppedAt} is null or excluded.stopped_at >= ${stored.stoppedAt}))`,
+    });
+}
+
+/**
+ * Donjons et autres « runs » (Allemano Ledger, agent 0.11.0), identifiés par leur début. Comme les
+ * sessions, ils s'ajoutent et ne sont jamais retirés ; une valeur connue n'est pas effacée par une
+ * absence.
+ */
+async function applyRuns(tx: DatabaseOrTransaction, characterId: number, character: CharacterPayload): Promise<void> {
+  const runs = uniqueBy(character.runs ?? [], (entry) => entry.startedAt);
+  if (runs.length === 0) return;
+  const stored = t.characterRuns;
+  await tx
+    .insert(stored)
+    .values(
+      runs.map((entry) => ({
+        characterId,
+        startedAt: fromUnix(entry.startedAt),
+        stoppedAt: entry.stoppedAt === undefined ? null : fromUnix(entry.stoppedAt),
+        durationSeconds: entry.durationSeconds ?? null,
+        zone: entry.zone ?? null,
+        tag: entry.tag ?? null,
+        xpGained: entry.xpGained ?? null,
+        levels: entry.levels ?? null,
+        moneyCopper: entry.moneyCopper ?? null,
+        netCopper: entry.netCopper ?? null,
+        lootValueCopper: entry.lootValueCopper ?? null,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [stored.characterId, stored.startedAt],
+      set: {
+        stoppedAt: sql`coalesce(excluded.stopped_at, ${stored.stoppedAt})`,
+        durationSeconds: sql`coalesce(excluded.duration_seconds, ${stored.durationSeconds})`,
+        zone: sql`coalesce(excluded.zone, ${stored.zone})`,
+        tag: sql`coalesce(excluded.tag, ${stored.tag})`,
+        xpGained: sql`coalesce(excluded.xp_gained, ${stored.xpGained})`,
+        levels: sql`coalesce(excluded.levels, ${stored.levels})`,
+        moneyCopper: sql`coalesce(excluded.money_copper, ${stored.moneyCopper})`,
+        netCopper: sql`coalesce(excluded.net_copper, ${stored.netCopper})`,
+        lootValueCopper: sql`coalesce(excluded.loot_value_copper, ${stored.lootValueCopper})`,
+      },
     });
 }

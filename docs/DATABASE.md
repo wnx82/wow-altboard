@@ -28,7 +28,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (63)
+## Tables (70)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -40,6 +40,7 @@ Conventions : clés `bigint` générées, dates en `timestamptz`, argent en piè
 | `agent_tokens` | `token_hash` | Jeton d'agent (SHA-256 seulement), libellé, machine liée, révocation |
 | `wow_accounts` | `account_key` | Un compte : empreinte du nom de dossier, libellé masqué, nom complet du dossier (agent 0.6.0, sinon null), nom d'affichage |
 | `machine_accounts` | `(machine_id, account_id)` | Quel PC a vu quel compte : client, version d'addon, empreinte et date du fichier |
+| `account_addon_errors` | `id` | Une erreur Lua gardée par l'addon AltBoard (`AltBoardDB.errors`, dix au plus) sur un PC (`machine_id`) : heure, emplacement, message, version de l'addon (agent 0.11.0). La liste reçue d'un PC remplace la sienne ; une liste vide l'efface, un envoi sans liste n'y touche pas. Index sur `(account_id, occurred_at)` |
 | `realms` | `name` | Royaume (nom normalisé). Pas de région : absente d'AltBoard |
 | `items` | `item_key` | Référentiel d'objets partagé (`AltBoardDB.items`) |
 
@@ -58,6 +59,7 @@ Conventions : clés `bigint` générées, dates en `timestamptz`, argent en piè
 | `character_playtime` | `character_id` | Dernier `/played` connu, date de la mesure, début du niveau en cours (addon Allemano Ledger) |
 | `character_level_times` | `(character_id, level)` | Un niveau terminé : temps de jeu, temps réel, date, zone (addon Allemano Ledger) |
 | `character_sessions` | `(character_id, started_at)` | Une session de jeu : fin, temps connecté, expérience gagnée, niveaux, zone, étiquette, session encore ouverte (addon Allemano Ledger) |
+| `character_runs` | `(character_id, started_at)` | Un donjon ou autre run d'instance : fin, durée, zone, étiquette, expérience gagnée, niveaux, or et gain net (négatifs quand le run a coûté), valeur du butin (addon Allemano Ledger, agent 0.11.0). Recoupe la session qui le contient : il ne compte pas dans le temps de jeu |
 | `character_ledger_days` | `(character_id, machine_id, day)` | Finances d'une journée relevées sur un PC : revenus et dépenses par source (`jsonb`, pièces de cuivre), transferts entre personnages, valeur marchande du butin, or en fin de journée, temps connecté (addon Allemano Ledger, agent 0.7.0). Index sur `day` |
 
 Colonnes volontairement absentes, faute de donnée dans AltBoard : genre, région, quêtes. Les
@@ -123,6 +125,19 @@ Séparées des tables d'Auctionator : les clés de marché des deux addons ne se
 | `market_scans` | `(scan_market_id, scanned_at)` | Un scan : enchères, objets distincts et origine (`own`, `external`) quand l'addon en a gardé le rapport ; objets relevés et unités, recomptés à chaque import |
 | `market_item_scans` | `(scan_market_id, item_key, scanned_at)` | Un relevé : objet (`item_id`, tiré de la clé `i:<objet>[:s…]`), 25e percentile du prix (strictement positif), unités en vente. Jamais modifié une fois reçu ; résumé par jour au-delà de 60 jours |
 | `market_item_scan_days` | `(scan_market_id, item_key, day)` | Un objet, un jour (heure de Bruxelles) au-delà de 60 jours : plus bas, médiane, plus haut des prix (plus bas ≤ médiane ≤ plus haut), plus grand nombre d'unités, nombre de scans |
+
+### Revente
+
+Portefeuille et affaires d'EZAuctioneer (agent 0.11.0), voir [RESALE](RESALE.md). Ajoutées par
+`0026_resale_runs_errors`.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `resale_portfolios` | `id` ; unique `(account_id, machine_id, portfolio_key)` | Portefeuille d'un personnage dans le fichier d'un compte sur un PC (supprimé avec le compte) : clé de l'addon, royaume (vide si inconnu de l'addon), nom, personnage du site (null s'il est inconnu ou ambigu ; remis à null quand le personnage est supprimé), bilan cumulé de l'addon (gain réalisé, signé ; ventes, commissions, invendus, dépôts perdus, issues inconnues), dernière réception. Bilan remplacé à chaque envoi de ce PC, remis à zéro quand le portefeuille disparaît de son fichier |
+| `resale_positions` | `(portfolio_id, item_key)` | Objet détenu pour la revente : `item_id`, quantité, coût d'achat restant, unités en vente, date d'ouverture. Remplacées à chaque envoi |
+| `resale_auctions` | `(portfolio_id, auction_id)` | Annonce suivie : objet, quantité (au moins 1), prix unitaire, dépôt, commission (0 à 1), marché, mise en vente. Remplacées à chaque envoi |
+| `resale_events` | `(portfolio_id, entry_hash)` | Entrée du journal : heure, type (`buy`, `post`, `sale`, `pending`, `expire`, `cancel`, `unknown`, `remove`), objet, quantité, montant, commission, gain (signé), prix unitaire, dépôt, source, réception. Jamais modifiée ni retirée : le journal s'accumule au-delà des 200 entrées de l'addon. Index sur `(portfolio_id, occurred_at)` |
+| `resale_deals` | `(scan_market_id, rank)` | Affaire repérée au dernier scan d'un marché, dans l'ordre de l'addon : heure du scan, objet, type (`resale`, `vendor`), source, quantité, coût, revente visée à l'unité, profit (signé) et rendement estimés, offres, marché étroit, état de l'annonce. La liste d'un scan plus récent remplace la précédente |
 
 ### Objectifs par personnage
 
@@ -195,6 +210,7 @@ synchronisations :
 | Personnages | ceux du compte, avec leurs tables filles et leurs snapshots |
 | Marché | les `market_imports` du compte ; `market_item_latest.import_id` passe à null. Les prix de `market_item_days` restent : fusionnés jour par jour avec ceux des autres comptes, ils ne s'en séparent plus |
 | Scans | les `scan_imports` du compte (cascade). Les relevés de `market_item_scans` restent : un même relevé peut venir de plusieurs comptes |
+| Revente | les portefeuilles du compte, avec positions, annonces et journal (cascade), et ses erreurs d'addon. Les affaires (`resale_deals`) restent : elles appartiennent au marché |
 | Liens | les lignes `machine_accounts` du compte, puis le compte lui-même |
 | Royaumes | un royaume resté sans personnage est supprimé |
 
@@ -289,6 +305,8 @@ grossit.
 Depuis le site 0.31.0 (migration `0023`) : `market_item_scans(scan_market_id, scanned_at)` pour
 les scans d'une période et la purge, `scan_imports(account_id)` et `scan_imports(sync_run_id)`
 pour la suppression d'un compte et la purge du journal.
+Depuis le site 0.37.0 (migration `0026`) : `resale_events(portfolio_id, occurred_at)` et
+`account_addon_errors(account_id, occurred_at)`.
 
 ## Durée de conservation
 
@@ -352,6 +370,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0023_ezauctioneer_scans` | `scan_markets`, `scan_imports`, `market_scans`, `market_item_scans`, `market_item_scan_days` et leurs index (ajouts seuls) |
 | `0024_notes_checklists` | `character_notes`, `character_tags`, `checklist_items`, `checklist_item_characters`, `checklist_checks` et leurs index, colonnes `app_settings.reset_hour` et `reset_weekday` (ajouts seuls) |
 | `0025_price_alert_notices` | colonne `price_alerts.notified_at` (ajout seul). Les alertes existantes la reçoivent à l'heure de la migration : aucun seuil déjà franchi n'est annoncé. `price` ajouté à `app_settings.notify_events` quand une liste y est enregistrée. Aucune ligne supprimée |
+| `0026_resale_runs_errors` | `resale_portfolios`, `resale_positions`, `resale_auctions`, `resale_events`, `resale_deals`, `character_runs`, `account_addon_errors` et leurs index (ajouts seuls) |
 
 ## Checkpoint B
 

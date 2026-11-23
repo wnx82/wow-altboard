@@ -35,8 +35,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// renvoyé une fois sans attendre une modification des fichiers. 2 : nom complet du dossier (0.6.0).
     /// 3 : finances par jour d'Allemano Ledger (0.7.0). 4 : courrier, enchères et banques de guilde de
     /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0). 6 : scans d'EZAuctioneer (0.10.0).
+    /// 7 : portefeuilles et bonnes affaires d'EZAuctioneer, erreurs d'AltBoard, runs d'Allemano Ledger (0.11.0).
     /// </summary>
-    public const string PayloadFormat = "6";
+    public const string PayloadFormat = "7";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -69,6 +70,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 Recipes = recipes,
                 Baganator = baganator,
                 EzAuctioneer = ezAuctioneer,
+                AddonErrors = document.AddonErrors,
                 Notices = notices.Count > 0 ? PayloadLimits.Warnings(notices) : null,
             };
             return new AccountReadResult(source, payload, null)
@@ -83,8 +85,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     }
 
     /// <summary>
-    /// Complète les personnages avec le temps de jeu et les sessions d'Allemano Ledger, quand son fichier existe.
-    /// Source facultative : illisible ou absente, elle ne fait jamais échouer la synchronisation.
+    /// Complète les personnages avec le temps de jeu, les sessions, les finances et les runs d'Allemano
+    /// Ledger, quand son fichier existe. Source facultative : illisible ou absente, elle ne fait jamais
+    /// échouer la synchronisation.
     /// </summary>
     private async Task<(IReadOnlyList<CharacterPayload> Characters, IReadOnlyList<string> Warnings, string? FileHash)> AttachLedgerAsync(
         AccountSource source, IReadOnlyList<CharacterPayload> characters, CancellationToken cancellationToken)
@@ -102,6 +105,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
                         Playtime = known.Playtime,
                         Sessions = known.Sessions.Count > 0 ? known.Sessions : null,
                         Finances = known.Finances.Count > 0 ? known.Finances : null,
+                        Runs = known.Runs.Count > 0 ? known.Runs : null,
                     }
                     : c)
                 .ToList();
@@ -109,7 +113,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
         {
-            var message = $"Allemano Ledger illisible, temps de jeu, sessions et finances non transmis : {e.Message}";
+            var message = $"Allemano Ledger illisible, temps de jeu, sessions, finances et runs non transmis : {e.Message}";
             return (characters, [message.Length > 300 ? message[..300] : message], null);
         }
     }
@@ -143,8 +147,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     }
 
     /// <summary>
-    /// Relevés de chaque scan de l'hôtel des ventes par EZAuctioneer. Source facultative, comme
-    /// Auctionator ; un fichier sans relevé (addon installé, aucun scan) n'envoie rien.
+    /// Relevés de chaque scan de l'hôtel des ventes par EZAuctioneer, portefeuilles de revente et bonnes
+    /// affaires. Source facultative, comme Auctionator ; un fichier sans aucun des trois (addon
+    /// installé, aucun scan ni achat) n'envoie rien.
     /// </summary>
     private async Task<EzAuctioneerPayload?> ReadEzAuctioneerAsync(AccountSource source, List<string> warnings, CancellationToken cancellationToken)
     {
@@ -153,11 +158,18 @@ public sealed class PayloadBuilder(StableFileReader reader)
         {
             var snapshot = await reader.ReadAsync(source.EzAuctioneerFilePath, cancellationToken).ConfigureAwait(false);
             var data = EzAuctioneerReader.Read(SavedVariablesParser.Parse(snapshot.Content), warnings);
-            return data is null ? null : new EzAuctioneerPayload(FileOf(snapshot), data.Schema, data.Markets);
+            if (data is null) return null;
+            return new EzAuctioneerPayload(FileOf(snapshot), data.Schema, data.Markets)
+            {
+                // Toujours une liste, même vide : le site remet à zéro les portefeuilles de ce PC qui n'y
+                // figurent plus. Seul un agent antérieur à 0.11.0 omet le champ.
+                Portfolios = data.Portfolios,
+                Deals = data.Deals.Count > 0 ? data.Deals : null,
+            };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
         {
-            warnings.Add(Truncate($"EZAuctioneer illisible, scans non transmis : {e.Message}"));
+            warnings.Add(Truncate($"EZAuctioneer illisible, scans, portefeuilles et bonnes affaires non transmis : {e.Message}"));
             return null;
         }
     }

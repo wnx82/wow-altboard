@@ -127,7 +127,9 @@ réglages et les erreurs de l'addon ne sont ni lus ni transmis.
 - L'addon ne garde que **50 sessions** par personnage et n'archive pas celles de moins de 60
   secondes. La session ouverte ne rejoint `history` qu'à la connexion suivante.
 - `history` contient aussi les « runs » d'instance (`kind = "run"`). Un run recoupe la session
-  qui le contient : il n'est pas transmis, sinon son expérience serait comptée deux fois.
+  qui le contient : il n'est jamais compté parmi les sessions, sinon son expérience serait comptée
+  deux fois. Depuis l'agent 0.11.0, il est transmis à part (`runs`) et montré dans la section
+  **Donjons** de la fiche du personnage.
 - Aucune courbe d'expérience à l'intérieur d'une session : la seule série temporelle de l'addon
   concerne l'or.
 
@@ -142,6 +144,8 @@ réglages et les erreurs de l'addon ne sont ni lus ni transmis.
 | Serveur | Total et niveau en cours : remplacés seulement par une mesure au moins aussi récente (`played.at`) |
 | Serveur | Un fichier AltBoard en retard (`lastSeen` plus ancien) apporte quand même ses temps par niveau |
 | Agent | Sessions : `history` sans les runs, puis `current`, de la plus ancienne à la plus récente ; une entrée sans début valide est écartée ; au plus 60 |
+| Agent | Runs (0.11.0) : les entrées `kind = "run"` de `history`, du plus ancien au plus récent ; une entrée sans début valide est écartée ; au plus 60 |
+| Serveur | Runs : ajoutés, jamais retirés ; une valeur connue n'est pas effacée par une absence. Identité : `(personnage, début)` |
 | Serveur | Sessions : ajoutées, jamais retirées — elles s'accumulent au-delà des 50 de l'addon. Identité : `(personnage, début)` |
 | Serveur | Une session close remplace sa version ouverte. Une version ouverte n'en remplace une autre que si elle est au moins aussi récente, et jamais une session close |
 | Agent | Finances : jour au format `AAAA-MM-JJ` valide, montants entiers positifs ; une source inconnue va dans `other` ; les 800 jours les plus récents |

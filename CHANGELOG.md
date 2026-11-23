@@ -4,6 +4,58 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.37.0 — 2026-11-23
+
+Pour le portefeuille de revente, les donjons et les erreurs d'addon de l'agent 0.11.0. Migration
+`0026_resale_runs_errors` : sept tables ajoutées, rien de modifié.
+
+### Ajouté
+
+- **Page Revente** (menu Économie, [RESALE](docs/RESALE.md)) : le portefeuille de l'addon
+  EZAuctioneer. Gain réalisé, ventes, commission, invendus et issues inconnues tels que l'addon les
+  compte ; capital engagé, valeur du stock au prix du marché du site et plus-value latente,
+  commission déduite ; positions et annonces en cours (écart du prix demandé au marché) ; résultat
+  par objet tiré du journal (gain net des dépôts perdus, rendement) ; bilan par personnage et par
+  PC ; les 60 dernières opérations ; les affaires repérées au dernier scan de chaque hôtel des
+  ventes, calculs de l'addon repris tels quels.
+- `POST /api/sync` accepte `ezAuctioneer.portfolios` et `ezAuctioneer.deals`, `runs` par
+  personnage et `addonErrors` par compte. Le journal de revente, que l'addon limite à 200 entrées,
+  s'accumule sans doublon ; bilan, positions et annonces sont remplacés à chaque envoi. Le fichier
+  d'EZAuctioneer étant propre à chaque PC, les portefeuilles sont rangés par compte et par PC. La
+  réponse ajoute `resalePortfolios`, `resaleEvents` et `resaleDeals`.
+- Un portefeuille est rattaché au personnage par son nom exact ou, comme EZAuctioneer n'enregistre
+  que le prénom sur WoW Forever, par son prénom quand un seul personnage du compte le porte.
+- **Fiche d'un personnage**, section « Donjons » : chaque run d'instance relevé par Allemano Ledger
+  (instance, durée, expérience, or net, butin estimé), à part des sessions de jeu qu'il recoupe.
+- **Comptes** : les erreurs Lua que l'addon AltBoard a gardées sur chaque PC, dépliables sous la
+  carte du compte, avec l'emplacement, l'heure et la version de l'addon.
+
+## Agent 0.11.0 — 2026-11-23
+
+S'installe seul depuis un agent 0.9.0 ou 0.10.0 une fois le site 0.37.0 déployé (un site plus
+ancien refuserait ses nouveaux champs).
+
+### Ajouté
+
+- `EZAuctioneer.lua` : le portefeuille de revente de chaque personnage (bilan, positions, annonces
+  suivies, journal des opérations) et les bonnes affaires du dernier scan de chaque marché
+  (`lastDeals`), sans les noms ni les liens d'objets. La liste des portefeuilles part toujours,
+  vide au besoin, pour que le site remette à zéro ceux qui ont été vidés en jeu. Une affaire d'un
+  type inconnu est ignorée sans avertissement.
+- `AllemanoLedger.lua` : les « runs » d'instance (début, fin, durée, zone, expérience, or, butin),
+  jamais comptés parmi les sessions.
+- `AltBoard.lua` : les dix dernières erreurs Lua de l'addon (`AltBoardDB.errors`).
+- Document au format 7 : chaque compte est renvoyé une fois après la mise à jour.
+
+### Modifié
+
+- `token set` refuse un texte qui n'a pas la forme d'un jeton (code de sortie 2, le texte n'est
+  jamais répété), comme la fenêtre. `token.dat` est écrit dans un fichier temporaire puis
+  substitué d'un coup : une coupure ne laisse jamais un jeton à moitié écrit.
+- Clés d'objets et de marchés d'EZAuctioneer vérifiées comme le fait le serveur (chiffres ASCII
+  seulement, pas de saut de ligne final), pour qu'une valeur inattendue soit écartée au lieu de
+  faire refuser tout le document.
+
 ## Site 0.36.0 — 2026-11-23
 
 Alertes de prix envoyées au webhook des notifications (n8n). Migration `0025_price_alert_notices` :

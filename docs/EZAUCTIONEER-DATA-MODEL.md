@@ -60,9 +60,10 @@ Bloc `ezAuctioneer` du compte (voir [API](API.md)), document au format 6 :
   nul ou au-delà de 10¹³ pièces de cuivre, unités négatives) ou une clé inconnue est ignoré et
   compté dans un avertissement. Un marché sans relevé n'est pas transmis.
 
-Ne sont **jamais** transmis : le portefeuille (positions, journal des achats et des ventes, noms
-des personnages), les bonnes affaires calculées en jeu (`lastDeals`) et les réglages de l'addon.
-Le journal de revente est prévu au lot F.
+Depuis l'agent 0.11.0, le **portefeuille** de chaque personnage (bilan, positions, annonces suivies,
+journal) et les **affaires** du dernier scan de chaque marché (`lastDeals`) sont aussi transmis :
+voir [RESALE](RESALE.md). Les noms et liens d'objets du portefeuille ne le sont pas (le site a son
+référentiel), ni les réglages de l'addon.
 
 Un fichier illisible n'empêche pas la synchronisation : l'agent l'annonce dans un avertissement et
 envoie le reste. La surveillance (`watch`) réagit aussi à ce fichier.

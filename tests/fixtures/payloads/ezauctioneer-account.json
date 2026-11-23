@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "agentVersion": "0.10.0",
+  "agentVersion": "0.11.0",
   "generatedAt": "2026-11-19T12:00:00+00:00",
   "machine": {
     "uuid": "00000000-0000-4000-8000-000000000001",
@@ -4950,9 +4950,9 @@
       "folderName": "111111111#1",
       "ezAuctioneer": {
         "file": {
-          "hash": "63f3fcb6fadd99cafb557ed9a4fbb445a8e292189ce020a5af89e479565d1dd5",
+          "hash": "f023fcdbecea3fea36975acd13374fb8849742a3d5ff7552ea6488a1b309fa15",
           "modifiedAt": "2026-11-19T12:58:37.604512+00:00",
-          "size": 2988
+          "size": 3056
         },
         "schema": 5,
         "markets": [
@@ -5016,8 +5016,33 @@
               }
             ]
           }
+        ],
+        "portfolios": [
+          {
+            "key": "3:Royaume Test PvE:Testeur",
+            "stats": {
+              "realized": 0,
+              "sales": 0,
+              "cuts": 0,
+              "expired": 0,
+              "depositsLost": 0,
+              "unknown": 0
+            },
+            "positions": [],
+            "auctions": [],
+            "log": [
+              {
+                "at": 1795079248,
+                "kind": "buy",
+                "key": "i:5266",
+                "qty": 1,
+                "amount": 16800
+              }
+            ]
+          }
         ]
-      }
+      },
+      "addonErrors": []
     }
   ]
 }

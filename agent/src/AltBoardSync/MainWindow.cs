@@ -1050,7 +1050,7 @@ internal sealed class MainWindow
         var token = new string(text, 0, GetWindowTextW(_tokenEdit, text, text.Length)).Trim();
         Array.Clear(text);
         _tokenError = token.Length == 0 ? "Collez d'abord le jeton créé sur la page Machines."
-            : !TokenStore.IsWellFormed(token) ? "Ce n'est pas un jeton : il commence par « wab_ » et compte 47 caractères."
+            : !TokenStore.IsWellFormed(token) ? TokenStore.MalformedMessage
             : null;
         if (_tokenError is null)
         {

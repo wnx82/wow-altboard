@@ -24,8 +24,8 @@ public sealed class TokenStore(string directory, Func<string, string?>? getEnvir
 
     /// <summary>
     /// Forme des jetons émis par le serveur (web/src/lib/agent-tokens.ts) : « wab_ » puis 43
-    /// caractères base64url. Un texte d'une autre forme est une erreur de copie : la fenêtre le
-    /// refuse avant de l'enregistrer.
+    /// caractères base64url. Un texte d'une autre forme est une erreur de copie : la fenêtre et
+    /// « token set » le refusent, et <see cref="Save"/> aussi.
     /// </summary>
     public static bool IsWellFormed(string token) =>
         token.Length == Prefix.Length + 43
@@ -53,11 +53,47 @@ public sealed class TokenStore(string directory, Func<string, string?>? getEnvir
         }
     }
 
+    /// <summary>Refus d'un texte qui n'a pas la forme d'un jeton ; ne le cite jamais.</summary>
+    public const string MalformedMessage = "Ce n'est pas un jeton : il commence par « wab_ » et compte 47 caractères.";
+
+    /// <summary>
+    /// Enregistre le jeton (espaces des bords retirés), chiffré. Un texte qui n'a pas la forme d'un
+    /// jeton est refusé (<see cref="ArgumentException"/>) avant toute écriture. L'écriture passe par un
+    /// fichier temporaire du même dossier, puis le remplace d'un coup : une coupure en cours de route
+    /// laisse l'ancien jeton intact, jamais un fichier à moitié écrit.
+    /// </summary>
     public void Save(string token)
     {
+        ArgumentNullException.ThrowIfNull(token);
+        var trimmed = token.Trim();
+        if (!IsWellFormed(trimmed)) throw new ArgumentException(MalformedMessage);
         if (!OperatingSystem.IsWindows()) throw WindowsRequired();
+
+        var bytes = ProtectedData.Protect(Encoding.UTF8.GetBytes(trimmed), Entropy, DataProtectionScope.CurrentUser);
         Directory.CreateDirectory(directory);
-        File.WriteAllBytes(TokenPath, ProtectedData.Protect(Encoding.UTF8.GetBytes(token.Trim()), Entropy, DataProtectionScope.CurrentUser));
+        var temporary = Path.Combine(directory, $"token.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllBytes(temporary, bytes);
+            File.Move(temporary, TokenPath, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temporary);
+            throw;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Le fichier temporaire ne contient que le jeton chiffré : l'erreur d'origine prime.
+        }
     }
 
     public bool Delete()

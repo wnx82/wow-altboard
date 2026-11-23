@@ -203,6 +203,8 @@ export async function getCharacterNeighbors(db: Database, id: number): Promise<{
 
 /** Sessions de jeu lues pour une fiche : les plus récentes. */
 export const SESSIONS_SHOWN = 100;
+/** Donjons et autres runs montrés sur la fiche, les plus récents. */
+export const RUNS_SHOWN = 60;
 
 export async function getCharacterDetail(db: Database, id: number) {
   const [character] = await db
@@ -222,7 +224,7 @@ export async function getCharacterDetail(db: Database, id: number) {
     .where(eq(t.characters.id, id));
   if (!character) return null;
 
-  const [stats, professions, equipment, reputations, currencies, items, snapshots, playtime, levelTimes, sessions, holdings, holdingSource] = await Promise.all([
+  const [stats, professions, equipment, reputations, currencies, items, snapshots, playtime, levelTimes, sessions, holdings, holdingSource, runs] = await Promise.all([
     db.select().from(t.characterStats).where(eq(t.characterStats.characterId, id)),
     db.select().from(t.characterProfessions).where(eq(t.characterProfessions.characterId, id)).orderBy(asc(t.characterProfessions.position)),
     db.select().from(t.characterEquipment).where(eq(t.characterEquipment.characterId, id)).orderBy(asc(t.characterEquipment.slot)),
@@ -284,6 +286,7 @@ export async function getCharacterDetail(db: Database, id: number) {
       .where(eq(t.characterHoldings.characterId, id))
       .orderBy(desc(t.items.quality), asc(t.items.name)),
     db.select({ fileModifiedAt: t.characterHoldingSources.fileModifiedAt }).from(t.characterHoldingSources).where(eq(t.characterHoldingSources.characterId, id)),
+    db.select().from(t.characterRuns).where(eq(t.characterRuns.characterId, id)).orderBy(desc(t.characterRuns.startedAt)).limit(RUNS_SHOWN),
   ]);
 
   return {
@@ -310,6 +313,8 @@ export async function getCharacterDetail(db: Database, id: number) {
     levelTimes,
     // De la plus ancienne à la plus récente.
     sessions: sessions.reverse(),
+    // Du plus récent au plus ancien (Allemano Ledger, agent 0.11.0).
+    runs,
   };
 }
 
@@ -417,7 +422,7 @@ export async function listLevelSnapshots(db: Database, since: Date | null): Prom
 }
 
 export async function listAccounts(db: Database) {
-  const [accounts, seenBy] = await Promise.all([
+  const [accounts, seenBy, errors] = await Promise.all([
     db
       .select({
         id: t.wowAccounts.id,
@@ -447,8 +452,23 @@ export async function listAccounts(db: Database) {
       .from(t.machineAccounts)
       .innerJoin(t.machines, eq(t.machines.id, t.machineAccounts.machineId))
       .orderBy(asc(t.machines.id)),
+    // Erreurs Lua de l'addon AltBoard (agent 0.11.0) : les dix dernières que l'addon a gardées sur chaque PC.
+    db
+      .select({
+        accountId: t.accountAddonErrors.accountId,
+        machineDisplayName: t.machines.displayName,
+        machineHostname: t.machines.hostname,
+        occurredAt: t.accountAddonErrors.occurredAt,
+        location: t.accountAddonErrors.location,
+        message: t.accountAddonErrors.message,
+        addonVersion: t.accountAddonErrors.addonVersion,
+      })
+      .from(t.accountAddonErrors)
+      .innerJoin(t.machines, eq(t.machines.id, t.accountAddonErrors.machineId))
+      .orderBy(desc(t.accountAddonErrors.occurredAt), desc(t.accountAddonErrors.id)),
   ]);
   const seenByAccount = Map.groupBy(seenBy, (row) => row.accountId);
+  const errorsByAccount = Map.groupBy(errors, (row) => row.accountId);
   return accounts.map((account) => ({
     ...account,
     label: accountLabel(account),
@@ -458,6 +478,13 @@ export async function listAccounts(db: Database) {
       flavor: row.flavor,
       addonVersion: row.addonVersion,
       lastSeenAt: row.lastSeenAt,
+    })),
+    addonErrors: (errorsByAccount.get(account.id) ?? []).map((row) => ({
+      occurredAt: row.occurredAt,
+      location: row.location,
+      message: row.message,
+      addonVersion: row.addonVersion,
+      machine: machineLabel({ displayName: row.machineDisplayName, hostname: row.machineHostname }),
     })),
   }));
 }

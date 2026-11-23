@@ -136,6 +136,23 @@ const session = z.strictObject({
   inProgress: z.boolean(),
 });
 
+// Donjons et autres « runs » relevés par Allemano Ledger, envoyés depuis l'agent 0.11.0 : chacun
+// recoupe la session qui le contient, il n'est donc pas compté dans les sessions. Identifiés par
+// leur début. Argent et gain net en pièces de cuivre, négatifs quand le run a coûté.
+const signedCopper = z.int().min(-10_000_000_000_000).max(10_000_000_000_000);
+const run = z.strictObject({
+  startedAt: unixSeconds,
+  stoppedAt: unixSeconds.optional(),
+  durationSeconds: count.optional(),
+  zone: text(80).optional(),
+  tag: text(40).optional(),
+  xpGained: count.optional(),
+  levels: level.optional(),
+  moneyCopper: signedCopper.optional(),
+  netCopper: signedCopper.optional(),
+  lootValueCopper: z.int().min(0).max(10_000_000_000_000).optional(),
+});
+
 // Finances par jour relevées par Allemano Ledger, envoyées depuis l'agent 0.7.0. Jour : date locale
 // du client de jeu. Montants en pièces de cuivre ; une source absente vaut 0. Les transferts entre
 // personnages du même joueur ne sont ni des revenus ni des dépenses.
@@ -188,6 +205,12 @@ const character = z.strictObject({
   bank: container.optional(),
   playtime: playtime.optional(),
   sessions: z.array(session).max(60).optional(),
+  // Facultatif : un agent antérieur à 0.11.0 ne l'envoie pas.
+  runs: z
+    .array(run)
+    .max(60)
+    .refine((runs) => new Set(runs.map((r) => r.startedAt)).size === runs.length, { message: "run en double" })
+    .optional(),
   finances: z
     .array(ledgerDay)
     .max(800)
@@ -264,10 +287,91 @@ const scanMarket = z.strictObject({
     .max(20_000),
 });
 
+// Portefeuille de revente d'EZAuctioneer, par personnage (« <région>:<royaume>:<personnage> », le
+// royaume vide quand l'addon ne le connaissait pas encore), envoyé depuis l'agent 0.11.0 : bilan
+// cumulé, positions détenues, annonces suivies, journal (l'addon en garde 200 entrées).
+export const PORTFOLIO_KEY_PATTERN = /^(\d{1,4}|\?):([^:\u0000-\u001f]{0,80}):([^:\u0000-\u001f]{1,40})$/;
+export const RESALE_EVENT_KINDS = ["buy", "post", "sale", "pending", "expire", "cancel", "unknown", "remove"] as const;
+const scanItemKey = z.string().regex(SCAN_ITEM_KEY_PATTERN);
+const portfolio = z.strictObject({
+  key: z.string().max(160).regex(PORTFOLIO_KEY_PATTERN),
+  stats: z.strictObject({ realized: signedCopper, sales: count, cuts: copper, expired: count, depositsLost: copper, unknown: count }),
+  positions: z
+    .array(z.strictObject({ key: scanItemKey, qty: count, cost: copper, listed: count, openedAt: scanInstant.optional() }))
+    .max(500)
+    .refine((rows) => new Set(rows.map((r) => r.key)).size === rows.length, { message: "position en double" }),
+  auctions: z
+    .array(
+      z.strictObject({
+        id: z.int().min(1).max(Number.MAX_SAFE_INTEGER),
+        key: scanItemKey,
+        qty: count.min(1),
+        unit: copper,
+        deposit: copper.optional(),
+        cut: z.number().min(0).max(1).optional(),
+        market: text(120).optional(),
+        postedAt: scanInstant.optional(),
+      }),
+    )
+    .max(500)
+    .refine((rows) => new Set(rows.map((r) => r.id)).size === rows.length, { message: "annonce en double" }),
+  log: z
+    .array(
+      z.strictObject({
+        at: scanInstant,
+        kind: z.enum(RESALE_EVENT_KINDS),
+        key: scanItemKey,
+        qty: count,
+        amount: copper.optional(),
+        fee: copper.optional(),
+        gain: signedCopper.optional(),
+        unit: copper.optional(),
+        deposit: copper.optional(),
+        source: z.string().regex(/^[\p{L}\p{N} _-]{1,20}$/u).optional(),
+      }),
+    )
+    .max(300),
+});
+
+// Affaires repérées par EZAuctioneer au dernier scan de chaque marché (lastDeals, 150 au plus),
+// dans l'ordre de l'addon. resale : prix de revente visé, à l'unité ; profit et roi : estimés en jeu.
+const deals = z.strictObject({
+  market: z.string().max(120).regex(SCAN_MARKET_KEY_PATTERN),
+  at: scanInstant.optional(),
+  entries: z
+    .array(
+      z.strictObject({
+        key: scanItemKey,
+        kind: z.enum(["resale", "vendor"]),
+        source: text(20).optional(),
+        qty: count.min(1),
+        cost: copper,
+        resale: copper,
+        profit: signedCopper,
+        roi: z.number().min(-1_000).max(1_000),
+        listings: count.optional(),
+        thin: z.boolean().optional(),
+        live: z.enum(["live", "gone", "checking"]).optional(),
+      }),
+    )
+    .max(150),
+});
+
 const ezAuctioneer = z.strictObject({
   file: sourceFile,
   schema: z.int().min(0).max(1_000),
   markets: z.array(scanMarket).max(20),
+  // Facultatifs : un agent antérieur à 0.11.0 ne les envoie pas.
+  portfolios: z
+    .array(portfolio)
+    .max(200)
+    .refine((rows) => new Set(rows.map((r) => r.key)).size === rows.length, { message: "portefeuille en double" })
+    .optional(),
+  deals: z
+    .array(deals)
+    .max(20)
+    .refine((rows) => new Set(rows.map((r) => r.market)).size === rows.length, { message: "marché en double" })
+    .optional(),
 });
 
 // NaowhForever (voir docs/PROFESSIONS-DATA-MODEL.md).
@@ -351,6 +455,12 @@ const account = z
     baganator: baganator.optional(),
     // Facultatif : un agent antérieur à 0.10.0 ne l'envoie pas.
     ezAuctioneer: ezAuctioneer.optional(),
+    // Erreurs Lua gardées par l'addon AltBoard (AltBoardDB.errors, 10 au plus), envoyées depuis l'agent
+    // 0.11.0. Une liste vide efface les précédentes ; absente (agent plus ancien), elles restent.
+    addonErrors: z
+      .array(z.strictObject({ at: unixSeconds, where: z.preprocess(shorten(80), text(80)), message: z.preprocess(shorten(400), text(400)), version: text(40).optional() }))
+      .max(10)
+      .optional(),
   })
   .refine((a) => a.folderName === undefined || accountKeyOf(a.folderName) === a.accountKey, {
     message: "nom de dossier sans rapport avec l'empreinte du compte",
@@ -394,4 +504,8 @@ export type MarketPayload = AuctionatorPayload["markets"][number];
 export type RecipesPayload = NonNullable<AccountPayload["recipes"]>;
 export type EzAuctioneerPayload = NonNullable<AccountPayload["ezAuctioneer"]>;
 export type ScanMarketPayload = EzAuctioneerPayload["markets"][number];
+export type PortfolioPayload = NonNullable<EzAuctioneerPayload["portfolios"]>[number];
+export type DealsPayload = NonNullable<EzAuctioneerPayload["deals"]>[number];
+export type RunPayload = NonNullable<CharacterPayload["runs"]>[number];
+export type AddonErrorPayload = NonNullable<AccountPayload["addonErrors"]>[number];
 export type BaganatorPayload = NonNullable<AccountPayload["baganator"]>;

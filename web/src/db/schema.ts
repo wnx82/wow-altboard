@@ -91,6 +91,29 @@ export const machineAccounts = pgTable(
   (t) => [primaryKey({ columns: [t.machineId, t.accountId] })],
 );
 
+// Erreurs Lua gardées par l'addon AltBoard (AltBoardDB.errors, les 10 dernières), envoyées depuis
+// l'agent 0.11.0 et montrées sur la page Comptes. Remplacées à chaque envoi d'un PC : la liste de
+// son fichier fait foi pour ce PC.
+export const accountAddonErrors = pgTable(
+  "account_addon_errors",
+  {
+    id: id(),
+    accountId: bigint("account_id", { mode: "number" })
+      .notNull()
+      .references(() => wowAccounts.id, { onDelete: "cascade" }),
+    // Le fichier AltBoard.lua est propre à chaque PC : chacun envoie ses erreurs.
+    machineId: bigint("machine_id", { mode: "number" })
+      .notNull()
+      .references(() => machines.id),
+    occurredAt: ts("occurred_at").notNull(),
+    location: text("location").notNull(),
+    message: text("message").notNull(),
+    addonVersion: text("addon_version"),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [index("account_addon_errors_account_idx").on(t.accountId, t.occurredAt)],
+);
+
 export const realms = pgTable("realms", {
   id: id(),
   name: text("name").notNull().unique(),
@@ -493,6 +516,30 @@ export const characterSessions = pgTable(
   ],
 );
 
+// Donjons et autres « runs » relevés par Allemano Ledger (agent 0.11.0), identifiés par leur début.
+// Chacun recoupe la session qui le contient : il ne compte pas dans le temps de jeu. Argent et gain
+// net en pièces de cuivre, négatifs quand le run a coûté ; valeur du butin au prix du marchand.
+export const characterRuns = pgTable(
+  "character_runs",
+  {
+    characterId: characterId(),
+    startedAt: ts("started_at").notNull(),
+    stoppedAt: ts("stopped_at"),
+    durationSeconds: integer("duration_seconds"),
+    zone: text("zone"),
+    tag: text("tag"),
+    xpGained: integer("xp_gained"),
+    levels: smallint("levels"),
+    moneyCopper: bigint("money_copper", { mode: "number" }),
+    netCopper: bigint("net_copper", { mode: "number" }),
+    lootValueCopper: bigint("loot_value_copper", { mode: "number" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.characterId, t.startedAt] }),
+    check("character_runs_values_check", sql`${t.durationSeconds} >= 0 and ${t.xpGained} >= 0 and ${t.levels} >= 0 and ${t.lootValueCopper} >= 0`),
+  ],
+);
+
 /**
  * Finances d'un personnage par jour (Allemano Ledger, agent 0.7.0), par machine : chaque PC ne
  * connaît que les sessions jouées chez lui. day est la date locale du client de jeu. income et
@@ -837,6 +884,145 @@ export const marketItemScanDays = pgTable(
       "market_item_scan_days_values_check",
       sql`${t.lowCopper} > 0 and ${t.lowCopper} <= ${t.medianCopper} and ${t.medianCopper} <= ${t.highCopper} and ${t.maxUnits} >= 0 and ${t.scans} > 0`,
     ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Revente : portefeuille et affaires d'EZAuctioneer (agent 0.11.0, voir docs/RESALE.md)
+// ---------------------------------------------------------------------------
+
+// Portefeuille d'un personnage, tel que l'addon le nomme (« <région>:<royaume>:<personnage> ») dans
+// le fichier d'un compte sur un PC. Le bilan cumulé est celui de l'addon, remplacé à chaque envoi. Le
+// personnage est retrouvé par son nom parmi ceux du compte ; null s'il est inconnu ou ambigu.
+export const resalePortfolios = pgTable(
+  "resale_portfolios",
+  {
+    id: id(),
+    accountId: bigint("account_id", { mode: "number" })
+      .notNull()
+      .references(() => wowAccounts.id, { onDelete: "cascade" }),
+    // EZAuctioneer.lua est propre à chaque PC : un même personnage peut avoir un portefeuille par PC.
+    machineId: bigint("machine_id", { mode: "number" })
+      .notNull()
+      .references(() => machines.id),
+    portfolioKey: text("portfolio_key").notNull(),
+    realm: text("realm").notNull(),
+    characterName: text("character_name").notNull(),
+    characterId: bigint("character_id", { mode: "number" }).references(() => characters.id, { onDelete: "set null" }),
+    realizedCopper: bigint("realized_copper", { mode: "number" }).notNull(),
+    sales: integer("sales").notNull(),
+    cutsCopper: bigint("cuts_copper", { mode: "number" }).notNull(),
+    expired: integer("expired").notNull(),
+    depositsLostCopper: bigint("deposits_lost_copper", { mode: "number" }).notNull(),
+    unknownOutcomes: integer("unknown_outcomes").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("resale_portfolios_account_machine_key_key").on(t.accountId, t.machineId, t.portfolioKey),
+    check("resale_portfolios_values_check", sql`${t.sales} >= 0 and ${t.cutsCopper} >= 0 and ${t.expired} >= 0 and ${t.depositsLostCopper} >= 0 and ${t.unknownOutcomes} >= 0`),
+  ],
+);
+
+const portfolioId = () =>
+  bigint("portfolio_id", { mode: "number" })
+    .notNull()
+    .references(() => resalePortfolios.id, { onDelete: "cascade" });
+
+// Objets détenus pour la revente : quantité, coût d'achat restant, unités en vente. Remplacés à
+// chaque envoi du portefeuille.
+export const resalePositions = pgTable(
+  "resale_positions",
+  {
+    portfolioId: portfolioId(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    costCopper: bigint("cost_copper", { mode: "number" }).notNull(),
+    listed: integer("listed").notNull(),
+    openedAt: ts("opened_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.itemKey] }),
+    check("resale_positions_values_check", sql`${t.quantity} >= 0 and ${t.costCopper} >= 0 and ${t.listed} >= 0`),
+  ],
+);
+
+// Annonces en cours suivies par l'addon. Remplacées à chaque envoi du portefeuille.
+export const resaleAuctions = pgTable(
+  "resale_auctions",
+  {
+    portfolioId: portfolioId(),
+    auctionId: bigint("auction_id", { mode: "number" }).notNull(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    unitCopper: bigint("unit_copper", { mode: "number" }).notNull(),
+    depositCopper: bigint("deposit_copper", { mode: "number" }),
+    cut: doublePrecision("cut"),
+    marketKey: text("market_key"),
+    postedAt: ts("posted_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.auctionId] }),
+    check("resale_auctions_values_check", sql`${t.quantity} > 0 and ${t.unitCopper} >= 0 and ${t.depositCopper} >= 0 and ${t.cut} between 0 and 1`),
+  ],
+);
+
+// Journal du portefeuille : achats, mises en vente, ventes, invendus… L'addon n'en garde que 200
+// entrées : le serveur les accumule, sans doublon (entry_hash : empreinte du contenu et rang parmi
+// les entrées identiques du même envoi).
+export const resaleEvents = pgTable(
+  "resale_events",
+  {
+    portfolioId: portfolioId(),
+    entryHash: text("entry_hash").notNull(),
+    occurredAt: ts("occurred_at").notNull(),
+    kind: text("kind").notNull(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    amountCopper: bigint("amount_copper", { mode: "number" }),
+    feeCopper: bigint("fee_copper", { mode: "number" }),
+    gainCopper: bigint("gain_copper", { mode: "number" }),
+    unitCopper: bigint("unit_copper", { mode: "number" }),
+    depositCopper: bigint("deposit_copper", { mode: "number" }),
+    source: text("source"),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.entryHash] }),
+    index("resale_events_portfolio_occurred_idx").on(t.portfolioId, t.occurredAt),
+    check("resale_events_kind_check", sql`${t.kind} in ('buy', 'post', 'sale', 'pending', 'expire', 'cancel', 'unknown', 'remove')`),
+    check("resale_events_values_check", sql`${t.quantity} >= 0 and ${t.amountCopper} >= 0 and ${t.feeCopper} >= 0 and ${t.unitCopper} >= 0 and ${t.depositCopper} >= 0`),
+  ],
+);
+
+// Affaires repérées par EZAuctioneer au dernier scan d'un marché, dans l'ordre de l'addon. La liste
+// la plus récente (captured_at) remplace la précédente, d'où qu'elle vienne.
+export const resaleDeals = pgTable(
+  "resale_deals",
+  {
+    scanMarketId: scanMarketId(),
+    rank: smallint("rank").notNull(),
+    capturedAt: ts("captured_at"),
+    receivedAt: ts("received_at").notNull(),
+    itemKey: text("item_key").notNull(),
+    itemId: integer("item_id").notNull(),
+    kind: text("kind").notNull(),
+    source: text("source"),
+    quantity: integer("quantity").notNull(),
+    costCopper: bigint("cost_copper", { mode: "number" }).notNull(),
+    resaleCopper: bigint("resale_copper", { mode: "number" }).notNull(),
+    profitCopper: bigint("profit_copper", { mode: "number" }).notNull(),
+    roi: doublePrecision("roi").notNull(),
+    listings: integer("listings"),
+    thin: boolean("thin"),
+    live: text("live"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scanMarketId, t.rank] }),
+    check("resale_deals_kind_check", sql`${t.kind} in ('resale', 'vendor')`),
+    check("resale_deals_values_check", sql`${t.quantity} > 0 and ${t.costCopper} >= 0 and ${t.resaleCopper} >= 0`),
   ],
 );
 

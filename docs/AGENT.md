@@ -161,7 +161,7 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 | Fichier | Contenu |
 |---|---|
 | `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl`, `autoUpdate` (absent : activée) — aucun secret |
-| `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant |
+| `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant ; depuis 0.11.0, écrit dans un fichier temporaire puis substitué d'un coup, comme `config.json` |
 | `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; dernière version de l'agent annoncée par le serveur, celle déjà signalée, et celle dont la mise à jour automatique a échoué ; ni contenu ni nom réel de dossier de compte |
 | `updates\` | exécutable en cours de téléchargement ou de vérification par la mise à jour automatique ; vidé au démarrage |
 | `journal.jsonl` | journal affiché par la fenêtre : une entrée par envoi, panne ou événement, avec ce qui a changé par personnage ; les 200 dernières sont gardées |
@@ -208,8 +208,11 @@ fichiers `.bak` sont ignorés. Zéro compte n'est pas une erreur.
 
 Si le même dossier contient `AllemanoLedger.lua` (addon Allemano Ledger), l'agent y lit le temps
 de jeu des personnages connus d'AltBoard : dernier `/played`, début du niveau en cours, niveaux
-terminés, leurs sessions de jeu (dates, durée, expérience gagnée) et, depuis 0.7.0, leurs
-finances par jour ([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)). Fichier facultatif : absent, rien ne change ;
+terminés, leurs sessions de jeu (dates, durée, expérience gagnée), depuis 0.7.0 leurs finances
+par jour et, depuis 0.11.0, leurs donjons (« runs » d'instance : durée, expérience, or, butin)
+([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)). Depuis 0.11.0 aussi, les erreurs Lua que l'addon
+AltBoard a gardées (`AltBoardDB.errors`, dix au plus) sont envoyées et montrées sur la page
+**Comptes**. Fichier facultatif : absent, rien ne change ;
 illisible, un avertissement est joint au document et la synchronisation continue.
 
 Deux autres fichiers voisins alimentent le moteur économique, avec la même règle (facultatifs,
@@ -228,8 +231,9 @@ d'AltBoard sur le compte n'est pas transmis, avec un avertissement. `scan` en af
 
 Depuis 0.10.0, `EZAuctioneer.lua` (addon EZAuctioneer) apporte, avec la même règle, les **scans de
 l'hôtel des ventes** : le prix de chaque objet à chaque scan complet, et la taille du marché
-([EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md)). Le portefeuille de revente et les noms
-des personnages ne sont pas transmis. `scan` en affiche le résumé par marché :
+([EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md)). Depuis 0.11.0, il apporte aussi le
+portefeuille de revente de chaque personnage et les affaires repérées au dernier scan
+([RESALE](RESALE.md)). `scan` en affiche le résumé par marché :
 `EZAuctioneer « 3:CAMWOW EU5 Realm 5 PvE:Alliance:faction » : 6959 objets, 12 scans`.
 
 Depuis 0.7.0, l'agent lit aussi, une fois par client, le cache local du jeu
@@ -341,7 +345,8 @@ notification ouvrent la fenêtre de l'agent :
 clic droit), **Créer un jeton** qui ouvre la page Machines du tableau de bord, **Enregistrer** (ou
 Entrée). Tant qu'aucun jeton n'est enregistré, la fenêtre l'ouvre d'elle-même, une fois par
 lancement. Un texte qui n'a pas la forme d'un jeton (`wab_` puis 43 caractères) est refusé avant
-d'être enregistré. Le jeton est chiffré comme par `token set` (voir
+d'être enregistré, par la fenêtre comme par `token set` (depuis 0.11.0, code de sortie 2, sans
+répéter le texte saisi). Le jeton est chiffré comme par `token set` (voir
 [Fichiers locaux](#fichiers-locaux)) et remplace celui qui existait ; une synchronisation part
 aussitôt, et son résultat s'inscrit au journal : un jeton refusé par le serveur s'y lit tout de
 suite.

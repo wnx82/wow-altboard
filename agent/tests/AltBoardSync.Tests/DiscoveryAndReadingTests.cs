@@ -283,12 +283,62 @@ public class AgentConfigStoreTests
         var store = new TokenStore(temp.Path, _ => null);
 
         Assert.Null(store.Read());
-        store.Save("  wab_jeton-secret-de-test  ");
+        store.Save($"  {SecretToken}  ");
 
-        Assert.Equal("wab_jeton-secret-de-test", store.Read());
-        Assert.DoesNotContain("jeton-secret", System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(store.TokenPath)));
+        Assert.Equal(SecretToken, store.Read());
+        Assert.DoesNotContain("jetonSecretDeTest", System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(store.TokenPath)));
         Assert.True(store.Delete());
         Assert.Null(store.Read());
+    }
+
+    /// <summary>Jeton de test de la forme émise par le serveur : « wab_ » puis 43 caractères base64url.</summary>
+    private const string SecretToken = "wab_jetonSecretDeTest-0123456789_abcdefghijklmn";
+
+    [Theory]
+    [InlineData("pas-un-jeton")]
+    [InlineData("wab_trop-court")]
+    [InlineData("Bearer wab_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk")]
+    public void Malformed_token_is_refused_before_anything_is_written(string token)
+    {
+        using var temp = new TempDirectory();
+        var store = new TokenStore(temp.Combine("home"), _ => null);
+
+        var error = Assert.Throws<ArgumentException>(() => store.Save(token));
+
+        Assert.Equal(TokenStore.MalformedMessage, error.Message);
+        Assert.DoesNotContain(token, error.Message);
+        Assert.False(Directory.Exists(temp.Combine("home")));
+    }
+
+    [Fact]
+    public void Token_replaces_the_previous_one_without_leaving_a_temporary_file()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var temp = new TempDirectory();
+        var store = new TokenStore(temp.Path, _ => null);
+        const string next = "wab_0123456789-_ABCDEFGHIJKLMNOPQRSTUVWXYZabcde";
+
+        store.Save(SecretToken);
+        store.Save(next);
+
+        Assert.Equal(next, store.Read());
+        Assert.Equal(["token.dat"], Directory.GetFiles(temp.Path).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void Failed_token_write_removes_its_temporary_file()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var temp = new TempDirectory();
+        var store = new TokenStore(temp.Path, _ => null);
+        // Un dossier à la place du fichier : le remplacement final échoue.
+        Directory.CreateDirectory(store.TokenPath);
+
+        var error = Record.Exception(() => store.Save(SecretToken));
+
+        Assert.True(error is IOException or UnauthorizedAccessException, error?.GetType().Name);
+        Assert.Empty(Directory.GetFiles(temp.Path));
+        Assert.True(Directory.Exists(store.TokenPath));
     }
 
     [Fact]

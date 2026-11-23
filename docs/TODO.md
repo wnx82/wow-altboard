@@ -132,11 +132,13 @@ Chaque ligne demande une évolution de l'agent, du contrat de `POST /api/sync` e
 - [x] **P2 · L** — Finances : or gagné et dépensé par source. Fait le 2026-11-09 (agent 0.7.0,
   site 0.11.0) : page **Finances**, à partir des journées d'Allemano Ledger. L'or en fin de journée
   (`gold`) est enregistré mais pas encore affiché.
-- [ ] **P3 · M** — Donjons : les « runs » d'instance de Ledger (`kind = "run"`), aujourd'hui
+- [x] **P3 · M** — Donjons : les « runs » d'instance de Ledger (`kind = "run"`), aujourd'hui
   écartés par `agent/src/AltBoardSync.Core/AltBoard/LedgerReader.cs:98`. À stocker à part des
-  sessions, dont ils recoupent l'expérience.
-- [ ] **P3 · S** — Diagnostic de l'addon : `AltBoardDB.errors` (dix dernières erreurs Lua), non lu
-  par l'agent, à afficher sur la page **Comptes**.
+  sessions, dont ils recoupent l'expérience. Fait le 2026-11-23 (agent 0.11.0, site 0.37.0) :
+  table `character_runs`, section **Donjons** de la fiche du personnage.
+- [x] **P3 · S** — Diagnostic de l'addon : `AltBoardDB.errors` (dix dernières erreurs Lua), non lu
+  par l'agent, à afficher sur la page **Comptes**. Fait le 2026-11-23 (agent 0.11.0, site 0.37.0) :
+  table `account_addon_errors`, liste dépliable sur la carte du compte.
 - [ ] **P3 · M** — Nom des enchantements et icônes des objets : seuls des identifiants existent
   (enchantement dans le lien, fichier d'icône). Il faut une table de correspondance ; source à
   trouver pour WoW Forever.
@@ -405,9 +407,11 @@ hors dépôt sur `AltBoardSync.Core` seul ; l'agent n'a pas été lancé.
   restent bornés côté serveur seulement.
 - [ ] **P3 · S** — `characters.json` illisible n'est jamais réparé (`App/SyncJournal.cs:60`,
   `:67`) : plus aucun « ce qui a changé » dans le journal, sans message. Repartir d'une base vide.
-- [ ] **P3 · S** — `token set` accepte n'importe quel texte, la fenêtre exige le format du jeton
+- [x] **P3 · S** — `token set` accepte n'importe quel texte, la fenêtre exige le format du jeton
   (`App/AgentApp.cs:372`) ; `token.dat` est écrit sans fichier temporaire
-  (`Config/TokenStore.cs:60`), contrairement à `config.json`.
+  (`Config/TokenStore.cs:60`), contrairement à `config.json`. Fait le 2026-11-23 (agent 0.11.0) :
+  `token set` refuse un texte mal formé (code 2, texte non répété), `TokenStore.Save` aussi, et
+  `token.dat` passe par un fichier temporaire du même dossier.
 - [ ] **P3 · S** — Deux octets NUL bruts dans le source
   (`AltBoard/AltBoardReader.cs:285`, `:348`) : un éditeur qui les remplace par une espace retire
   toutes les espaces des noms envoyés, sans qu'aucun test le voie. Écrire `"\0"` et ajouter le

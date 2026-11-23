@@ -30,6 +30,7 @@ public class AgentAppTests
         public string Flavor { get; }
         public string Home { get; }
         public string? TokenValue { get; set; } = Token;
+        public TextReader In { get; init; } = TextReader.Null;
 
         public Harness()
         {
@@ -45,6 +46,7 @@ public class AgentAppTests
                 HomeDirectory = Home,
                 Out = Out,
                 Error = Error,
+                In = In,
                 HttpHandler = server,
                 Hostname = "PC-TEST",
                 Now = () => new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero),
@@ -279,6 +281,33 @@ public class AgentAppTests
         Assert.Equal(AgentApp.ExitUsage, exit);
         Assert.Empty(server.Calls);
         Assert.Contains("Aucun jeton d'agent", h.Error.ToString());
+    }
+
+    [Fact]
+    public async Task Token_set_refuses_a_malformed_token_without_repeating_it()
+    {
+        using var h = new Harness { In = new StringReader("  mot-de-passe-colle  \n") };
+
+        var exit = await h.Run(null, "token", "set");
+
+        Assert.Equal(AgentApp.ExitUsage, exit);
+        Assert.Contains("Ce n'est pas un jeton", h.Error.ToString());
+        Assert.Contains("Rien n'a été enregistré.", h.Error.ToString());
+        Assert.DoesNotContain("mot-de-passe-colle", h.Out.ToString() + h.Error.ToString() + h.Log);
+        Assert.False(File.Exists(Path.Combine(h.Home, "token.dat")));
+    }
+
+    [Fact]
+    public async Task Token_set_saves_a_well_formed_token()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using var h = new Harness { In = new StringReader(" wab_0123456789-_ABCDEFGHIJKLMNOPQRSTUVWXYZabcde \n") };
+
+        var exit = await h.Run(null, "token", "set");
+
+        Assert.Equal(AgentApp.ExitOk, exit);
+        Assert.Contains("Jeton enregistré", h.Out.ToString());
+        Assert.True(File.Exists(Path.Combine(h.Home, "token.dat")));
     }
 
     [Theory]

@@ -102,7 +102,7 @@ nil,
 | `schema` | nombre | version du schéma addon (`2`) | **oui** (détection de version) |
 | `chars` | table | personnages, **clé = GUID joueur** | **oui** |
 | `items` | table | référentiel d'objets partagé, clé = `itemKey` | **oui** (noms des objets des sacs/banque) |
-| `errors` | liste | 10 dernières erreurs Lua `{ t, where, msg, v }` — vide dans les 2 fichiers | diagnostic seulement |
+| `errors` | liste | 10 dernières erreurs Lua `{ t, where, msg, v }` — vide dans les 2 fichiers | diagnostic : transmises depuis l'agent 0.11.0 (`addonErrors`), montrées sur la page Comptes |
 | `order` | liste de GUID | ordre manuel des personnages — **absente** des 2 fichiers (créée seulement après un déplacement) | optionnel |
 | `settings` | table | préférences d'interface de l'addon | non |
 | `launcher` | table | position du bouton (`left`, `top`) | non |

@@ -306,6 +306,227 @@ public class EzAuctioneerReaderTests
         Assert.NotEqual(first.ContentHash, changed.ContentHash);
     }
 
+    /// <summary>
+    /// Deux portefeuilles au format d'EZAuctioneer 0.4.3 (Core.Journal), sans aucun scan : positions,
+    /// annonces suivies (clé numérique ou chaîne), journal dans le désordre, montants fractionnaires.
+    /// </summary>
+    internal const string PortfolioFile = """
+        EZAuctioneerDB = { ["schema"] = 5, ["markets"] = { ["3:Royaume Test PvE:neutral"] = { ["history"] = { }, ["lastDeals"] = { } } }, ["portfolio"] = {
+        ["3:Royaume Test PvE:Ada"] = {
+          ["stats"] = { ["realized"] = 1234.5, ["sales"] = 3, ["cuts"] = 210, ["expired"] = 1, ["depositsLost"] = 60, ["unknown"] = 0 },
+          ["positions"] = {
+            ["i:4306:s1019"] = { ["key"] = "i:4306:s1019", ["itemID"] = 4306, ["name"] = "Bottes de l'Ours", ["link"] = "|cff1eff00|Hitem:4306::::::1019|h[Bottes de l'Ours]|h|r", ["qty"] = 2, ["cost"] = 49500, ["listed"] = 1, ["opened"] = 1795079248 },
+            ["i:2589"] = { ["key"] = "i:2589", ["qty"] = 20, ["cost"] = 240.4, ["listed"] = 0 },
+          },
+          ["auctions"] = {
+            [1234567] = { ["key"] = "i:4306:s1019", ["qty"] = 1, ["unit"] = 30000, ["deposit"] = 150, ["cut"] = 0.05, ["market"] = "3:Royaume Test PvE:Alliance:faction", ["at"] = 1795079300, ["soldPending"] = true },
+            ["99"] = { ["key"] = "i:2589", ["qty"] = 20, ["unit"] = 15 },
+          },
+          ["log"] = {
+            { ["t"] = 1795079300, ["kind"] = "post", ["key"] = "i:4306:s1019", ["name"] = "Bottes de l'Ours", ["qty"] = 1, ["unit"] = 30000, ["deposit"] = 150 },
+            { ["t"] = 1795079248, ["kind"] = "buy", ["key"] = "i:4306:s1019", ["name"] = "Bottes de l'Ours", ["link"] = "|cff1eff00|Hitem:4306::::::1019|h[Bottes de l'Ours]|h|r", ["qty"] = 2, ["amount"] = 49500, ["source"] = "achat" },
+            { ["t"] = 1795090000, ["kind"] = "sale", ["key"] = "i:4306:s1019", ["qty"] = 1, ["amount"] = 30000, ["fee"] = 1500, ["gain"] = -0.5 },
+          },
+        },
+        ["3::Bea"] = { ["stats"] = { ["realized"] = -500 } },
+        } }
+        """;
+
+    /// <summary>
+    /// Classements de trois marchés : revente à l'HV et au marchand, type inconnu, entrée incomplète,
+    /// ancienne entrée sans prix de revente, classement vide, ROI hors bornes.
+    /// </summary>
+    internal const string DealsFile = """
+        EZAuctioneerDB = { ["schema"] = 5, ["markets"] = {
+        ["3:Royaume Test PvE:Alliance:faction"] = {
+          ["history"] = { },
+          ["lastSummary"] = { ["at"] = 1795079141, ["auctions"] = 174284 },
+          ["lastDeals"] = {
+            { ["key"] = "i:13133", ["kind"] = "resale", ["source"] = "both", ["name"] = "Épaulettes drakefeu", ["qty"] = 1, ["cost"] = 49898, ["resale"] = 149900.4, ["profit"] = 80000.5, ["roi"] = 1.6033, ["listings"] = 4, ["thin"] = true, ["liveStatus"] = "gone" },
+            { ["key"] = "i:2589", ["kind"] = "vendor", ["source"] = "vendor", ["qty"] = 200, ["cost"] = 1000, ["resale"] = 10, ["profit"] = 1000, ["roi"] = 1, ["liveStatus"] = "valid" },
+            { ["key"] = "i:4306:s1019", ["kind"] = "craft", ["qty"] = 1, ["cost"] = 1, ["resale"] = 2, ["profit"] = 1, ["roi"] = 1 },
+            { ["key"] = "i:4", ["kind"] = "resale", ["cost"] = 1, ["resale"] = 2, ["profit"] = 1, ["roi"] = 1 },
+            { ["key"] = "i:5", ["kind"] = "resale", ["qty"] = 1, ["cost"] = 1, ["reference"] = 3, ["profit"] = -2, ["roi"] = -2 },
+          },
+        },
+        ["3:Royaume Test PvE:neutral"] = { ["lastDeals"] = { } },
+        ["3:Royaume Test PvE:Horde:faction"] = { ["lastDeals"] = { { ["key"] = "i:6", ["kind"] = "resale", ["qty"] = 1, ["cost"] = 1, ["resale"] = 2, ["profit"] = 1, ["roi"] = 5000 } } },
+        } }
+        """;
+
+    [Fact]
+    public void Portfolios_are_read_with_positions_auctions_and_journal()
+    {
+        var warnings = new List<string>();
+
+        var data = Read(PortfolioFile, warnings)!;
+
+        Assert.Empty(warnings);
+        // Aucun scan : seuls les portefeuilles partent.
+        Assert.Empty(data.Markets);
+        Assert.Empty(data.Deals);
+        Assert.Equal(["3::Bea", "3:Royaume Test PvE:Ada"], data.Portfolios.Select(p => p.Key));
+
+        // Bilan seul, non nul : transmis ; un champ absent vaut zéro.
+        var bea = data.Portfolios[0];
+        Assert.Equal(new PortfolioStatsPayload(-500, 0, 0, 0, 0, 0), bea.Stats);
+        Assert.Empty(bea.Positions);
+        Assert.Empty(bea.Auctions);
+        Assert.Empty(bea.Log);
+
+        var ada = data.Portfolios[1];
+        // Montants fractionnaires arrondis à la pièce, à la demi-pièce loin de zéro.
+        Assert.Equal(new PortfolioStatsPayload(1235, 3, 210, 1, 60, 0), ada.Stats);
+        Assert.Equal(
+            [new PortfolioPositionPayload("i:2589", 20, 240, 0, null), new PortfolioPositionPayload("i:4306:s1019", 2, 49500, 1, 1795079248)],
+            ada.Positions);
+        Assert.Equal(
+            [
+                new PortfolioAuctionPayload(99, "i:2589", 20, 15, null, null, null, null),
+                new PortfolioAuctionPayload(1234567, "i:4306:s1019", 1, 30000, 150, 0.05, "3:Royaume Test PvE:Alliance:faction", 1795079300),
+            ],
+            ada.Auctions);
+        Assert.Equal(
+            [
+                new PortfolioLogEntryPayload(1795079248, "buy", "i:4306:s1019", 2, 49500, null, null, null, null, "achat"),
+                new PortfolioLogEntryPayload(1795079300, "post", "i:4306:s1019", 1, null, null, null, 30000, 150, null),
+                new PortfolioLogEntryPayload(1795090000, "sale", "i:4306:s1019", 1, 30000, 1500, -1, null, null, null),
+            ],
+            ada.Log);
+    }
+
+    [Fact]
+    public void Invalid_portfolio_entries_are_dropped_with_one_warning_per_kind()
+    {
+        const string lua = """
+            EZAuctioneerDB = { ["schema"] = 5, ["portfolio"] = {
+            ["Ada"] = { ["stats"] = { ["realized"] = 5 } },
+            ["3:R:Ada:Autre"] = { ["stats"] = { ["realized"] = 5 } },
+            [5] = { ["stats"] = { ["realized"] = 5 } },
+            ["3:R:Ada"] = {
+              ["stats"] = { ["realized"] = "beaucoup", ["sales"] = -1, ["cuts"] = 100, ["expired"] = 1.5 },
+              ["positions"] = {
+                ["i:1"] = { ["qty"] = 1, ["cost"] = 10 },
+                ["x:2"] = { ["qty"] = 1, ["cost"] = 10, ["listed"] = 0 },
+                ["i:3"] = { ["qty"] = -1, ["cost"] = 10, ["listed"] = 0 },
+                ["i:4"] = { ["qty"] = 1, ["listed"] = 0 },
+                ["i:5"] = "pas une table",
+                ["i:6"] = { ["qty"] = 3000000000, ["cost"] = 10, ["listed"] = 0 },
+              },
+              ["auctions"] = {
+                [10] = { ["key"] = "i:1", ["qty"] = 1, ["unit"] = 5, ["cut"] = 2, ["market"] = "inconnu", ["at"] = 12, ["deposit"] = -3 },
+                ["10"] = { ["key"] = "i:1", ["qty"] = 2, ["unit"] = 5 },
+                [0] = { ["key"] = "i:1", ["qty"] = 1, ["unit"] = 5 },
+                [11] = { ["key"] = "i:1", ["qty"] = 0, ["unit"] = 5 },
+                [12] = { ["key"] = "i:1", ["qty"] = 1 },
+                ["abc"] = { ["key"] = "i:1", ["qty"] = 1, ["unit"] = 5 },
+              },
+              ["log"] = {
+                { ["t"] = 1795079248, ["kind"] = "buy", ["key"] = "i:1", ["qty"] = 1, ["amount"] = -5, ["source"] = "achat; autre" },
+                { ["t"] = 1795079249, ["kind"] = "gift", ["key"] = "i:1", ["qty"] = 1 },
+                { ["t"] = 1500000000, ["kind"] = "buy", ["key"] = "i:1", ["qty"] = 1 },
+                { ["t"] = 1795079250, ["kind"] = "sale", ["qty"] = 1 },
+                "pas une table",
+              },
+            },
+            } }
+            """;
+        var warnings = new List<string>();
+
+        var portfolio = Read(lua, warnings)!.Portfolios.Single();
+
+        Assert.Equal("3:R:Ada", portfolio.Key);
+        Assert.Equal(new PortfolioStatsPayload(0, 0, 100, 0, 0, 0), portfolio.Stats);
+        // Valeur facultative invalide (commission, marché, heure, dépôt) : omise, l'entrée reste.
+        // Quantité au-delà de 32 bits : refusée, comme par le serveur.
+        Assert.Equal([new PortfolioPositionPayload("i:1", 1, 10, 0, null)], portfolio.Positions);
+        // [10] et ["10"] : la même annonce, gardée une fois.
+        Assert.Equal([new PortfolioAuctionPayload(10, "i:1", 1, 5, null, null, null, null)], portfolio.Auctions);
+        Assert.Equal([new PortfolioLogEntryPayload(1795079248, "buy", "i:1", 1, null, null, null, null, null, null)], portfolio.Log);
+        Assert.Equal(
+            [
+                "EZAuctioneer : 3 portefeuilles à la clé non reconnue, ignorés.",
+                "EZAuctioneer : portefeuilles : 3 valeurs du bilan invalides, comptées à zéro.",
+                "EZAuctioneer : portefeuilles : 5 positions invalides, ignorées.",
+                "EZAuctioneer : portefeuilles : 5 annonces suivies invalides, ignorées.",
+                "EZAuctioneer : portefeuilles : 4 opérations du journal invalides, ignorées.",
+            ],
+            warnings);
+    }
+
+    [Fact]
+    public void Empty_portfolios_are_not_sent()
+    {
+        const string lua = """
+            EZAuctioneerDB = { ["schema"] = 5, ["markets"] = { ["3:R:neutral"] = { ["history"] = { }, ["lastDeals"] = { } } }, ["portfolio"] = {
+            ["3:R:Ada"] = { ["positions"] = { }, ["auctions"] = { }, ["log"] = { }, ["stats"] = { ["realized"] = 0, ["sales"] = 0, ["cuts"] = 0, ["expired"] = 0, ["depositsLost"] = 0, ["unknown"] = 0 } },
+            ["3:R:Bea"] = { ["stats"] = { ["sales"] = 0 } },
+            ["3:R:Cyd"] = { },
+            } }
+            """;
+        var warnings = new List<string>();
+
+        Assert.Null(Read(lua, warnings));
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    public void Journal_is_sorted_by_time_and_only_the_most_recent_entries_are_kept()
+    {
+        static string Journal(IEnumerable<string> entries) =>
+            $"EZAuctioneerDB = {{ [\"schema\"] = 5, [\"portfolio\"] = {{ [\"3:R:Ada\"] = {{ [\"log\"] = {{ {string.Join(", ", entries)} }} }} }} }}";
+        static string Entry(long at, int qty) => $"{{ [\"t\"] = {at}, [\"kind\"] = \"buy\", [\"key\"] = \"i:1\", [\"qty\"] = {qty} }}";
+
+        // À heure égale, l'ordre du fichier est gardé.
+        var tied = Read(Journal([Entry(1795000500, 1), Entry(1795000500, 2), Entry(1795000100, 9), Entry(1795000500, 3)]))!.Portfolios.Single().Log;
+        Assert.Equal([9L, 1, 2, 3], tied.Select(e => e.Qty));
+
+        // Du plus récent au plus ancien dans le fichier : les 300 plus récents, remis dans l'ordre.
+        var many = Read(Journal(Enumerable.Range(0, 310).Select(i => Entry(1795000000 + (309 - i) * 10L, i))))!.Portfolios.Single().Log;
+        Assert.Equal(EzAuctioneerReader.MaxLogEntriesPerPortfolio, many.Count);
+        Assert.Equal((1795000100L, 1795003090L), (many[0].At, many[^1].At));
+        Assert.Equal(many.Select(e => e.At).Order(), many.Select(e => e.At));
+    }
+
+    [Fact]
+    public void Deals_are_read_per_market_in_rank_order()
+    {
+        var warnings = new List<string>();
+
+        var data = Read(DealsFile, warnings)!;
+
+        // Aucun relevé : seules les bonnes affaires partent.
+        Assert.Empty(data.Markets);
+        Assert.Empty(data.Portfolios);
+        // Classement vide, ou sans entrée valide : le marché n'est pas transmis.
+        var market = Assert.Single(data.Deals);
+        Assert.Equal(("3:Royaume Test PvE:Alliance:faction", 1795079141L), (market.Market, market.At));
+        Assert.Equal(
+            [
+                new DealPayload("i:13133", "resale", "both", 1, 49898, 149900, 80001, 1.6033, 4, true, "gone"),
+                // État de vérification que le serveur ne connaît pas (« valid ») : omis.
+                new DealPayload("i:2589", "vendor", "vendor", 200, 1000, 10, 1000, 1, null, null, null),
+                // Entrée d'avant EZAuctioneer 0.4.2 : la référence tient lieu de prix de revente.
+                new DealPayload("i:5", "resale", null, 1, 1, 3, -2, -2, null, null, null),
+            ],
+            market.Entries);
+        // Type inconnu (« craft ») : sauté sans avertissement ; quantité absente et ROI hors bornes : comptés.
+        Assert.Equal("EZAuctioneer : 2 bonnes affaires invalides, ignorées.", Assert.Single(warnings));
+    }
+
+    [Fact]
+    public void Only_the_first_deals_of_the_ranking_are_kept()
+    {
+        var entries = string.Join(", ", Enumerable.Range(1, 160).Select(i =>
+            $"{{ [\"key\"] = \"i:{i}\", [\"kind\"] = \"resale\", [\"qty\"] = 1, [\"cost\"] = 100, [\"resale\"] = 200, [\"profit\"] = {1000 - i}, [\"roi\"] = 1 }}"));
+
+        var deals = Read($"EZAuctioneerDB = {{ [\"schema\"] = 5, [\"markets\"] = {{ [\"3:R:neutral\"] = {{ [\"lastDeals\"] = {{ {entries} }} }} }} }}")!.Deals.Single();
+
+        Assert.Equal(EzAuctioneerReader.MaxDealsPerMarket, deals.Entries.Count);
+        Assert.Equal(("i:1", "i:150"), (deals.Entries[0].Key, deals.Entries[^1].Key));
+        Assert.Null(deals.At);
+    }
+
     private static string MinimalFile(int schema, string samples) =>
         $"EZAuctioneerDB = {{ [\"schema\"] = {schema}, [\"markets\"] = {{ [\"3:R:Alliance:faction\"] = {{ [\"history\"] = {{ [\"i:2589\"] = {{ [\"samples\"] = {{ {samples} }} }} }} }} }} }}";
 }
@@ -419,7 +640,7 @@ public class EconomyPayloadTests
     }
 
     [Fact]
-    public async Task Scan_samples_are_attached_to_the_account_without_the_positions_journal()
+    public async Task Scan_samples_and_portfolio_are_attached_to_the_account_without_item_names()
     {
         using var temp = new TempDirectory();
         var flavor = temp.Combine("_forever_");
@@ -443,9 +664,78 @@ public class EconomyPayloadTests
         var market = json.RootElement.GetProperty("ezAuctioneer").GetProperty("markets")[0];
         Assert.Equal(3, market.GetProperty("items")[0].GetProperty("samples")[0].GetArrayLength());
         Assert.Equal("own", market.GetProperty("scans")[1].GetProperty("origin").GetString());
-        // Journal des positions, classement et noms d'objets restent sur le PC.
-        Assert.DoesNotContain("Testeur", text);
+        // Portefeuille du personnage fictif : transmis depuis l'agent 0.11.0.
+        var portfolio = json.RootElement.GetProperty("ezAuctioneer").GetProperty("portfolios")[0];
+        Assert.Equal("3:Royaume Test PvE:Testeur", portfolio.GetProperty("key").GetString());
+        Assert.Equal(("buy", 16800L), (portfolio.GetProperty("log")[0].GetProperty("kind").GetString(), portfolio.GetProperty("log")[0].GetProperty("amount").GetInt64()));
+        // La bonne affaire du fichier, sans type, n'est pas transmise ; les noms d'objets restent sur le PC.
+        Assert.False(json.RootElement.GetProperty("ezAuctioneer").TryGetProperty("deals", out _));
         Assert.DoesNotContain("drakefeu", text);
+    }
+
+    [Fact]
+    public async Task Portfolio_alone_is_sent_with_an_empty_market_list()
+    {
+        using var temp = new TempDirectory();
+        var flavor = temp.Combine("_forever_");
+        var folder = Path.GetDirectoryName(temp.AddAccount(flavor, "123456789#1", "account-two-characters.lua"))!;
+        File.WriteAllText(Path.Combine(folder, "EZAuctioneer.lua"), EzAuctioneerReaderTests.PortfolioFile);
+
+        var result = await Builder().ReadAccountAsync(AccountScanner.Scan(flavor).Single());
+
+        var ez = result.Payload!.EzAuctioneer!;
+        Assert.Empty(ez.Markets);
+        Assert.Equal(["3::Bea", "3:Royaume Test PvE:Ada"], ez.Portfolios!.Select(p => p.Key));
+        Assert.Null(ez.Deals);
+        Assert.Empty(result.Payload.Warnings);
+
+        var text = JsonSerializer.Serialize(result.Payload, SyncJsonContext.Default.AccountPayload);
+        using var json = JsonDocument.Parse(text);
+        var root = json.RootElement.GetProperty("ezAuctioneer");
+        Assert.Equal(0, root.GetProperty("markets").GetArrayLength());
+        Assert.False(root.TryGetProperty("deals", out _));
+        var ada = root.GetProperty("portfolios")[1];
+        Assert.Equal(
+            ["realized", "sales", "cuts", "expired", "depositsLost", "unknown"],
+            ada.GetProperty("stats").EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["key", "qty", "cost", "listed", "openedAt"], ada.GetProperty("positions")[1].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["key", "qty", "cost", "listed"], ada.GetProperty("positions")[0].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(
+            ["id", "key", "qty", "unit", "deposit", "cut", "market", "postedAt"],
+            ada.GetProperty("auctions")[1].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(1234567L, ada.GetProperty("auctions")[1].GetProperty("id").GetInt64());
+        Assert.Equal(["at", "kind", "key", "qty", "amount", "source"], ada.GetProperty("log")[0].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["at", "kind", "key", "qty", "amount", "fee", "gain"], ada.GetProperty("log")[2].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(-1L, ada.GetProperty("log")[2].GetProperty("gain").GetInt64());
+        // Noms et liens d'objets du portefeuille restent sur le PC.
+        Assert.DoesNotContain("Ours", root.GetRawText());
+        Assert.DoesNotContain("Hitem", root.GetRawText());
+    }
+
+    [Fact]
+    public async Task Deals_use_the_server_field_names()
+    {
+        using var temp = new TempDirectory();
+        var flavor = temp.Combine("_forever_");
+        var folder = Path.GetDirectoryName(temp.AddAccount(flavor, "123456789#1", "account-two-characters.lua"))!;
+        File.WriteAllText(Path.Combine(folder, "EZAuctioneer.lua"), EzAuctioneerReaderTests.DealsFile);
+
+        var result = await Builder().ReadAccountAsync(AccountScanner.Scan(flavor).Single());
+
+        var text = JsonSerializer.Serialize(result.Payload!, SyncJsonContext.Default.AccountPayload);
+        using var json = JsonDocument.Parse(text);
+        var root = json.RootElement.GetProperty("ezAuctioneer");
+        Assert.Equal(0, root.GetProperty("markets").GetArrayLength());
+        // Aucun portefeuille : liste vide, pour que le site remette à zéro ceux que ce PC avait envoyés.
+        Assert.Equal(0, root.GetProperty("portfolios").GetArrayLength());
+        var deals = root.GetProperty("deals")[0];
+        Assert.Equal(["market", "at", "entries"], deals.EnumerateObject().Select(p => p.Name));
+        Assert.Equal(
+            ["key", "kind", "source", "qty", "cost", "resale", "profit", "roi", "listings", "thin", "live"],
+            deals.GetProperty("entries")[0].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(1.6033, deals.GetProperty("entries")[0].GetProperty("roi").GetDouble());
+        Assert.False(deals.GetProperty("entries")[1].TryGetProperty("live", out _));
+        Assert.DoesNotContain("drakefeu", root.GetRawText());
     }
 
     [Fact]

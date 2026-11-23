@@ -3,7 +3,8 @@
 -- les fichiers du 2026-11-19 : mêmes clés, mêmes formes de valeur, valeurs inventées.
 -- Cas couverts : relevés dans le désordre, objet à suffixe aléatoire, clé non reconnue, relevé
 -- invalide (prix nul), marché sans historique, rapport et résumé du même scan datés à une seconde
--- d'écart, scan rejeté, journal des positions (jamais transmis).
+-- d'écart, scan rejeté, portefeuille d'un personnage fictif (transmis depuis l'agent 0.11.0), bonne
+-- affaire sans type (ignorée).
 EZAuctioneerDB = {
 ["options"] = {
 ["share"] = 0.25,

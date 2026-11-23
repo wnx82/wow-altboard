@@ -145,6 +145,71 @@ public class LedgerReaderTests
     }
 
     [Fact]
+    public void Instance_runs_are_read_apart_from_the_sessions()
+    {
+        var ledger = LedgerReader.Read(Fixture.Parse("ledger-two-characters.lua"), []);
+
+        Assert.Equal(
+            [new RunPayload(1791060000, 1791062400, 2400, "Les Mortemines", "Dungeon", 3100, 0, null, null, null)],
+            ledger["Player-9999-00000002"].Runs);
+        Assert.DoesNotContain(ledger["Player-9999-00000002"].Sessions, session => session.StartedAt == 1791060000);
+        Assert.Empty(ledger["Player-9999-00000009"].Runs);
+    }
+
+    [Fact]
+    public void Runs_are_deduplicated_by_start_and_bad_values_are_left_out()
+    {
+        var longZone = new string('z', 90);
+        var warnings = new List<string>();
+
+        var character = Read($$"""
+            AllemanoLedgerDB = { chars = { ["Player-1-A"] = {
+              history = {
+                { kind = "run", start = 1791000500, stop = 1791000900, duration = 400, zone = "Doublon" },
+                { kind = "run", start = 1791000100, stop = 1e15, duration = -1, xpGained = "beaucoup", levels = 99999, money = 2e13, net = "x", lootValue = -5, zone = 42, tag = 7 },
+                { kind = "run", start = 1791000500, stop = 1791001000, duration = 500, zone = "{{longZone}}", tag = "Raid", xpGained = 10, levels = 0, money = 1234.5, net = -20.5, lootValue = 300 },
+                { kind = "run", stop = 1791000200 },
+                { kind = "run", start = 1500000000 },
+                { start = 1791000000, stop = 1791002000, duration = 2000, xpGained = 99 },
+              },
+            } } }
+            """, warnings)["Player-1-A"];
+
+        Assert.Equal(
+            [
+                new RunPayload(1791000100, null, null, null, null, null, null, null, null, null),
+                // Même début : la dernière entrée lue fait foi. Montants arrondis à la pièce, loin de zéro.
+                new RunPayload(1791000500, 1791001000, 500, new string('z', 80), "Raid", 10, 0, 1235, -21, 300),
+            ],
+            character.Runs);
+        // Les runs restent hors des sessions.
+        Assert.Equal([1791000000L], character.Sessions.Select(session => session.StartedAt));
+        Assert.Equal("Allemano Ledger : 2 runs d'instance sans début valide, ignorés.", Assert.Single(warnings));
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(
+            new CharacterPayload { Guid = "Player-1-A", Name = "Nom", Realm = "Royaume", LastSeen = 1791001000, Runs = character.Runs },
+            SyncJsonContext.Default.CharacterPayload));
+        var run = json.RootElement.GetProperty("runs")[1];
+        Assert.Equal(
+            (1791000500L, 1791001000L, 500, "Raid", 10, 0, 1235L, -21L, 300L),
+            (run.GetProperty("startedAt").GetInt64(), run.GetProperty("stoppedAt").GetInt64(), run.GetProperty("durationSeconds").GetInt32(),
+                run.GetProperty("tag").GetString(), run.GetProperty("xpGained").GetInt32(), run.GetProperty("levels").GetInt32(),
+                run.GetProperty("moneyCopper").GetInt64(), run.GetProperty("netCopper").GetInt64(), run.GetProperty("lootValueCopper").GetInt64()));
+        Assert.Equal(["startedAt"], json.RootElement.GetProperty("runs")[0].EnumerateObject().Select(p => p.Name));
+    }
+
+    [Fact]
+    public void Only_the_most_recent_runs_are_kept()
+    {
+        var entries = string.Join(",", Enumerable.Range(0, 70).Select(i => $"{{ kind = \"run\", start = {1791000000 + i * 1000}, xpGained = {i} }}"));
+
+        var runs = Read("AllemanoLedgerDB = { chars = { [\"Player-1-A\"] = { history = { " + entries + " } } } }")["Player-1-A"].Runs;
+
+        Assert.Equal(60, runs.Count);
+        Assert.Equal((10, 69), (runs[0].XpGained, runs[^1].XpGained));
+    }
+
+    [Fact]
     public async Task Playtime_is_attached_to_the_matching_altboard_characters()
     {
         using var temp = new TempDirectory();
@@ -184,6 +249,10 @@ public class LedgerReaderTests
         using var warlock = JsonDocument.Parse(JsonSerializer.Serialize(withLedger.Characters[1], SyncJsonContext.Default.CharacterPayload));
         Assert.False(warlock.RootElement.GetProperty("sessions")[0].TryGetProperty("zone", out _));
         Assert.False(warlock.RootElement.TryGetProperty("finances", out _));
+        Assert.False(warlock.RootElement.TryGetProperty("runs", out _));
+        // Le run d'instance part à part des sessions.
+        var run = Assert.Single(json.RootElement.GetProperty("runs").EnumerateArray());
+        Assert.Equal(("Les Mortemines", 1791060000L), (run.GetProperty("zone").GetString(), run.GetProperty("startedAt").GetInt64()));
         // Finances : sources en clés minuscules, telles que l'addon les nomme.
         var finances = json.RootElement.GetProperty("finances");
         Assert.Equal(2, finances.GetArrayLength());

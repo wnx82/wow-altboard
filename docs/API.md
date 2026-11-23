@@ -86,6 +86,11 @@ Règles :
 - `sessions` est absent quand Allemano Ledger n'en a enregistré aucune. `startedAt` identifie la
   session ; `durationSeconds` est le temps connecté, pauses exclues ; `inProgress` signale une
   session encore ouverte, aux valeurs provisoires. Au plus 60 sessions par personnage ;
+- `runs` (agent 0.11.0) : donjons et autres runs d'instance d'Allemano Ledger, absents sans run.
+  `startedAt` identifie le run (unique) ; facultatifs : `stoppedAt`, `durationSeconds`, `zone`
+  (80 caractères), `tag` (40), `xpGained`, `levels`, `moneyCopper` et `netCopper` (or gagné moins
+  or dépensé, négatifs quand le run a coûté), `lootValueCopper`. Un run recoupe la session qui le
+  contient : il n'est pas compté parmi les sessions. Au plus 60 runs par personnage ;
 - `finances` (agent 0.7.0) : journées d'Allemano Ledger, absentes sans l'addon. Une entrée par
   jour (`day`, date locale du client de jeu, `AAAA-MM-JJ`, unique) : `income` et `expense`, montants
   par source en pièces de cuivre (sources `loot`, `vendor`, `quest`, `ah`, `mail`, `trade`, `other`
@@ -104,6 +109,11 @@ Règles :
   l'empreinte à partir de ce nom (`SHA-256("wow-altboard-account:" + NOM EN MAJUSCULES)`) et refuse
   le document (`422`) si elle diffère d'`accountKey`. Un envoi sans `folderName` n'efface pas le nom
   déjà reçu.
+- `addonErrors` (agent 0.11.0), par compte : erreurs Lua gardées par l'addon AltBoard
+  (`AltBoardDB.errors`), dix au plus, `{ "at": <secondes Unix>, "where": "…", "message": "…", "version": "0.8.3" }`.
+  `where` au-delà de 80 caractères et `message` au-delà de 400 sont raccourcis par le serveur. La
+  liste reçue remplace celle du même PC, montrée sur la page **Comptes** ; une liste vide l'efface,
+  un envoi sans liste n'y touche pas.
 
 Compatibilité : `playtime`, `sessions`, `folderName`, `finances` et `itemNames` sont des ajouts facultatifs à la version 1. Les objets étant
 stricts, un serveur antérieur refuserait un document qui les contient : **le serveur se met à jour avant les
@@ -210,6 +220,41 @@ au moins un relevé :
   connu (même marché, objet et heure) n'est pas doublé. La réponse ajoute `scanMarketsImported`,
   `scanMarketsUnchanged` et `scanSamples` (relevés nouveaux).
 - Compatibilité : un serveur antérieur au site 0.31.0 refuse ce bloc (schéma strict).
+
+Depuis l'agent 0.11.0, le bloc porte aussi le **portefeuille de revente** et les **affaires**
+repérées en jeu ([RESALE](RESALE.md)), tous deux facultatifs :
+
+```json
+"portfolios": [
+  { "key": "3:Royaume Test PvE:Élodie Brisefer",
+    "stats": { "realized": -2231, "sales": 0, "cuts": 0, "expired": 1, "depositsLost": 2231, "unknown": 0 },
+    "positions": [{ "key": "i:5266", "qty": 1, "cost": 16800, "listed": 1, "openedAt": 1795079000 }],
+    "auctions": [{ "id": 2004001, "key": "i:5266", "qty": 1, "unit": 60000, "deposit": 2231, "cut": 0.05,
+                   "market": "3:Royaume Test PvE:Alliance:faction", "postedAt": 1795079100 }],
+    "log": [{ "at": 1795079000, "kind": "buy", "key": "i:5266", "qty": 1, "amount": 16800, "source": "achat" }] }
+],
+"deals": [
+  { "market": "3:Royaume Test PvE:Alliance:faction", "at": 1795079141,
+    "entries": [{ "key": "i:7094", "kind": "resale", "source": "scan", "qty": 3, "cost": 11000, "resale": 45000,
+                  "profit": 112081, "roi": 2.4, "listings": 10, "thin": false, "live": "live" }] }
+]
+```
+
+- `portfolios` : 200 au plus, clé `<région>:<royaume>:<personnage>` unique (royaume vide permis,
+  aucun deux-points dans le royaume ni le nom). `positions` (clé unique) et `auctions` (`id`
+  unique) : 500 au plus ; `log` : 300 au plus, `kind` parmi `buy`, `post`, `sale`, `pending`,
+  `expire`, `cancel`, `unknown`, `remove`. Montants en pièces de cuivre ; `realized`, `gain`
+  et `profit` peuvent être négatifs. Les clés d'objets suivent la forme des scans.
+- `deals` : 20 marchés au plus (clé unique), 150 affaires chacun, dans l'ordre de l'addon. `kind` :
+  `resale` ou `vendor` ; `live` : `live`, `gone` ou `checking`.
+- Les portefeuilles sont rangés par compte et par PC (le fichier de l'addon est propre à chaque PC).
+  Le serveur remplace bilan, positions et annonces de chaque portefeuille, ajoute les entrées
+  nouvelles du journal et remet à zéro un portefeuille de ce compte et de ce PC absent de l'envoi ;
+  l'agent 0.11.0 envoie toujours la liste, vide au besoin. Un bloc sans `portfolios` (agent plus
+  ancien) n'y touche pas. La réponse ajoute `resalePortfolios`,
+  `resaleEvents` (entrées nouvelles) et `resaleDeals`.
+- Compatibilité : un serveur antérieur au site 0.37.0 refuse ces champs, comme `runs` et
+  `addonErrors` (schéma strict).
 
 Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miroir côté agent est
 `agent/src/AltBoardSync.Core/Sync/SyncPayload.cs`. Le fichier

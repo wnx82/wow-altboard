@@ -10,7 +10,11 @@ public sealed record AltBoardDocument(
     int? Schema,
     IReadOnlyList<CharacterPayload> Characters,
     IReadOnlyList<ItemPayload> Items,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings)
+{
+    /// <summary>Erreurs Lua gardées par l'addon (<c>errors</c>), les plus anciennes d'abord ; null si le fichier n'en a pas de liste.</summary>
+    public IReadOnlyList<AddonErrorPayload>? AddonErrors { get; init; }
+}
 
 /// <summary>
 /// Convertit <c>AltBoardDB</c> (structure documentée dans docs/ALTBOARD-DATA-MODEL.md) vers le modèle
@@ -46,6 +50,15 @@ public static partial class AltBoardReader
     // "item:ID:enchant:..." : le premier champ est l'objet, le deuxième l'enchantement.
     [GeneratedRegex(@"item:(\d{1,9}):(\d{0,9})")]
     private static partial Regex ItemLinkPattern();
+
+    [GeneratedRegex(@"\p{Cc}+")]
+    private static partial Regex ControlCharacters();
+
+    // L'addon garde les 10 dernières erreurs, message limité à 400 caractères.
+    private const int MaxAddonErrors = 10;
+    private const int MaxErrorWhere = 80;
+    private const int MaxErrorMessage = 400;
+    private const int MaxErrorVersion = 40;
 
     public static AltBoardDocument Read(IReadOnlyDictionary<string, LuaValue> globals)
     {
@@ -90,10 +103,57 @@ public static partial class AltBoardReader
             }
         }
 
+        var addonErrors = ReadErrors(db.Get("errors"), warnings);
+
         // Ordre déterministe : le client réécrit ses tables dans un ordre variable.
         characters.Sort((a, b) => string.CompareOrdinal(a.Guid, b.Guid));
         items.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
-        return new AltBoardDocument(schema, characters, items, warnings.ToList());
+        return new AltBoardDocument(schema, characters, items, warnings.ToList()) { AddonErrors = addonErrors };
+    }
+
+    /// <summary>
+    /// Erreurs Lua que l'addon garde (<c>{ t, where, msg, v }</c>), des plus anciennes aux plus récentes,
+    /// les 10 dernières au plus. Liste vide si l'addon n'en garde aucune ; null si la liste est absente.
+    /// </summary>
+    private static List<AddonErrorPayload>? ReadErrors(LuaValue? value, Warnings warnings)
+    {
+        if (value is null) return null;
+        if (value is not LuaTable table)
+        {
+            warnings.Add("errors n'est pas une table : erreurs de l'addon non transmises");
+            return null;
+        }
+
+        var errors = new List<AddonErrorPayload>();
+        var invalid = 0;
+        foreach (var (_, entry) in table.Entries)
+        {
+            if (entry is not LuaTable error
+                || PayloadLimits.Timestamp(error.Get("t")?.AsInt64()) is not { } at
+                || ErrorText(error.Get("where"), MaxErrorWhere) is not { } where
+                || ErrorText(error.Get("msg"), MaxErrorMessage) is not { } message)
+            {
+                invalid++;
+                continue;
+            }
+
+            errors.Add(new AddonErrorPayload(at, where, message, ErrorText(error.Get("v"), MaxErrorVersion)));
+        }
+
+        if (invalid > 0) warnings.Add($"erreurs de l'addon : {invalid} entrées invalides ignorées");
+        // OrderBy est stable : deux erreurs de la même seconde gardent l'ordre de l'addon.
+        return errors.OrderBy(error => error.At).TakeLast(MaxAddonErrors).ToList();
+    }
+
+    /// <summary>
+    /// Texte d'une erreur : caractères de contrôle (sauts de ligne d'une pile d'appels…) remplacés par
+    /// une espace, bords rognés, raccourci ; null s'il ne reste rien.
+    /// </summary>
+    private static string? ErrorText(LuaValue? value, int maxLength)
+    {
+        if (value?.AsString() is not { } raw) return null;
+        var text = ControlCharacters().Replace(raw, " ").Trim();
+        return text.Length == 0 ? null : Truncate(text, maxLength).TrimEnd();
     }
 
     private static CharacterPayload? ReadCharacter(LuaKey key, LuaValue value, Warnings warnings)

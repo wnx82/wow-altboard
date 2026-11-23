@@ -88,6 +88,37 @@ export default async function AccountsPage() {
                 </ul>
               </div>
 
+              {account.addonErrors.length > 0 && (
+                <details className="mt-4 border-t border-line pt-4">
+                  <summary className="cursor-pointer text-sm">
+                    <span className="badge" data-tone="warn">
+                      {account.addonErrors.length} erreur{account.addonErrors.length > 1 ? "s" : ""} de l&apos;addon
+                    </span>
+                    <span className="ml-2 text-xs text-muted">dernière {formatRelative(account.addonErrors[0].occurredAt, now)}</span>
+                  </summary>
+                  <ul className="mt-3 space-y-2 text-xs">
+                    {account.addonErrors.map((error, index) => (
+                      <li key={index} className="rounded border border-line p-2">
+                        <p className="flex flex-wrap justify-between gap-2 text-muted">
+                          <span>
+                            <code className="text-text">{error.location}</code>
+                            {error.addonVersion && <span className="ml-2">AltBoard {error.addonVersion}</span>}
+                            <span className="ml-2">{error.machine}</span>
+                          </span>
+                          <time dateTime={error.occurredAt.toISOString()}>{formatDateTime(error.occurredAt)}</time>
+                        </p>
+                        <p className="mt-1 break-words font-mono">{error.message}</p>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-faint">
+                    Erreurs Lua que l&apos;addon AltBoard a interceptées en jeu (les dix dernières de chaque PC, aussi listées par{" "}
+                    <code className="text-text">/ab errors</code>). <code className="text-text">/ab errors clear</code> vide la liste ; elle
+                    disparaît d&apos;ici au prochain envoi de l&apos;agent.
+                  </p>
+                </details>
+              )}
+
               <div className="mt-4 space-y-3 border-t border-line pt-4">
                 <FavoriteToggle accountId={account.id} accountLabel={account.label} favorite={account.featured} />
                 <RenameForm

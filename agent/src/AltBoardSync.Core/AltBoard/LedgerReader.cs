@@ -3,15 +3,17 @@ using AltBoardSync.Core.Sync;
 
 namespace AltBoardSync.Core.AltBoard;
 
-/// <summary>Ce que Ledger sait d'un personnage : temps de jeu par niveau, sessions et finances par jour.</summary>
-public sealed record LedgerCharacter(PlaytimePayload? Playtime, IReadOnlyList<SessionPayload> Sessions, IReadOnlyList<LedgerDayPayload> Finances);
+/// <summary>Ce que Ledger sait d'un personnage : temps de jeu par niveau, sessions, finances par jour et runs d'instance.</summary>
+public sealed record LedgerCharacter(
+    PlaytimePayload? Playtime, IReadOnlyList<SessionPayload> Sessions, IReadOnlyList<LedgerDayPayload> Finances, IReadOnlyList<RunPayload> Runs);
 
 /// <summary>
 /// Lit ce qu'enregistre l'addon Allemano Ledger (structure documentée dans
 /// docs/LEDGER-DATA-MODEL.md) : <c>AllemanoLedgerDB.chars[guid]</c>, mêmes GUID qu'AltBoard.
 /// Sont lus <c>played</c>, <c>levelStart</c>, <c>levelLog</c> (temps de jeu), <c>history</c> et
-/// <c>current</c> (sessions : dates, durée, expérience), et <c>days</c> (or gagné et dépensé par jour
-/// et par source). Les « runs » d'instance, la réputation et les objets ramassés ne sont pas transmis.
+/// <c>current</c> (sessions : dates, durée, expérience), <c>days</c> (or gagné et dépensé par jour
+/// et par source), et les « runs » d'instance de <c>history</c>, transmis à part des sessions. La
+/// réputation et les objets ramassés ne sont pas transmis.
 /// </summary>
 public static class LedgerReader
 {
@@ -21,6 +23,9 @@ public static class LedgerReader
     // L'addon garde 50 sessions par personnage, plus celle en cours.
     private const int MaxSessions = 60;
     private const int MaxTag = 40;
+    // L'addon garde 50 entrées de history, sessions et runs confondus.
+    private const int MaxRuns = 60;
+    private const int MaxRunZone = 80;
     // L'addon garde 800 jours par personnage.
     private const int MaxDays = 800;
 
@@ -42,15 +47,19 @@ public static class LedgerReader
         }
 
         if (db.Get("chars") is not LuaTable chars) return result;
+        var invalidRuns = 0;
         foreach (var (key, value) in chars.Entries)
         {
             if (key.Kind != LuaKeyKind.String || value is not LuaTable character) continue;
             var playtime = ReadPlaytime(character);
             var sessions = ReadSessions(character);
             var finances = ReadDays(character);
-            if (playtime is not null || sessions.Count > 0 || finances.Count > 0) result[key.Text!] = new LedgerCharacter(playtime, sessions, finances);
+            var runs = ReadRuns(character, ref invalidRuns);
+            if (playtime is not null || sessions.Count > 0 || finances.Count > 0 || runs.Count > 0)
+                result[key.Text!] = new LedgerCharacter(playtime, sessions, finances, runs);
         }
 
+        if (invalidRuns > 0) warnings.Add($"Allemano Ledger : {invalidRuns} runs d'instance sans début valide, ignorés.");
         return result;
     }
 
@@ -140,6 +149,46 @@ public static class LedgerReader
         if (ordered.Count > MaxSessions) ordered.RemoveRange(0, ordered.Count - MaxSessions);
         return ordered;
     }
+
+    /// <summary>
+    /// Runs d'instance de <c>history</c> (<c>kind = "run"</c>), du plus ancien au plus récent, un par
+    /// début. Un run sans début valide est écarté et compté dans <paramref name="invalid"/> ; une valeur
+    /// hors bornes est omise.
+    /// </summary>
+    private static List<RunPayload> ReadRuns(LuaTable character, ref int invalid)
+    {
+        if (character.Get("history") is not LuaTable history) return [];
+        var runs = new Dictionary<long, RunPayload>();
+        foreach (var (_, value) in history.Entries)
+        {
+            if (value is not LuaTable entry || entry.Get("kind")?.AsString() != "run") continue;
+            if (PayloadLimits.Timestamp(entry.Get("start")?.AsInt64()) is not { } start)
+            {
+                invalid++;
+                continue;
+            }
+
+            // Même début : comme pour les sessions, la dernière entrée lue fait foi.
+            runs[start] = new RunPayload(
+                start,
+                PayloadLimits.Timestamp(entry.Get("stop")?.AsInt64()),
+                AltBoardReader.NonNegative(entry.Get("duration")?.AsInt32()),
+                AltBoardReader.Text(entry.Get("zone"), MaxRunZone),
+                AltBoardReader.Text(entry.Get("tag"), MaxTag),
+                AltBoardReader.NonNegative(entry.Get("xpGained")?.AsInt32()),
+                AltBoardReader.Small(entry.Get("levels")),
+                SignedCopper(entry.Get("money")),
+                SignedCopper(entry.Get("net")),
+                PayloadLimits.Copper(entry.Get("lootValue")?.AsDouble(), 0, PayloadLimits.MaxCopper));
+        }
+
+        var ordered = runs.Values.OrderBy(run => run.StartedAt).ToList();
+        if (ordered.Count > MaxRuns) ordered.RemoveRange(0, ordered.Count - MaxRuns);
+        return ordered;
+    }
+
+    /// <summary>Gain ou perte en pièces de cuivre, arrondi à la pièce, dans ±10¹³.</summary>
+    private static long? SignedCopper(LuaValue? value) => PayloadLimits.Copper(value?.AsDouble(), -PayloadLimits.MaxCopper, PayloadLimits.MaxCopper);
 
     /// <summary>
     /// Journées de <c>days["AAAA-MM-JJ"]</c>, de la plus ancienne à la plus récente. Une clé qui n'est

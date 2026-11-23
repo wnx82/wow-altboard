@@ -12,6 +12,7 @@ import { blockColumns, identityColumns, replaceDetails } from "./character-detai
 import { chunks, fromUnix, uniqueBy } from "./helpers";
 import { applyBaganator } from "./inventory";
 import { applyLedger } from "./ledger";
+import { applyAddonErrors, applyResale } from "./resale";
 import { applyEzAuctioneer } from "./scans";
 import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
 
@@ -198,6 +199,11 @@ export async function processSync(db: Database, payload: SyncPayload, context: S
       await applyRecipes(tx, account, now, economy);
       await applyBaganator(tx, account, accountId, now);
       await applyEzAuctioneer(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
+      const resale = await applyResale(tx, account, { accountId, machineId: machine.id, now });
+      economy.resalePortfolios += resale.portfolios;
+      economy.resaleEvents += resale.events;
+      economy.resaleDeals += resale.deals;
+      await applyAddonErrors(tx, account, { accountId, machineId: machine.id, now });
     }
     if (payload.itemNames) economy.itemNamesStored = await storeClientNames(tx, payload.itemNames, now);
 

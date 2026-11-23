@@ -22,6 +22,10 @@ export type EconomyCounters = {
   scanMarketsUnchanged: number;
   /** Relevés de scan nouveaux ; un relevé déjà reçu n'est pas compté. */
   scanSamples: number;
+  /** Portefeuilles de revente reçus, entrées nouvelles de leur journal, affaires enregistrées (agent 0.11.0). */
+  resalePortfolios: number;
+  resaleEvents: number;
+  resaleDeals: number;
 };
 
 export const emptyEconomyCounters = (): EconomyCounters => ({
@@ -33,6 +37,9 @@ export const emptyEconomyCounters = (): EconomyCounters => ({
   scanMarketsImported: 0,
   scanMarketsUnchanged: 0,
   scanSamples: 0,
+  resalePortfolios: 0,
+  resaleEvents: 0,
+  resaleDeals: 0,
 });
 
 type Scope = { accountId: number; machineId: number; runId: number; now: Date };
