@@ -2,22 +2,13 @@ import { eq, inArray } from "drizzle-orm";
 import type { DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 import { canonicalHash } from "@/lib/hash";
+import { chunks, uniqueBy } from "./helpers";
 import type { AccountPayload, BaganatorPayload } from "./schema";
 
 // Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator (agent 0.8.0,
 // voir docs/BAGANATOR-DATA-MODEL.md). Sacs et banque restent ceux d'AltBoard (character_items).
 
 const BATCH = 2_000;
-
-function chunks<T>(values: readonly T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < values.length; i += size) result.push(values.slice(i, i + size));
-  return result;
-}
-
-function dedupe<T>(values: readonly T[], key: (value: T) => string | number): T[] {
-  return [...new Map(values.map((value) => [key(value), value])).values()];
-}
 
 const fromUnix = (seconds: number | undefined) => (seconds === undefined ? null : new Date(seconds * 1000));
 
@@ -45,12 +36,12 @@ async function applyHoldings(tx: DatabaseOrTransaction, characters: BaganatorPay
     .where(inArray(t.characterHoldingSources.characterId, [...ids.values()]));
   const sourceOf = new Map(sources.map((source) => [source.characterId, source]));
 
-  for (const character of dedupe(characters, (c) => c.guid)) {
+  for (const character of uniqueBy(characters, (c) => c.guid)) {
     const characterId = ids.get(character.guid);
     if (characterId === undefined) continue;
     const holdings = [
-      ...dedupe(character.mail, (h) => h.key).map((h) => ({ location: "mail" as const, ...h })),
-      ...dedupe(character.auctions, (h) => h.key).map((h) => ({ location: "auctions" as const, ...h })),
+      ...uniqueBy(character.mail, (h) => h.key).map((h) => ({ location: "mail" as const, ...h })),
+      ...uniqueBy(character.auctions, (h) => h.key).map((h) => ({ location: "auctions" as const, ...h })),
     ];
     const contentHash = canonicalHash(holdings.map((h) => [h.location, h.key, h.count, h.expiresAt ?? null]));
     const source = sourceOf.get(characterId);
@@ -89,9 +80,9 @@ async function applyGuildBanks(tx: DatabaseOrTransaction, guilds: BaganatorPaylo
   const keyOf = (name: string, realm: string) => `${name}\u0000${realm}`;
   const known = new Map(existing.map((bank) => [keyOf(bank.name, bank.realm), bank]));
 
-  for (const guild of dedupe(guilds, (g) => keyOf(g.name, g.realm))) {
+  for (const guild of uniqueBy(guilds, (g) => keyOf(g.name, g.realm))) {
     if (!realms.has(guild.realm)) continue;
-    const tabs = dedupe(guild.tabs, (tab) => tab.index).map((tab) => ({ ...tab, items: dedupe(tab.items, (item) => item.key) }));
+    const tabs = uniqueBy(guild.tabs, (tab) => tab.index).map((tab) => ({ ...tab, items: uniqueBy(tab.items, (item) => item.key) }));
     const contentHash = canonicalHash([guild.moneyCopper ?? null, tabs.map((tab) => [tab.index, tab.name ?? null, tab.items.map((item) => [item.key, item.count])])]);
     const previous = known.get(keyOf(guild.name, guild.realm));
     if (previous && (previous.contentHash === contentHash || previous.fileModifiedAt.getTime() > fileModifiedAt.getTime())) continue;

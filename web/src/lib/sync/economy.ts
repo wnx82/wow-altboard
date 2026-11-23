@@ -3,6 +3,7 @@ import type { DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
 import { canonicalHash } from "@/lib/hash";
 import { auctionDayToDate } from "@/lib/economy/days";
+import { chunks, uniqueBy } from "./helpers";
 import type { AccountPayload, MarketPayload, RecipesPayload } from "./schema";
 
 // Import des données économiques d'un compte : prix Auctionator et recettes NaowhForever. Les
@@ -38,18 +39,12 @@ type Scope = { accountId: number; machineId: number; runId: number; now: Date };
 
 const BATCH = 2_000;
 
-function chunks<T>(values: readonly T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < values.length; i += size) result.push(values.slice(i, i + size));
-  return result;
-}
-
 export async function applyAuctionator(tx: DatabaseOrTransaction, account: AccountPayload, scope: Scope, counters: EconomyCounters): Promise<void> {
   const auctionator = account.auctionator;
   if (!auctionator) return;
   const observedAt = new Date(auctionator.file.modifiedAt);
 
-  for (const batch of chunks(dedupe(auctionator.vendorPrices, (v) => v.key), BATCH)) {
+  for (const batch of chunks(uniqueBy(auctionator.vendorPrices, (v) => v.key), BATCH)) {
     await tx
       .insert(t.vendorPrices)
       .values(batch.map((v) => ({ itemKey: v.key, priceCopper: v.price, observedAt })))
@@ -92,9 +87,9 @@ async function applyMarket(
     return;
   }
 
-  const items = dedupe(market.items, (item) => item.key);
+  const items = uniqueBy(market.items, (item) => item.key);
   const days = items.flatMap((item) =>
-    dedupe(item.days, ([day]) => day).map(([day, low, high, available]) => ({
+    uniqueBy(item.days, ([day]) => day).map(([day, low, high, available]) => ({
       marketId,
       itemKey: item.key,
       day: auctionDayToDate(day),
@@ -188,10 +183,10 @@ export async function applyRecipes(tx: DatabaseOrTransaction, account: AccountPa
     .where(inArray(t.characterRecipeSources.characterId, [...ids.values()]));
   const sourceOf = new Map(sources.map((s) => [s.characterId, s]));
 
-  for (const character of dedupe(payload.characters, (c) => c.guid)) {
+  for (const character of uniqueBy(payload.characters, (c) => c.guid)) {
     const characterId = ids.get(character.guid);
     if (characterId === undefined) continue;
-    const recipes = dedupe(character.recipes, (r) => r.spellId);
+    const recipes = uniqueBy(character.recipes, (r) => r.spellId);
     const contentHash = canonicalHash(recipes.map((r) => [r.spellId, r.outputItemId, r.outputQuantity, r.cooldown, r.reagents.map((x) => [x.itemId, x.quantity])]));
     const source = sourceOf.get(characterId);
     // Liste identique, ou fichier plus ancien que celui qui l'a fournie : on ne touche à rien.
@@ -227,7 +222,7 @@ export async function applyRecipes(tx: DatabaseOrTransaction, account: AccountPa
       await tx.delete(t.recipeReagents).where(inArray(t.recipeReagents.spellId, spellIds));
       await tx
         .insert(t.recipeReagents)
-        .values(recipes.flatMap((r) => dedupe(r.reagents, (x) => x.itemId).map((x) => ({ spellId: r.spellId, itemId: x.itemId, quantity: x.quantity }))));
+        .values(recipes.flatMap((r) => uniqueBy(r.reagents, (x) => x.itemId).map((x) => ({ spellId: r.spellId, itemId: x.itemId, quantity: x.quantity }))));
       await tx
         .delete(t.characterRecipes)
         .where(and(eq(t.characterRecipes.characterId, characterId), notInArray(t.characterRecipes.spellId, spellIds)));
@@ -248,6 +243,3 @@ export async function applyRecipes(tx: DatabaseOrTransaction, account: AccountPa
   }
 }
 
-function dedupe<T>(values: readonly T[], key: (value: T) => string | number): T[] {
-  return [...new Map(values.map((value) => [key(value), value])).values()];
-}

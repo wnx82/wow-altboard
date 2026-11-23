@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DatabaseOrTransaction } from "@/db/client";
 import * as t from "@/db/schema";
+import { chunks, uniqueBy } from "./helpers";
 import type { EconomyCounters } from "./economy";
 import { type AccountPayload, SCAN_ITEM_KEY_PATTERN, SCAN_MARKET_KEY_PATTERN, type ScanMarketPayload } from "./schema";
 
@@ -65,7 +66,7 @@ async function applyScanMarket(
     return;
   }
 
-  const samples = dedupe(
+  const samples = uniqueBy(
     market.items.flatMap((item) =>
       item.samples.map(([at, price, units]) => ({
         scanMarketId,
@@ -121,7 +122,7 @@ async function applyScanMarket(
 
   // Rapports de l'addon : rattachés au scan de relevés le plus proche, sinon scan sans relevé
   // (analysé sans entrer dans l'historique de l'addon, par exemple trop proche du précédent).
-  for (const report of dedupe(market.scans, (scan) => scan.at)) {
+  for (const report of uniqueBy(market.scans, (scan) => scan.at)) {
     const reportAt = report.at * 1000;
     const nearest = times.reduce<number | null>(
       (best, time) => (Math.abs(time - reportAt) <= REPORT_MATCH_SECONDS * 1000 && (best === null || Math.abs(time - reportAt) < Math.abs(best - reportAt)) ? time : best),
@@ -154,12 +155,3 @@ async function applyScanMarket(
   counters.scanSamples += inserted;
 }
 
-function chunks<T>(values: readonly T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let i = 0; i < values.length; i += size) result.push(values.slice(i, i + size));
-  return result;
-}
-
-function dedupe<T>(values: readonly T[], key: (value: T) => string | number): T[] {
-  return [...new Map(values.map((value) => [key(value), value])).values()];
-}
