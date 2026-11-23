@@ -4,6 +4,24 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.33.0 — 2026-11-23
+
+Page **Craft** plus lisible. Aucune migration.
+
+### Modifié
+
+- Les recettes sont rangées par métier, chacun dans une section repliable dont l'intitulé donne le
+  nombre de recettes, celles à crafter, celles faisables avec vos stocks, le meilleur profit et le
+  profit des lots. Sans filtre, seuls les métiers qui ont une recette à crafter sont ouverts ; les
+  plus rentables viennent en tête, et dans chacun les recettes à crafter d'abord.
+- Recherche sur le produit, ses composants et les personnages qui connaissent la recette, sans
+  accents ni casse, et filtre par métier. Ils se combinent avec la décision et « Faisables avec vos
+  stocks » ; chaque compteur dit combien de recettes ce choix montrerait. L'adresse garde le tout.
+- Une recherche sans résultat propose « Tout afficher ». Le tableau « Par métier » disparaît : son
+  bilan est dans l'intitulé de chaque section.
+- Tableaux des recettes : légende pour les lecteurs d'écran, produit en en-tête de ligne, conteneur
+  focalisable quand il défile en largeur.
+
 ## Site 0.32.0 — 2026-11-23
 
 Interface : accessibilité, préférences d'affichage, finitions et dette de code. Aucune migration.

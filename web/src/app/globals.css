@@ -1318,6 +1318,22 @@ body {
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
+  /* Page Craft : un métier par section repliable, son bilan dans l'intitulé. */
+  .craft-group { overflow: hidden; }
+  .craft-group > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1.1rem;
+    cursor: pointer;
+    list-style: none;
+  }
+  .craft-group > summary::-webkit-details-marker { display: none; }
+  .craft-group > summary:hover { background: rgb(227 189 106 / 0.05); }
+  .craft-group > summary:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+  .craft-group[open] > summary { border-bottom: 1px solid var(--line); }
+  .craft-chevron { flex: none; color: var(--faint); transition: transform 150ms ease; }
+  .craft-group:not([open]) .craft-chevron { transform: rotate(-90deg); }
   .category-chevron { flex: none; color: var(--faint); transition: transform 150ms ease; }
   .category-section:not([open]) .category-chevron { transform: rotate(-90deg); }
   /* Hors de l'écran, la grille d'une catégorie n'est ni mise en page ni peinte : la vue par

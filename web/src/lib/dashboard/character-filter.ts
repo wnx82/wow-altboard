@@ -4,11 +4,9 @@
 import type { Filters, GoalState, Sort, SortKey } from "@/lib/dashboard/browser-state";
 import type { CharacterListItem } from "@/lib/dashboard/queries";
 import { classLabel } from "@/lib/wow/format";
+import { fold } from "./inventory-view";
 
 export const collator = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
-
-/** Minuscules sans accents : « elodie » trouve « Élodie ». */
-export const fold = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 export function goalState(goals: CharacterListItem["goals"]): GoalState {
   if (goals.total === 0) return "none";

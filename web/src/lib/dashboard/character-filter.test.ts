@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NO_FILTERS } from "./browser-state";
-import { filterCharacters, fold, goalState, sortCharacters } from "./character-filter";
+import { filterCharacters, goalState, sortCharacters } from "./character-filter";
+import { fold } from "./inventory-view";
 import type { CharacterListItem } from "./queries";
 
 function character(id: number, name: string, extra: Partial<CharacterListItem> = {}): CharacterListItem {
