@@ -4,6 +4,28 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.35.0 — 2026-11-23
+
+Scans d'EZAuctioneer dans le moteur de prix. Aucune migration.
+
+### Ajouté
+
+- Un marché d'EZAuctioneer est **relié** à un marché d'Auctionator quand leurs prix concordent sur
+  les 14 derniers jours (30 objets-jours communs au moins, rapport médian entre 0,9 et 1,1, 40 % des
+  objets-jours à moins de 5 % d'écart) et qu'ils sont du même client et de la même faction. Le nom
+  du royaume, qui diffère d'un addon à l'autre, n'entre pas en compte.
+- Les scans des marchés reliés complètent les relevés d'Auctionator : jours sans relevé d'Auctionator,
+  plus bas et plus haut du jour, objets qu'Auctionator ne relève pas. Le dernier prix est le dernier
+  scan quand il est plus récent que le fichier d'Auctionator. Crafts, opportunités, hausses et
+  baisses, valeur des inventaires et du patrimoine, alertes de prix en profitent.
+- Page **Marché** : chaque marché d'EZAuctioneer dit s'il est repris dans les prix, avec sa
+  concordance, ou pourquoi il est écarté. Page d'un objet : le dernier prix dit s'il vient d'un scan
+  d'EZAuctioneer, avec son heure.
+
+### Modifié
+
+- Version du moteur d'opportunités portée à 2 : le classement en cache est recalculé.
+
 ## Site 0.34.0 — 2026-11-23
 
 Carnet des personnages et listes à cocher. Migration `0024_notes_checklists` : cinq tables et deux

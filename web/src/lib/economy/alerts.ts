@@ -1,13 +1,15 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { readSettings } from "@/lib/settings/store";
+import { freshestLatest, linkedIds, loadScanLatest, scanLinks } from "./feeds";
 import { historyStart } from "./load";
 import { ITEM_KEY_PATTERN } from "./view";
 
 // Alertes de prix : un seuil bas (« prévenir sous 12 po ») et un seuil haut par objet et par marché,
-// comparés au dernier prix relevé (champ m d'Auctionator, table market_item_latest). Aucune
-// notification ni état : le résultat se relit à chaque affichage (fiche de l'objet, Marché, accueil).
+// comparés au dernier prix relevé : champ m d'Auctionator (table market_item_latest), ou dernier scan
+// d'EZAuctioneer d'un marché relié quand il est plus récent (feeds.ts). Aucun état : le résultat se
+// relit à chaque affichage (fiche de l'objet, Marché, accueil).
 
 export const ALERT_DIRECTIONS = ["below", "above"] as const;
 export type AlertDirection = (typeof ALERT_DIRECTIONS)[number];
@@ -15,7 +17,8 @@ export type AlertDirection = (typeof ALERT_DIRECTIONS)[number];
 /** Au-delà, une nouvelle alerte est refusée : la liste de la page Marché reste lisible. */
 export const MAX_ALERTS = 500;
 
-export type LatestPrice = { minCopper: number; day: string };
+/** at et source : heure et addon du relevé, quand on les connaît. */
+export type LatestPrice = { minCopper: number; day: string; at?: Date | null; source?: "auctionator" | "ezauctioneer" };
 
 export type AlertStatus = {
   id: number;
@@ -40,7 +43,11 @@ export function isTriggered(direction: AlertDirection, thresholdCopper: number, 
 }
 
 /** Alertes d'un marché (ou de tous), d'un objet au besoin, avec le dernier prix relevé. Déclenchées en tête. */
-export async function listAlerts(db: Database, options: { marketId?: number; itemKey?: string; historyFrom?: string | null } = {}): Promise<AlertStatus[]> {
+export async function listAlerts(
+  db: Database,
+  options: { marketId?: number; itemKey?: string; historyFrom?: string | null; now?: Date } = {},
+): Promise<AlertStatus[]> {
+  const now = options.now ?? new Date();
   const historyFrom = options.historyFrom === undefined ? historyStart(await readSettings(db)) : options.historyFrom;
   const filters = [
     options.marketId === undefined ? undefined : eq(t.priceAlerts.marketId, options.marketId),
@@ -55,16 +62,33 @@ export async function listAlerts(db: Database, options: { marketId?: number; ite
       thresholdCopper: t.priceAlerts.thresholdCopper,
       minCopper: t.marketItemLatest.minCopper,
       day: t.marketItemLatest.day,
+      observedAt: t.marketItemLatest.observedAt,
     })
     .from(t.priceAlerts)
     .leftJoin(t.marketItemLatest, and(eq(t.marketItemLatest.marketId, t.priceAlerts.marketId), eq(t.marketItemLatest.itemKey, t.priceAlerts.itemKey)))
     .where(filters.length > 0 ? and(...filters) : undefined)
     .orderBy(asc(t.priceAlerts.itemKey), asc(t.priceAlerts.direction));
 
+  // Dernier scan des marchés d'EZAuctioneer reliés à chaque marché alerté (60 jours de relevés gardés tels quels).
+  const scanned = new Map<number, Map<string, { price: number; at: Date }>>();
+  const marketIds = [...new Set(rows.map((row) => row.marketId))];
+  if (marketIds.length > 0) {
+    const markets = await db.select({ id: t.markets.id, flavor: t.markets.flavor, auctionKey: t.markets.auctionKey }).from(t.markets).where(inArray(t.markets.id, marketIds));
+    const since = new Date(now.getTime() - 60 * 24 * 60 * 60_000);
+    await Promise.all(
+      markets.map(async (market) => {
+        const ids = linkedIds(await scanLinks(db, market, now));
+        const keys = rows.filter((row) => row.marketId === market.id).map((row) => row.itemKey);
+        scanned.set(market.id, await loadScanLatest(db, ids, since, keys));
+      }),
+    );
+  }
+
   return rows
     .map((row) => {
       const direction = row.direction as AlertDirection;
-      const latest = consideredPrice(row.minCopper === null || row.day === null ? null : { minCopper: row.minCopper, day: row.day }, historyFrom);
+      const auction = row.minCopper === null || row.day === null || row.observedAt === null ? null : { minCopper: row.minCopper, day: row.day, observedAt: row.observedAt };
+      const latest = consideredPrice(freshestLatest(auction, scanned.get(row.marketId)?.get(row.itemKey) ?? null), historyFrom);
       return {
         id: row.id,
         marketId: row.marketId,

@@ -122,7 +122,13 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
           <StatTile
             label="Dernier prix"
             value={<Money copper={stats.current?.minCopper ?? null} />}
-            hint={stats.current ? `plus bas du scan du ${formatDay(stats.current.day)}` : "aucun prix depuis le début de l'historique"}
+            hint={
+              stats.current
+                ? stats.current.source === "ezauctioneer" && stats.current.at
+                  ? `scan EZAuctioneer du ${formatDateTime(stats.current.at)} (25e percentile)`
+                  : `plus bas du scan du ${formatDay(stats.current.day)}`
+                : "aucun prix depuis le début de l'historique"
+            }
           />
           <StatTile
             label="Valeur de marché"

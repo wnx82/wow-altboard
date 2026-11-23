@@ -3,8 +3,8 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 
 // Lecture des scans d'EZAuctioneer (voir docs/EZAUCTIONEER-DATA-MODEL.md) : taille de chaque
-// marché et prix d'un objet scan par scan. Le moteur de prix ne s'en sert pas encore : il reste
-// sur les relevés journaliers d'Auctionator.
+// marché et prix d'un objet scan par scan. Le moteur de prix les reprend par feeds.ts, pour les
+// marchés dont les prix concordent avec ceux d'Auctionator.
 
 export type ScanMarketSummary = {
   id: number;

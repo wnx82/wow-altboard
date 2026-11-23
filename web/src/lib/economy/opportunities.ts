@@ -6,7 +6,8 @@ import type { ItemStats } from "./prices";
 // Chaque opportunité porte son signal chiffré, son horizon, sa confiance, ses raisons et les
 // valeurs qui l'ont produite : rien n'y est affirmé qui ne vienne des relevés.
 
-export const ENGINE_VERSION = "1";
+/** 2 : prix complétés par les scans d'EZAuctioneer reliés (site 0.35.0). Un calcul d'une autre version est refait. */
+export const ENGINE_VERSION = "2";
 
 export type OpportunityKind = "CRAFT" | "PROCESS" | "DONT_CRAFT" | "SELL" | "KEEP" | "BUY" | "FARM";
 

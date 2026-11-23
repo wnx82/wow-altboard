@@ -31,7 +31,9 @@ EZAuctioneerDB = {
 - **Clé de marché** : `<région>:<royaume>:<faction>:faction` (hôtel des ventes de faction) ou
   `<région>:<royaume>:neutral` (hôtel des ventes neutre). Le royaume est le nom que donne le jeu
   (`GetRealmName()`). Il peut différer de celui de la liste des royaumes et des clés d'Auctionator
-  (« PvE »). Les deux sources restent donc séparées. Leur rapprochement est prévu au lot G.
+  (« PvE »). Le moteur ne s'y fie donc pas : il relie un marché d'EZAuctioneer à un marché
+  d'Auctionator quand leurs prix concordent (voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md), « Scans
+  EZAuctioneer »).
 - **Clé d'objet** : `i:<objet>`, `i:<objet>:s<suffixe>` ou `i:<objet>:s<suffixe négatif>:f<facteur>`.
   Une variante à suffixe (« de l'Ours », etc.) a son propre prix.
 - **Relevé** (`samples`) : `ts`, heure du serveur du jeu (`GetServerTime()`, secondes Unix) ;
@@ -80,9 +82,10 @@ envoie le reste. La surveillance (`watch`) réagit aussi à ce fichier.
   `market_item_scan_days` (plus bas, médiane, plus haut, plus grand nombre d'unités, nombre de
   scans) puis supprimés, par la purge quotidienne. Le prix de chaque jour n'est donc jamais perdu.
 
-Le moteur de l'économie ne s'en sert pas encore : ses prix restent ceux d'Auctionator. Le
-tableau de bord affiche les scans sur la page **Marché** (taille de chaque marché) et sur la page
-d'un objet (section « Scans EZAuctioneer » : dernier prix, variation sur 24 h, unités en vente,
-courbe scan par scan).
+Depuis le site 0.35.0, le moteur de l'économie complète les prix d'Auctionator par les scans des
+marchés reliés ([ECONOMY-ENGINE](ECONOMY-ENGINE.md), « Scans EZAuctioneer »). Le tableau de bord
+affiche aussi les scans sur la page **Marché** (taille de chaque marché, et s'il complète les
+prix) et sur la page d'un objet (section « Scans EZAuctioneer » : dernier prix, variation sur
+24 h, unités en vente, courbe scan par scan).
 
 Voir [DATABASE](DATABASE.md).

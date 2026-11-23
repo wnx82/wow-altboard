@@ -8,15 +8,19 @@ import { daysBetween } from "./days";
 // Auctionator lui-même. Le nombre d'enchères n'est pas relevé par l'addon : il reste inconnu.
 
 export type DayObservation = { day: string; low: number; high: number; available: number | null };
-export type LatestObservation = { minCopper: number; day: string };
+/** Dernier prix : at et source quand on les connaît (heure du scan, addon qui l'a relevé). */
+export type LatestObservation = { minCopper: number; day: string; at?: Date | null; source?: "auctionator" | "ezauctioneer" };
 
 export type ConfidenceFactors = { history: number; freshness: number; volume: number; stability: number };
 export type Liquidity = "élevée" | "moyenne" | "faible" | "inconnue";
 
 export type ItemStats = {
   itemKey: string;
-  /** Dernier prix minimum vu (champ m), s'il est postérieur au début de l'historique. */
-  current: { minCopper: number; day: string; ageDays: number } | null;
+  /**
+   * Dernier prix vu, s'il est postérieur au début de l'historique : champ m d'Auctionator, ou
+   * dernier scan d'EZAuctioneer quand il est plus récent.
+   */
+  current: { minCopper: number; day: string; ageDays: number; at: Date | null; source: "auctionator" | "ezauctioneer" } | null;
   lastDay: string | null;
   lastAvailable: number | null;
   daysObserved7: number;
@@ -158,7 +162,10 @@ export function computeItemStats(
 
   return {
     itemKey,
-    current: currentPrice !== null && latest ? { minCopper: currentPrice, day: latest.day, ageDays: daysBetween(latest.day, today) } : null,
+    current:
+      currentPrice !== null && latest
+        ? { minCopper: currentPrice, day: latest.day, ageDays: daysBetween(latest.day, today), at: latest.at ?? null, source: latest.source ?? "auctionator" }
+        : null,
     lastDay,
     lastAvailable: lastObs?.available ?? null,
     daysObserved7: last7.length,

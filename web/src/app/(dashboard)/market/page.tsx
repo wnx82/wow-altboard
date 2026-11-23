@@ -10,10 +10,11 @@ import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
 import { deleteAlertAction } from "@/lib/economy/actions";
 import { listAlerts, type AlertStatus } from "@/lib/economy/alerts";
+import type { ScanLink } from "@/lib/economy/feeds";
 import { itemLabel, loadEconomy } from "@/lib/economy/load";
 import { buildMarketView, SORTS, type MarketRow, type MarketSort } from "@/lib/economy/market-view";
 import { listScanMarkets, type ScanMarketSummary } from "@/lib/economy/scans";
-import { formatCopperShort, formatDay, marketParam, marketQuery } from "@/lib/economy/view";
+import { formatCopperShort, formatDay, formatPercent, marketParam, marketQuery } from "@/lib/economy/view";
 import { formatDateTime, formatInteger, formatRelative } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Marché" };
@@ -63,7 +64,8 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
     <>
       <Header>
         <MarketSource lastImport={context.lastImport} lastDay={formatDay(context.lastImport?.lastDay ?? null)} />{" "}
-        {context.historyFrom && <>Prix pris en compte depuis le {formatDay(context.historyFrom)}.</>}
+        {context.historyFrom && <>Prix pris en compte depuis le {formatDay(context.historyFrom)}.</>}{" "}
+        {context.scanLinks.some((link) => link.linked) && <>Complétés par les scans EZAuctioneer du même hôtel des ventes.</>}
       </Header>
       <MarketSelector path="/market" market={context.market} markets={context.markets} />
 
@@ -80,7 +82,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
         <MoverList title="Prix anormaux" rows={view.anomalies} names={context.names} query={itemQuery} empty="Aucun prix isolé." anomaly />
       </div>
 
-      {scanMarkets.length > 0 && <ScanMarketList markets={scanMarkets} />}
+      {scanMarkets.length > 0 && <ScanMarketList markets={scanMarkets} links={context.scanLinks} />}
 
       {alerts.length > 0 && <AlertList alerts={alerts} names={context.names} query={itemQuery} />}
 
@@ -201,9 +203,10 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
           </nav>
         )}
         <p className="mt-3 text-xs text-faint">
-          Dernier prix : le plus bas vu au dernier scan. Valeur de marché : médiane des plus bas journaliers sur 14 jours (30 à défaut, trois
-          jours au moins). En vente : plus grande quantité vue le dernier jour relevé. Auctionator ne relève ni le nombre d&apos;enchères ni
-          l&apos;heure du scan ; EZAuctioneer les relève, et la page de chaque objet montre ses prix scan par scan.
+          Dernier prix : le plus bas vu au dernier scan d&apos;Auctionator, ou le dernier scan d&apos;EZAuctioneer (25e percentile) s&apos;il est
+          plus récent. Valeur de marché : médiane des plus bas journaliers sur 14 jours (30 à défaut, trois jours au moins), scans
+          d&apos;EZAuctioneer compris. En vente : plus grande quantité vue le dernier jour relevé. La page de chaque objet montre les prix
+          d&apos;EZAuctioneer scan par scan.
         </p>
       </section>
     </>
@@ -266,13 +269,17 @@ function MoverList({
   );
 }
 
-/** Marchés relevés par EZAuctioneer : taille de l'hôtel des ventes au dernier scan qui l'a donnée. */
-function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
+/**
+ * Marchés relevés par EZAuctioneer : taille de l'hôtel des ventes au dernier scan qui l'a donnée,
+ * et si ses prix complètent ceux du marché affiché.
+ */
+function ScanMarketList({ markets, links }: { markets: ScanMarketSummary[]; links: ScanLink[] }) {
+  const linkOf = new Map(links.map((link) => [link.scanMarketId, link]));
   return (
     <section aria-label="Scans EZAuctioneer" className="mt-8">
       <SectionTitle aside="addon EZAuctioneer : chaque scan complet, à son heure">Scans EZAuctioneer</SectionTitle>
       <ScrollRegion className="panel overflow-x-auto" label="Scans EZAuctioneer">
-        <table className="data-table min-w-[720px]">
+        <table className="data-table min-w-[880px]">
           <caption className="sr-only">Scans EZAuctioneer</caption>
           <thead>
             <tr>
@@ -287,6 +294,7 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
               <th scope="col" className="num">
                 Scans 7 j
               </th>
+              <th scope="col">Dans les prix</th>
             </tr>
           </thead>
           <tbody>
@@ -299,6 +307,9 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
                 <td className="num">{formatInteger(market.lastSized?.auctions ?? null)}</td>
                 <td className="num">{formatInteger(market.lastSized?.listedItems ?? null)}</td>
                 <td className="num">{formatInteger(market.scans7d)}</td>
+                <td>
+                  <LinkStatus link={linkOf.get(market.id)} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -306,9 +317,32 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
       </ScrollRegion>
       <p className="mt-3 text-xs text-faint">
         Enchères et objets : ceux du dernier scan dont l&apos;addon a gardé le rapport. Royaume : le nom que donne le jeu, qui peut différer de
-        celui de la liste des royaumes.
+        celui de la liste des royaumes. Un marché ne complète les prix que si ses scans concordent avec Auctionator sur les mêmes objets
+        et les mêmes jours (14 derniers jours) : son nom ne suffit pas à dire qu&apos;il s&apos;agit du même hôtel des ventes.
       </p>
     </section>
+  );
+}
+
+function LinkStatus({ link }: { link: ScanLink | undefined }) {
+  if (!link) return <span className="text-xs text-faint">Autre hôtel des ventes</span>;
+  const measure =
+    link.pairs > 0 ? `concordance ${formatPercent(link.agreement)} sur ${formatInteger(link.pairs)} objet${link.pairs > 1 ? "s" : ""}-jours` : null;
+  return link.linked ? (
+    <>
+      <span className="badge" data-tone="ok">
+        Repris
+      </span>
+      {measure && <span className="ml-2 text-xs text-muted">{measure}</span>}
+    </>
+  ) : (
+    <>
+      <span className="badge">Écarté</span>
+      <span className="ml-2 text-xs text-muted">
+        {link.reason}
+        {measure && link.pairs >= 30 ? ` (${measure})` : ""}
+      </span>
+    </>
   );
 }
 

@@ -6,6 +6,7 @@ import { cachedEconomy } from "./cache";
 import { DEFAULT_CRAFT_OPTIONS, evaluateRecipe, type CraftEvaluation, type Recipe } from "./craft";
 import { addDays, todayInBrussels } from "./days";
 import { farmSignal, type FarmSignal } from "./farm";
+import { freshestLatest, linkedIds, loadScanDays, loadScanLatest, mergeDays, scanLinks, type AuctionLatest, type ScanLink } from "./feeds";
 import { attachItemIcons } from "@/lib/wow/icon-files";
 import { fillCatalogNames } from "./item-names";
 import { computeItemStats, type DayObservation, type ItemStats } from "./prices";
@@ -38,7 +39,7 @@ export type EconomyContext = {
   historyFrom: string | null;
   auctionCut: number;
   stats: Map<string, ItemStats>;
-  /** Relevés journaliers de la fenêtre lue, du plus ancien au plus récent. */
+  /** Relevés journaliers de la fenêtre lue (Auctionator et scans reliés), du plus ancien au plus récent. */
   days: Map<string, DayObservation[]>;
   names: Map<string, ItemName>;
   vendor: Map<string, number>;
@@ -49,6 +50,8 @@ export type EconomyContext = {
   /** Nom de chaque métier (ligne de compétence), tel que le jeu le donne. */
   professions: Map<number, string>;
   farmSignals: FarmSignal[];
+  /** Marchés d'EZAuctioneer comparés à ce marché ; ceux qui sont reliés complètent ses prix. */
+  scanLinks: ScanLink[];
   /** Relevé le plus frais du marché (dernier jour, puis fichier le plus récent). */
   lastImport: { id: number; receivedAt: Date; fileModifiedAt: Date; lastDay: string | null } | null;
   /** Dernier relevé reçu, quel qu'il soit : tout nouvel import change la base des calculs. */
@@ -158,9 +161,10 @@ function statsWindow(settings: { marketHistoryFrom: Date | null; charactersCutof
 export async function loadEconomy(db: Database, options: { marketId?: number; now: Date }): Promise<EconomyContext | null> {
   const [settings, version] = await Promise.all([
     readSettings(db),
-    db.execute<{ run: string | null; import: string | null; characters: number }>(sql`
+    db.execute<{ run: string | null; import: string | null; scans: string | null; characters: number }>(sql`
       select (select max(id) from ${t.syncRuns})::text as run,
              (select max(id) from ${t.marketImports})::text as import,
+             (select max(id) from ${t.scanImports})::text as scans,
              (select count(*) from ${t.characters})::int as characters
     `),
   ]);
@@ -170,6 +174,7 @@ export async function loadEconomy(db: Database, options: { marketId?: number; no
     todayInBrussels(options.now),
     basis.run,
     basis.import,
+    basis.scans,
     basis.characters,
     settings.marketHistoryFrom?.toISOString() ?? null,
     settings.charactersCutoffAt?.toISOString() ?? null,
@@ -183,17 +188,20 @@ async function computeEconomy(db: Database, options: { marketId?: number; now: D
   const market = markets.find((m) => m.id === options.marketId) ?? markets.find((m) => m.lastDay !== null) ?? markets[0];
   if (!market) return null;
 
-  const settings = await readSettings(db);
+  const [settings, links] = await Promise.all([readSettings(db), scanLinks(db, market, options.now)]);
   const { historyFrom, today, from } = statsWindow(settings, options.now);
   const auctionCut = (settings.auctionCutPercent ?? 5) / 100;
+  const scanIds = linkedIds(links);
 
-  const [dayRows, latestRows, vendorRows, itemRows, holdings, recipeRows, reagentRows, knownRows, lastImportRows, lastRun, professionRows, newestImport] = await Promise.all([
+  const [scanDays, scanLatest, dayRows, latestRows, vendorRows, itemRows, holdings, recipeRows, reagentRows, knownRows, lastImportRows, lastRun, professionRows, newestImport] = await Promise.all([
+    loadScanDays(db, scanIds, from),
+    loadScanLatest(db, scanIds, new Date(`${from}T00:00:00Z`)),
     db
       .select({ itemKey: t.marketItemDays.itemKey, day: t.marketItemDays.day, low: t.marketItemDays.lowCopper, high: t.marketItemDays.highCopper, available: t.marketItemDays.available })
       .from(t.marketItemDays)
       .where(and(eq(t.marketItemDays.marketId, market.id), gte(t.marketItemDays.day, from))),
     db
-      .select({ itemKey: t.marketItemLatest.itemKey, minCopper: t.marketItemLatest.minCopper, day: t.marketItemLatest.day })
+      .select({ itemKey: t.marketItemLatest.itemKey, minCopper: t.marketItemLatest.minCopper, day: t.marketItemLatest.day, observedAt: t.marketItemLatest.observedAt })
       .from(t.marketItemLatest)
       .where(eq(t.marketItemLatest.marketId, market.id)),
     db.select({ itemKey: t.vendorPrices.itemKey, price: t.vendorPrices.priceCopper }).from(t.vendorPrices),
@@ -225,10 +233,13 @@ async function computeEconomy(db: Database, options: { marketId?: number; now: D
     daysByItem.set(row.itemKey, list);
   }
   for (const list of daysByItem.values()) list.sort((a, b) => (a.day < b.day ? -1 : 1));
-  const latestByItem = new Map(latestRows.map((row) => [row.itemKey, { minCopper: row.minCopper, day: row.day }]));
+  // Les scans reliés complètent les jours d'Auctionator ; le dernier prix est le plus récent des deux.
+  for (const [itemKey, list] of scanDays) daysByItem.set(itemKey, mergeDays(daysByItem.get(itemKey) ?? [], list));
+  const auctionLatest = new Map<string, AuctionLatest>(latestRows.map(({ itemKey, ...latest }) => [itemKey, latest]));
   const stats = new Map<string, ItemStats>();
-  for (const itemKey of new Set([...daysByItem.keys(), ...latestByItem.keys()])) {
-    stats.set(itemKey, computeItemStats(itemKey, daysByItem.get(itemKey) ?? [], latestByItem.get(itemKey) ?? null, today, historyFrom));
+  for (const itemKey of new Set([...daysByItem.keys(), ...auctionLatest.keys(), ...scanLatest.keys()])) {
+    const latest = freshestLatest(auctionLatest.get(itemKey) ?? null, scanLatest.get(itemKey) ?? null);
+    stats.set(itemKey, computeItemStats(itemKey, daysByItem.get(itemKey) ?? [], latest, today, historyFrom));
   }
 
   const vendor = new Map(vendorRows.map((row) => [row.itemKey, row.price]));
@@ -297,6 +308,7 @@ async function computeEconomy(db: Database, options: { marketId?: number; now: D
     crafts,
     professions: new Map(professionRows.map((row) => [row.skillLine, row.name])),
     farmSignals,
+    scanLinks: links,
     lastImport: lastImportRows[0] ?? null,
     newestImportId: newestImport[0]?.id ?? null,
     lastSyncRunId: lastRun[0]?.id ?? null,
@@ -319,24 +331,30 @@ export async function loadMarketValues(db: Database, itemKeys: readonly string[]
   const keys = [...new Set(itemKeys)];
   if (!market || keys.length === 0) return { market: market ? { id: market.id, label: market.label } : null, values: new Map() };
 
-  const { historyFrom, today, from } = statsWindow(await readSettings(db), now);
-  const [dayRows, latestRows] = await Promise.all([
+  const [settings, links] = await Promise.all([readSettings(db), scanLinks(db, market, now)]);
+  const { historyFrom, today, from } = statsWindow(settings, now);
+  const scanIds = linkedIds(links);
+  const [scanDays, scanLatest, dayRows, latestRows] = await Promise.all([
+    loadScanDays(db, scanIds, from, keys),
+    loadScanLatest(db, scanIds, new Date(`${from}T00:00:00Z`), keys),
     db
       .select({ itemKey: t.marketItemDays.itemKey, day: t.marketItemDays.day, low: t.marketItemDays.lowCopper, high: t.marketItemDays.highCopper, available: t.marketItemDays.available })
       .from(t.marketItemDays)
       .where(and(eq(t.marketItemDays.marketId, market.id), gte(t.marketItemDays.day, from), inArray(t.marketItemDays.itemKey, keys))),
     db
-      .select({ itemKey: t.marketItemLatest.itemKey, minCopper: t.marketItemLatest.minCopper, day: t.marketItemLatest.day })
+      .select({ itemKey: t.marketItemLatest.itemKey, minCopper: t.marketItemLatest.minCopper, day: t.marketItemLatest.day, observedAt: t.marketItemLatest.observedAt })
       .from(t.marketItemLatest)
       .where(and(eq(t.marketItemLatest.marketId, market.id), inArray(t.marketItemLatest.itemKey, keys))),
   ]);
   const days = new Map<string, DayObservation[]>();
   for (const { itemKey, ...day } of dayRows) days.set(itemKey, [...(days.get(itemKey) ?? []), day]);
-  const latest = new Map(latestRows.map((row) => [row.itemKey, { minCopper: row.minCopper, day: row.day }]));
+  for (const [itemKey, list] of scanDays) days.set(itemKey, mergeDays(days.get(itemKey) ?? [], list));
+  const latest = new Map<string, AuctionLatest>(latestRows.map(({ itemKey, ...row }) => [itemKey, row]));
 
   const values = new Map<string, number>();
-  for (const itemKey of new Set([...days.keys(), ...latest.keys()])) {
-    const value = computeItemStats(itemKey, days.get(itemKey) ?? [], latest.get(itemKey) ?? null, today, historyFrom).marketValue;
+  for (const itemKey of new Set([...days.keys(), ...latest.keys(), ...scanLatest.keys()])) {
+    const current = freshestLatest(latest.get(itemKey) ?? null, scanLatest.get(itemKey) ?? null);
+    const value = computeItemStats(itemKey, days.get(itemKey) ?? [], current, today, historyFrom).marketValue;
     if (value !== null) values.set(itemKey, Math.round(value));
   }
   return { market: { id: market.id, label: market.label }, values };

@@ -24,13 +24,39 @@ Prix de référence d'un jour : son **plus bas** (plus bas des prix minimums vus
 
 | Statistique | Règle |
 |---|---|
-| Dernier prix | `m` d'Auctionator, s'il date d'après le début de l'historique |
+| Dernier prix | `m` d'Auctionator, ou le dernier scan d'un marché EZAuctioneer relié s'il est plus récent ; s'il date d'après le début de l'historique |
 | Valeur de marché | médiane des plus bas sur 14 jours ; sur 30 à défaut ; **au moins 3 jours**, sinon « insuffisant » |
 | Médianes | 7 et 30 jours |
 | Variations | dernier jour relevé contre : le jour relevé précédent (1 j) ; le dernier relevé d'au moins 7 ou 30 jours plus tôt |
 | Volatilité | 1,4826 × MAD ÷ médiane des plus bas sur 30 jours (3 jours au moins) |
 | Liquidité | quantité médiane en vente sur 30 jours : élevée ≥ 50, moyenne ≥ 10, faible en dessous |
 | Prix anormal | écart robuste du dernier prix à la médiane des jours précédents (en MAD) au-delà de 3,5 |
+
+### Scans EZAuctioneer (`feeds.ts`)
+
+Depuis le site 0.35.0, les scans d'EZAuctioneer complètent les relevés d'Auctionator du même
+hôtel des ventes. Le nom du royaume ne suffit pas à l'établir (« Realm 5 » et « Realm 1 » pour un
+même hôtel) : un marché d'EZAuctioneer n'est **relié** à un marché d'Auctionator que si
+
+- les deux sont du même client et, quand la clé d'Auctionator nomme une faction (« PvE Alliance »),
+  de la même maison et de la même faction ;
+- leurs prix **concordent** sur les 14 derniers jours : au moins 30 objets-jours relevés par les
+  deux, rapport médian des plus bas du jour entre 0,9 et 1,1, au moins 40 % des objets-jours à
+  moins de 5 % d'écart.
+
+La page **Marché** dit pour chaque marché d'EZAuctioneer s'il est repris, avec sa concordance, ou
+pourquoi il est écarté. Un marché relié apporte :
+
+| Apport | Règle |
+|---|---|
+| Jours | par jour de Bruxelles, plus bas et plus haut des scans, plus grande quantité ; fusionnés avec le jour d'Auctionator (plus bas des plus bas, plus haut des plus hauts, plus grande quantité). Un jour sans scan d'Auctionator est ainsi relevé |
+| Dernier prix | le dernier scan, s'il est plus récent que le fichier d'Auctionator qui a donné `m` |
+| Objets | les objets simples seulement (`i:1234` devient `1234`) ; les variantes à suffixe aléatoire n'ont pas d'équivalent chez Auctionator |
+
+Le prix d'un scan est le 25e percentile pondéré par les unités, pas le plus bas : il est un peu
+au-dessus quand quelques enchères isolées sont moins chères. Les historiques des pages d'objet
+restent ceux d'Auctionator ; la section « Scans EZAuctioneer » de la même page montre les scans.
+La liaison est recalculée à chaque nouvel import (Auctionator ou EZAuctioneer) et chaque jour.
 
 ### Confiance (0 à 100)
 
@@ -149,7 +175,8 @@ paramètres (dont la date du jour).
 
 Sur la fiche d'un objet, deux seuils facultatifs par marché : **prévenir sous** et **prévenir
 au-dessus de**, saisis en or (« 12,5 ») ou en unités (« 12 po 50 pa »), relus par
-`money-input.ts`. Ils sont comparés au dernier prix relevé (`market_item_latest`) : un seuil bas se
+`money-input.ts`. Ils sont comparés au dernier prix relevé (`market_item_latest`, ou le dernier
+scan d'un marché EZAuctioneer relié s'il est plus récent) : un seuil bas se
 déclenche au prix égal ou inférieur, un seuil haut au prix égal ou supérieur. Un prix antérieur au
 début de l'historique ne compte pas. Le seuil bas doit rester sous le seuil haut ; 500 alertes au
 plus. Rien n'est conservé de l'état : il se recalcule à chaque affichage, sur la fiche de l'objet,
@@ -236,7 +263,8 @@ seul nomme 59 % des objets d'Auctionator ; avec le cache, 98,5 %.
 
 ## Limites connues
 
-- Granularité journalière : pas de prix « 24 h » ni d'heure de scan, pas de nombre d'enchères.
+- Granularité journalière des statistiques ; seul le dernier prix a l'heure du scan, quand un marché
+  EZAuctioneer relié l'apporte. Sans relevé d'Auctionator récent, aucune liaison ne se vérifie.
 - Un scan partiel fait un jour à peu d'objets : la page Audit le signale (moins de la moitié des
   objets habituels).
 - Noms d'objets jamais possédés : ceux de wago.tools, réimportés chaque jour quand une nouvelle

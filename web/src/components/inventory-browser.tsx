@@ -385,8 +385,8 @@ export function InventoryBrowser({ data, now: nowIso, exportPath }: { data: Inve
       )}
       {data.market && rows.length > 0 && (
         <p className="text-xs text-faint">
-          Valeurs estimées à l&apos;hôtel des ventes {data.market.label} : médiane des prix les plus bas relevés par Auctionator sur les quatorze
-          derniers jours, commission non déduite. Les objets jamais vus en vente n&apos;ont pas de prix.
+          Valeurs estimées à l&apos;hôtel des ventes {data.market.label} : médiane des prix les plus bas relevés chaque jour (Auctionator et
+          EZAuctioneer) sur les quatorze derniers jours, commission non déduite. Les objets jamais vus en vente n&apos;ont pas de prix.
         </p>
       )}
     </div>

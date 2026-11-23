@@ -61,10 +61,10 @@ describe("alertes enregistrées", () => {
     let alerts = await listAlerts(database.db, { marketId, itemKey: "2576" });
     // Dernier prix 100 pc : sous le seuil bas de 150, loin du seuil haut.
     assert.deepEqual(
-      alerts.map((a) => [a.direction, a.thresholdCopper, a.latest, a.triggered]),
+      alerts.map((a) => [a.direction, a.thresholdCopper, a.latest?.minCopper, a.latest?.day, a.latest?.source, a.triggered]),
       [
-        ["below", 150, { minCopper: 100, day: "2026-11-06" }, true],
-        ["above", 500, { minCopper: 100, day: "2026-11-06" }, false],
+        ["below", 150, 100, "2026-11-06", "auctionator", true],
+        ["above", 500, 100, "2026-11-06", "auctionator", false],
       ],
     );
 
