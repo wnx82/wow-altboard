@@ -5,41 +5,23 @@ import { cache, Suspense } from "react";
 import { CharacterEquipment, type EquipmentRow } from "@/components/character-equipment";
 import { CharacterGoals } from "@/components/character-goals";
 import { CharacterInventory, type CharacterInventoryPlace } from "@/components/character-inventory";
-import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
-import { ScrollRegion } from "@/components/scroll-region";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
-import { TrendChart, type TrendPoint } from "@/components/trend-chart";
-import { ClassAvatar, FactionBadge, GameIcon, Meter, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
+import { SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { describeError } from "@/lib/errors";
-import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
-import { buildHistory } from "@/lib/dashboard/history";
-import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes } from "@/lib/dashboard/level-times";
-import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
-import { getCharacterDetail, getCharacterNeighbors, SESSIONS_SHOWN, type CharacterDetail, type CharacterLink } from "@/lib/dashboard/queries";
+import { getCharacterDetail, getCharacterNeighbors, type CharacterDetail } from "@/lib/dashboard/queries";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
 import { loadMarketValues } from "@/lib/economy/load";
 import { isGear } from "@/lib/wow/gear";
 import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { equippedItemKey, getEnchantText } from "@/lib/wow/item-tooltips";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
-import {
-  classKey,
-  classLabel,
-  formatDateTime,
-  formatDuration,
-  formatDurationToMinute,
-  formatInteger,
-  formatItemLevel,
-  formatMoney,
-  formatRelative,
-  fractionalLevel,
-  PLAYER_TIME_ZONE,
-  progressPercent,
-  QUALITY_LABELS,
-  REACTION_LABELS,
-} from "@/lib/wow/format";
+import { classKey, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
+import { CharacterHero, OverviewTiles } from "./hero";
+import { HistorySection } from "./history";
+import { LevelTimesSection, SessionsSection } from "./ledger";
+import { CurrenciesSection, ProfessionsSection, ReputationsSection, StatsSection } from "./sections";
 
 // L'identifiant vient de l'URL : seul un entier positif est accepté. Mis en cache le temps de la
 // requête : les métadonnées et la page partagent une seule lecture.
@@ -71,11 +53,6 @@ const SECTIONS: SectionLink[] = [
   { id: "sessions", label: "Sessions" },
   { id: "history", label: "Progression" },
 ];
-
-const percentFormat = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const percent = (value: number | null) => (value === null ? null : `${percentFormat.format(value)} %`);
-const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: PLAYER_TIME_ZONE });
-const levelFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
 
 export default async function CharacterPage({ params }: PageProps<"/characters/[id]">) {
   await requireSession();
@@ -159,163 +136,11 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
     ),
   );
 
-  const stats = character.stats;
-  const history = buildHistory(character.snapshots);
-  const levelTimes = buildLevelTimes(character.levelTimes, character.playtime, character.level);
-  // Le graphique ne trace que les niveaux relevés ; le tableau les liste tous.
-  const allLevelTimes = fillLevelTimes(levelTimes, character.level);
-  const totalPlayed = character.playtime?.totalSeconds ?? null;
-  const cumulativePlayed = cumulativePlayedSeconds(allLevelTimes, totalPlayed);
-  const sessions = buildSessions(character.sessions);
-  const sessionTotals = summarizeSessions(sessions);
-  // Niveau et part d'expérience acquise sur une même échelle : la courbe monte aussi entre deux niveaux.
-  const levelPoints: TrendPoint[] = character.snapshots
-    .filter((snapshot) => snapshot.level !== null)
-    .map((snapshot) => {
-      const value = fractionalLevel(snapshot.level!, snapshot.xp, snapshot.xpMax);
-      const percentOfLevel = progressPercent(snapshot.xp, snapshot.xpMax);
-      return {
-        at: snapshot.capturedAt.toISOString(),
-        value,
-        label: percentOfLevel === null ? `Niveau ${snapshot.level}` : `Niveau ${snapshot.level} · ${Math.min(percentOfLevel, 99)} %`,
-        valueLabel: levelFormat.format(value),
-        dateLabel: shortDate.format(snapshot.capturedAt),
-      };
-    });
-  const goldPoints: TrendPoint[] = character.snapshots
-    .filter((snapshot) => snapshot.moneyCopper !== null)
-    .map((snapshot) => ({
-      at: snapshot.capturedAt.toISOString(),
-      value: snapshot.moneyCopper! / 10_000,
-      label: formatMoney(snapshot.moneyCopper),
-      dateLabel: shortDate.format(snapshot.capturedAt),
-    }));
-  const reputationGroups = Map.groupBy(character.reputations, (reputation) => reputation.groupName ?? "Autres");
-
-  const statRows: [string, string | null][] = stats
-    ? [
-        ["Force", stats.strength?.toString() ?? null],
-        ["Agilité", stats.agility?.toString() ?? null],
-        ["Endurance", stats.stamina?.toString() ?? null],
-        ["Intelligence", stats.intellect?.toString() ?? null],
-        ["Esprit", stats.spirit?.toString() ?? null],
-        ["Armure", formatNullable(stats.armor)],
-        ["Points de vie", formatNullable(stats.health)],
-        [stats.powerType ? `Ressource (${stats.powerType})` : "Ressource", formatNullable(stats.power)],
-        ["Puissance d'attaque", formatNullable(stats.attackPower)],
-        ["Puissance d'attaque à distance", formatNullable(stats.rangedAttackPower)],
-        ["Critique", percent(stats.crit)],
-        ["Critique à distance", percent(stats.rangedCrit)],
-        ["Toucher", percent(stats.hit)],
-        ["Esquive", percent(stats.dodge)],
-        ["Parade", percent(stats.parry)],
-        ["Blocage", percent(stats.block)],
-        ["Défense", formatNullable(stats.defense)],
-        ["Puissance des sorts", formatNullable(stats.spellPower)],
-        ["Critique des sorts", percent(stats.spellCrit)],
-        ["Soins", formatNullable(stats.healing)],
-        ["Toucher des sorts", percent(stats.spellHit)],
-        ["Résistance au feu", formatNullable(stats.resFire)],
-        ["Résistance à la nature", formatNullable(stats.resNature)],
-        ["Résistance au givre", formatNullable(stats.resFrost)],
-        ["Résistance à l'ombre", formatNullable(stats.resShadow)],
-        ["Résistance aux arcanes", formatNullable(stats.resArcane)],
-      ]
-    : [];
-
-  const classIcon = classIconUrl(character.class);
-
   return (
     <div data-class={classKey(character.class)}>
-      <nav aria-label="Autres personnages" className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <Link href="/" className="page-eyebrow hover:underline">
-          Tous les personnages
-        </Link>
-        <span className="flex flex-wrap gap-x-4 text-sm">
-          <Link href={`/compare?c=${character.id}`} prefetch={false} className="text-muted hover:text-gold hover:underline">
-            Comparer
-          </Link>
-          <NeighborLink character={neighbors.previous} direction="previous" />
-          <NeighborLink character={neighbors.next} direction="next" />
-        </span>
-      </nav>
+      <CharacterHero character={character} neighbors={neighbors} now={now} />
 
-      <header className="panel character-card character-hero isolate mt-4 flex flex-wrap items-center gap-5 p-6 sm:p-7" data-class={classKey(character.class)}>
-        {/* Grande icône de la classe, floue, en fond : la même signature que le podium de l'accueil. */}
-        {classIcon && <GameIcon src={classIcon} size={56} className="champion-backdrop" />}
-        <ClassAvatar name={character.name} classToken={character.class} size="lg" level={character.level} />
-        {/* Base de 14 rem : sur téléphone, les dates passent sous le nom au lieu de l'écraser. */}
-        <div className="min-w-0 flex-[1_1_14rem]">
-          <h1 className="display break-words text-3xl font-bold leading-tight class-text sm:text-[2.6rem]">{character.name}</h1>
-          <p className="mt-1 text-lg">
-            {classLabel(character.class)}
-            {character.level !== null && <span className="text-muted"> — Niveau {character.level}</span>}
-          </p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-            {[character.race, character.realm].filter(Boolean).join(" • ")}
-            <FactionBadge faction={character.faction} />
-            {character.guild && <span className="badge">&lt;{character.guild}&gt;</span>}
-            {character.hidden && <span className="badge">Masqué dans l&apos;addon</span>}
-          </p>
-        </div>
-        <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_auto]">
-          <dt className="text-muted">Dernière donnée AltBoard connue</dt>
-          <dd title={formatDateTime(character.sourceLastSeenAt)}>{formatRelative(character.sourceLastSeenAt, now)}</dd>
-          <dt className="text-muted">Dernière synchronisation</dt>
-          <dd title={formatDateTime(character.lastSyncAt)}>
-            {formatRelative(character.lastSyncAt, now)}
-            {character.lastMachine && <span className="text-muted"> · {character.lastMachine}</span>}
-          </dd>
-          <dt className="text-muted">Compte</dt>
-          <dd>{character.account.label}</dd>
-          {character.zone && (
-            <>
-              <dt className="text-muted">Zone</dt>
-              <dd>{character.zone}</dd>
-            </>
-          )}
-        </dl>
-      </header>
-
-      <section
-        aria-label="Vue générale"
-        className={`mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 ${totalPlayed === null ? "xl:grid-cols-6" : "xl:grid-cols-7"}`}
-      >
-        <StatTile
-          label="Niveau"
-          value={character.level ?? "—"}
-          hint={
-            character.xp !== null && character.xpMax !== null ? (
-              <>
-                <Meter value={character.xp} max={character.xpMax} label="Progression du niveau" />
-                <span className="mt-1 block">
-                  {formatInteger(character.xp)} / {formatInteger(character.xpMax)} XP ({progressPercent(character.xp, character.xpMax)} %)
-                </span>
-              </>
-            ) : undefined
-          }
-        />
-        <StatTile label="Niveau d'objet" value={formatItemLevel(character.itemLevel)} />
-        <StatTile label="Or" value={<Money copper={character.moneyCopper} />} />
-        <StatTile label="XP reposée" value={formatInteger(character.restedXp)} />
-        {totalPlayed !== null && (
-          <StatTile
-            label="Temps de jeu"
-            value={formatDuration(totalPlayed)}
-            hint={character.playtime?.measuredAt ? `Relevé ${formatRelative(character.playtime.measuredAt, now)}` : undefined}
-          />
-        )}
-        <StatTile
-          label="Sacs"
-          value={character.bagSlotsUsed === null ? "—" : `${character.bagSlotsUsed} / ${character.bagSlotsTotal ?? "—"}`}
-          hint={character.bagsAt ? `Relevés ${formatRelative(character.bagsAt, now)}` : "Jamais relevés"}
-        />
-        <StatTile
-          label="Banque"
-          value={character.bankSlotsUsed === null ? "—" : `${character.bankSlotsUsed} / ${character.bankSlotsTotal ?? "—"}`}
-          hint={character.bankAt ? `Relevée ${formatRelative(character.bankAt, now)}` : "Jamais relevée"}
-        />
-      </section>
+      <OverviewTiles character={character} now={now} />
 
       <SectionNav label="Sections de la fiche" items={SECTIONS} />
 
@@ -331,61 +156,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       />
 
       <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-2">
-        <section aria-labelledby="professions">
-          <SectionTitle>
-            <span id="professions">Métiers</span>
-          </SectionTitle>
-          <div className="panel p-5">
-            {character.professions.length === 0 ? (
-              <p className="text-sm text-muted">Aucun métier appris.</p>
-            ) : (
-              <ul className="space-y-4">
-                {character.professions.map((profession) => (
-                  <li key={profession.skillLine}>
-                    <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                      <span className="font-medium">
-                        <ProfessionIcon skillLine={profession.skillLine} size={22} /> {profession.name}
-                        {profession.isPrimary && <span className="badge ml-2">Principal</span>}
-                      </span>
-                      <span className="tabular-nums text-muted">
-                        {profession.rank ?? "—"} / {profession.maxRank ?? "—"}
-                        {progressPercent(profession.rank, profession.maxRank) !== null && (
-                          <span className="ml-2 text-text">{progressPercent(profession.rank, profession.maxRank)} %</span>
-                        )}
-                      </span>
-                    </div>
-                    <Meter value={profession.rank} max={profession.maxRank} label={profession.name} tone="gold" />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
+        <ProfessionsSection character={character} />
 
-        <section aria-labelledby="currencies">
-          <SectionTitle>
-            <span id="currencies">Monnaies</span>
-          </SectionTitle>
-          <div className="panel p-5">
-            {character.currencies.length === 0 ? (
-              <p className="text-sm text-muted">Aucune monnaie détenue.</p>
-            ) : (
-              <ul className="divide-y divide-white/5 text-sm">
-                {character.currencies.map((currency) => (
-                  <li key={currency.name} className="flex items-baseline justify-between gap-3 py-2">
-                    <span>{currency.name}</span>
-                    <span className="tabular-nums">
-                      {formatInteger(currency.quantity)}
-                      {currency.maxQuantity !== null && currency.maxQuantity > 0 && (
-                        <span className="text-muted"> / {formatInteger(currency.maxQuantity)}</span>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
+        <CurrenciesSection character={character} />
 
         {/* Fiche à la manière du jeu : pleine largeur, comme les statistiques en dessous. */}
         <section aria-labelledby="equipment" className="xl:col-span-2">
@@ -412,67 +185,10 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
           </div>
         </section>
 
-        <section aria-labelledby="stats" className="xl:col-span-2">
-          <SectionTitle aside={character.statsAt ? `Relevées ${formatRelative(character.statsAt, now)}, améliorations actives incluses` : undefined}>
-            <span id="stats">Statistiques</span>
-          </SectionTitle>
-          <div className="panel p-5">
-            {statRows.every(([, value]) => value === null) ? (
-              <p className="text-sm text-muted">Aucune statistique relevée.</p>
-            ) : (
-              <dl className="grid grid-cols-1 gap-x-8 text-sm sm:grid-cols-2 xl:grid-cols-3">
-                {statRows
-                  .filter(([, value]) => value !== null)
-                  .map(([label, value]) => (
-                    <div key={label} className="flex items-baseline justify-between gap-3 border-b border-white/5 py-1.5">
-                      <dt className="text-muted">{label}</dt>
-                      <dd className="font-medium tabular-nums">{value}</dd>
-                    </div>
-                  ))}
-              </dl>
-            )}
-          </div>
-        </section>
+        <StatsSection character={character} now={now} />
       </div>
 
-      <section aria-labelledby="reputations" className="mt-8">
-        <SectionTitle aside={`${character.reputations.length} faction${character.reputations.length > 1 ? "s" : ""}`}>
-          <span id="reputations">Réputations</span>
-        </SectionTitle>
-        {character.reputations.length === 0 ? (
-          <div className="panel p-5 text-sm text-muted">Aucune réputation relevée.</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[...reputationGroups.entries()].map(([group, reputations]) => (
-              <div key={group} className="panel p-5">
-                <h3 className="eyebrow mb-3">{group}</h3>
-                <ul className="space-y-3">
-                  {reputations.map((reputation) => {
-                    const span = reputation.minValue !== null && reputation.maxValue !== null ? reputation.maxValue - reputation.minValue : null;
-                    const progress = reputation.currentValue !== null && reputation.minValue !== null ? reputation.currentValue - reputation.minValue : null;
-                    return (
-                      <li key={reputation.factionId}>
-                        <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
-                          <span className="min-w-0 truncate">{reputation.name}</span>
-                          <span className="whitespace-nowrap text-xs text-muted">
-                            {reputation.reaction === null ? "—" : (REACTION_LABELS[reputation.reaction] ?? `Palier ${reputation.reaction}`)}
-                            {progress !== null && span !== null && span > 0 && (
-                              <span className="ml-2 tabular-nums text-text">
-                                {formatInteger(progress)} / {formatInteger(span)}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <Meter value={progress} max={span} label={reputation.name} />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <ReputationsSection character={character} />
 
       <section aria-labelledby="inventory" className="mt-8">
         <SectionTitle>
@@ -494,224 +210,12 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         )}
       </section>
 
-      <section aria-labelledby="level-times" className="mt-8">
-        <SectionTitle aside="Source : addon Allemano Ledger">
-          <span id="level-times">Temps par niveau</span>
-        </SectionTitle>
-        {levelTimes.length === 0 ? (
-          <div className="panel p-5 text-sm text-muted">
-            Aucun temps relevé pour ce personnage. L&apos;addon Allemano Ledger mesure le temps de jeu de chaque niveau à partir de son
-            installation : connectez ce personnage, faites <code className="text-text">/reload</code>, puis synchronisez. Les niveaux gagnés
-            avant l&apos;installation ne peuvent pas être reconstitués : le jeu ne donne que le total et le niveau en cours.
-          </div>
-        ) : (
-          <>
-            <LevelTimeChart levels={levelTimes} />
-            <details open className="panel mt-4 overflow-hidden">
-              <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des temps par niveau</summary>
-              <ScrollRegion className="overflow-x-auto" label="Temps par niveau">
-                <table className="data-table">
-                  <caption className="sr-only">Temps par niveau</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Niveau</th>
-                      <th scope="col" className="num">
-                        Temps de jeu
-                      </th>
-                      <th scope="col" className="num" title="Temps de jeu total à la fin du niveau">
-                        Temps cumulé
-                      </th>
-                      <th scope="col" className="num">
-                        Temps réel
-                      </th>
-                      <th scope="col">Terminé le</th>
-                      <th scope="col">Zone</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...allLevelTimes].reverse().map((entry) => (
-                      <tr key={entry.level} className={entry.playedSeconds === null && entry.wallSeconds === null ? "text-muted" : undefined}>
-                        <th scope="row" className="whitespace-nowrap">
-                          {entry.current ? `${entry.level} (en cours)` : `${entry.level} → ${entry.level + 1}`}
-                        </th>
-                        <td className="num">{entry.playedSeconds === null ? "non mesuré" : formatDuration(entry.playedSeconds)}</td>
-                        <td className="num">{formatDurationToMinute(cumulativePlayed.get(entry.level) ?? null)}</td>
-                        <td className="num">{formatDuration(entry.wallSeconds)}</td>
-                        <td className="whitespace-nowrap">{formatDateTime(entry.reachedAt)}</td>
-                        <td>{entry.zone ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollRegion>
-            </details>
-          </>
-        )}
-      </section>
+      <LevelTimesSection character={character} />
 
-      <section aria-labelledby="sessions" className="mt-8">
-        <SectionTitle
-          aside={
-            sessions.length === 0
-              ? "Source : addon Allemano Ledger"
-              : `${sessions.length >= SESSIONS_SHOWN ? `${SESSIONS_SHOWN} dernières sessions` : `${sessions.length} session${sessions.length > 1 ? "s" : ""}`} · ${formatInteger(sessionTotals.xpGained)} XP en ${formatDuration(sessionTotals.durationSeconds)}${
-                  sessionTotals.xpPerHour === null ? "" : ` · ${formatInteger(sessionTotals.xpPerHour)} XP/h`
-                }`
-          }
-        >
-          <span id="sessions">Sessions de jeu</span>
-        </SectionTitle>
-        {sessions.length === 0 ? (
-          <div className="panel p-5 text-sm text-muted">
-            Aucune session relevée pour ce personnage. L&apos;addon Allemano Ledger enregistre chaque session de jeu (durée, expérience
-            gagnée) à partir de son installation : connectez ce personnage, faites <code className="text-text">/reload</code>, puis
-            synchronisez.
-          </div>
-        ) : (
-          <>
-            <SessionXpChart sessions={sessions} />
-            <details className="panel mt-4 overflow-hidden">
-              <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des sessions</summary>
-              <ScrollRegion className="overflow-x-auto" label="Sessions de jeu">
-                <table className="data-table">
-                  <caption className="sr-only">Sessions de jeu</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Début</th>
-                      <th scope="col" className="num">
-                        Durée
-                      </th>
-                      <th scope="col" className="num">
-                        XP gagnée
-                      </th>
-                      <th scope="col" className="num">
-                        XP par heure
-                      </th>
-                      <th scope="col" className="num">
-                        Niveaux
-                      </th>
-                      <th scope="col">Zone</th>
-                      <th scope="col">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...sessions].reverse().map((session) => (
-                      <tr key={session.startedAt}>
-                        <th scope="row" className="whitespace-nowrap">
-                          {formatDateTime(session.startedAt)}
-                          {session.current && " (en cours)"}
-                        </th>
-                        <td className="num">{formatDuration(session.durationSeconds)}</td>
-                        <td className="num">{formatInteger(session.xpGained)}</td>
-                        <td className="num">{formatInteger(session.xpPerHour)}</td>
-                        <td className="num">{session.levels ? `+${session.levels}` : "—"}</td>
-                        <td>{session.zone ?? "—"}</td>
-                        <td>{sessionTagLabel(session.tag) ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </ScrollRegion>
-            </details>
-          </>
-        )}
-      </section>
+      <SessionsSection character={character} />
 
-      <section aria-labelledby="history" className="mt-8">
-        <SectionTitle aside={`${character.snapshots.length} relevé${character.snapshots.length > 1 ? "s" : ""} conservé${character.snapshots.length > 1 ? "s" : ""}`}>
-          <span id="history">Progression</span>
-        </SectionTitle>
-        {character.snapshots.length < 2 ? (
-          <div className="panel p-5 text-sm text-muted">
-            Un seul relevé pour l&apos;instant. L&apos;historique se construit à chaque synchronisation qui suit une progression en jeu (niveau, or,
-            métiers, équipement, réputations).
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            {levelPoints.length > 1 && <TrendChart title="Niveau et expérience" series="level" points={levelPoints} />}
-            {goldPoints.length > 1 && <TrendChart title="Or" series="gold" points={goldPoints} />}
-            <div className="panel p-5">
-              <h3 className="eyebrow mb-3">Derniers changements</h3>
-              {history.length === 0 ? (
-                <p className="text-sm text-muted">Aucun changement lisible entre les relevés.</p>
-              ) : (
-                <ol className="max-h-72 space-y-3 overflow-y-auto pr-1 text-sm">
-                  {history.slice(0, 30).map((entry) => (
-                    <li key={entry.at.toISOString()}>
-                      <time className="text-xs text-faint" dateTime={entry.at.toISOString()}>
-                        {formatDateTime(entry.at)}
-                      </time>
-                      <ul className="mt-0.5">
-                        {entry.changes.map((change) => (
-                          <li key={change.text}>{change.text}</li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
-          </div>
-        )}
-        {character.snapshots.length > 0 && (
-          <details className="panel mt-4 overflow-hidden">
-            <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des relevés</summary>
-            <ScrollRegion className="overflow-x-auto" label="Derniers changements">
-              <table className="data-table">
-                <caption className="sr-only">Derniers changements</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Relevé en jeu</th>
-                    <th scope="col" className="num">
-                      Niveau
-                    </th>
-                    <th scope="col" className="num">
-                      XP
-                    </th>
-                    <th scope="col" className="num">
-                      Or
-                    </th>
-                    <th scope="col" className="num">
-                      Niv. d&apos;objet
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...character.snapshots].reverse().map((snapshot) => (
-                    <tr key={snapshot.id}>
-                      <th scope="row" className="whitespace-nowrap">{formatDateTime(snapshot.capturedAt)}</th>
-                      <td className="num">{snapshot.level ?? "—"}</td>
-                      <td className="num">{formatInteger(snapshot.xp)}</td>
-                      <td className="num">
-                        <Money copper={snapshot.moneyCopper} />
-                      </td>
-                      <td className="num">{formatItemLevel(snapshot.itemLevel)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollRegion>
-          </details>
-        )}
-      </section>
+      <HistorySection character={character} />
     </div>
-  );
-}
-
-function formatNullable(value: number | null | undefined): string | null {
-  return value === null || value === undefined ? null : formatInteger(value);
-}
-
-/** Personnage voisin dans l'ordre de l'accueil (niveau décroissant, puis nom). */
-function NeighborLink({ character, direction }: { character: CharacterLink | null; direction: "previous" | "next" }) {
-  if (!character) return null;
-  const previous = direction === "previous";
-  return (
-    <Link href={`/characters/${character.id}`} prefetch={false} rel={previous ? "prev" : "next"} className="hover:underline" data-class={classKey(character.class)}>
-      <span className="text-muted">{previous ? "← Précédent : " : "Suivant : "}</span>
-      <span className="class-text font-semibold">{character.name}</span>
-      {!previous && <span className="text-muted"> →</span>}
-    </Link>
   );
 }
 

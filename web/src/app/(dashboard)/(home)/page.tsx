@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { ArtBackdrop } from "@/components/art-backdrop";
 import { ChampionPodium } from "@/components/champion-podium";
@@ -13,6 +14,7 @@ import { requireSession } from "@/lib/auth/session";
 import { pickChampions } from "@/lib/dashboard/champions";
 import { buildGoldHistory, GOLD_HISTORY_DAYS } from "@/lib/dashboard/gold-history";
 import { getOverview, listCharacters, listMoneySnapshots } from "@/lib/dashboard/queries";
+import { readViewPrefs } from "@/lib/dashboard/view-prefs";
 import { buildWatchList, loadWatchFacts, loadWatchMachines } from "@/lib/dashboard/watch";
 import { listAlerts } from "@/lib/economy/alerts";
 import { loadItemNames } from "@/lib/economy/item-names";
@@ -36,6 +38,8 @@ export default async function CharactersPage() {
   const now = new Date();
   const { config } = await syncStatusRuntime();
   const goldSince = new Date(now.getTime() - GOLD_HISTORY_DAYS * 24 * 3600 * 1000);
+  const cookieStore = await cookies();
+  const prefs = readViewPrefs((name) => cookieStore.get(name)?.value);
   const [characters, overview, servers, opportunities, moneySnapshots, machines, alerts] = await Promise.all([
     listCharacters(db),
     getOverview(db),
@@ -157,7 +161,7 @@ export default async function CharactersPage() {
 
       <WatchListPanel list={watch} alerts={watchAlerts} />
 
-      <CharacterBrowser characters={characters} now={now.toISOString()} ranks={ranks} />
+      <CharacterBrowser characters={characters} now={now.toISOString()} ranks={ranks} prefs={prefs} />
 
       {(hasEconomy || watchedServers.length > 0) && (
         <div className="mt-12 space-y-8 border-t border-line pt-8">
