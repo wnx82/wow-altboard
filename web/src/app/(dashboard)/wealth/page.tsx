@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -53,8 +54,9 @@ export default async function WealthPage() {
 
           <section aria-label="Par compte">
             <SectionTitle>Par compte</SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Patrimoine par compte">
               <table className="data-table min-w-[640px]">
+                <caption className="sr-only">Patrimoine par compte</caption>
                 <thead>
                   <tr>
                     <th scope="col">Compte</th>
@@ -90,13 +92,14 @@ export default async function WealthPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </section>
 
           <section aria-label="Par personnage">
             <SectionTitle aside="du plus riche au moins riche">Par personnage</SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Patrimoine par personnage">
               <table className="data-table min-w-[860px]">
+                <caption className="sr-only">Patrimoine par personnage</caption>
                 <thead>
                   <tr>
                     <th scope="col">Personnage</th>
@@ -145,7 +148,7 @@ export default async function WealthPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
             <p className="mt-2 text-xs text-faint">
               Sacs et banque relevés par AltBoard, courrier et ventes en cours par Baganator : un endroit jamais relevé paraît vide.
             </p>

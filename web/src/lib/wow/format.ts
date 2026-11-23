@@ -107,10 +107,42 @@ export function fractionalLevel(level: number, xp: number | null, xpMax: number 
   return level + Math.max(0, Math.min(0.99, xp / xpMax));
 }
 
-const dateTime = new Intl.DateTimeFormat("fr-BE", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Brussels" });
+/**
+ * Fuseau du joueur : les jours, heures et semaines du site sont ceux de Bruxelles, comme les jours
+ * d'Auctionator. Seule source de ce nom, côté pages comme côté requêtes SQL.
+ */
+export const PLAYER_TIME_ZONE = "Europe/Brussels";
+
+const isoDay = new Intl.DateTimeFormat("en-CA", { timeZone: PLAYER_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** Jour civil ISO (« 2026-11-23 ») d'un instant, à l'heure de Bruxelles. */
+export function brusselsDay(date: Date | string | number): string {
+  return isoDay.format(new Date(date));
+}
+
+const dateTime = new Intl.DateTimeFormat("fr-BE", { dateStyle: "short", timeStyle: "short", timeZone: PLAYER_TIME_ZONE });
 
 export function formatDateTime(date: Date | string | null): string {
   return date === null ? "—" : dateTime.format(new Date(date));
+}
+
+/** « 45 s », « 12 min », « 3 h 05 », « 1 h », « 2 j 4 h », « 1 j ». Les zéros de queue sont omis. */
+export function formatDuration(seconds: number | null): string {
+  if (seconds === null) return "—";
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return `${total} s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${String(minutes % 60).padStart(2, "0")}`;
+  return hours % 24 === 0 ? `${Math.floor(hours / 24)} j` : `${Math.floor(hours / 24)} j ${hours % 24} h`;
+}
+
+/** Comme formatDuration, minutes gardées au-delà d'un jour : « 2 j 4 h 07 ». Pour un cumul, où deux lignes voisines diffèrent de moins d'une heure. */
+export function formatDurationToMinute(seconds: number | null): string {
+  if (seconds === null || Math.round(seconds) < 86_400) return formatDuration(seconds);
+  const minutes = Math.floor(Math.round(seconds) / 60);
+  return `${Math.floor(minutes / 1440)} j ${Math.floor(minutes / 60) % 24} h ${String(minutes % 60).padStart(2, "0")}`;
 }
 
 const relative = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });

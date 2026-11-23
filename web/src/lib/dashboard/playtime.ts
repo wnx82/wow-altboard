@@ -1,4 +1,4 @@
-import { brusselsDay } from "./gold-history";
+import { brusselsDay, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Temps de jeu de tous les personnages, à partir des données d'Allemano Ledger : /played par
 // compte, résumé par semaine et répartition par jour et par heure. Pur, sans base.
@@ -14,8 +14,8 @@ export type AccountPlaytime = { accountId: number; label: string; seconds: numbe
 export type WeekSummary = { week: string; seconds: number; xp: number; levels: number; sessions: number; byTag: Map<string | null, number> };
 
 const HOUR = 3600 * 1000;
-const weekdayFormat = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Brussels", weekday: "short" });
-const hourFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", hour: "2-digit", hourCycle: "h23" });
+const weekdayFormat = new Intl.DateTimeFormat("en-US", { timeZone: PLAYER_TIME_ZONE, weekday: "short" });
+const hourFormat = new Intl.DateTimeFormat("en-GB", { timeZone: PLAYER_TIME_ZONE, hour: "2-digit", hourCycle: "h23" });
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Jour de la semaine à Bruxelles, lundi = 0. */

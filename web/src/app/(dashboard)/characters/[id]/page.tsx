@@ -6,6 +6,7 @@ import { CharacterEquipment, type EquipmentRow } from "@/components/character-eq
 import { CharacterGoals } from "@/components/character-goals";
 import { CharacterInventory, type CharacterInventoryPlace } from "@/components/character-inventory";
 import { LevelTimeChart, SessionXpChart } from "@/components/ledger-charts";
+import { ScrollRegion } from "@/components/scroll-region";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
 import { TrendChart, type TrendPoint } from "@/components/trend-chart";
 import { ClassAvatar, FactionBadge, GameIcon, Meter, Money, ProfessionIcon, SectionTitle, StatTile } from "@/components/ui";
@@ -14,7 +15,7 @@ import { describeError } from "@/lib/errors";
 import { classIconUrl } from "@/lib/wow/icons";
 import { requireSession } from "@/lib/auth/session";
 import { buildHistory } from "@/lib/dashboard/history";
-import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes, formatDuration, formatDurationToMinute } from "@/lib/dashboard/level-times";
+import { buildLevelTimes, cumulativePlayedSeconds, fillLevelTimes } from "@/lib/dashboard/level-times";
 import { buildSessions, sessionTagLabel, summarizeSessions } from "@/lib/dashboard/sessions";
 import { getCharacterDetail, getCharacterNeighbors, SESSIONS_SHOWN, type CharacterDetail, type CharacterLink } from "@/lib/dashboard/queries";
 import { catalogId, loadItemNames } from "@/lib/economy/item-names";
@@ -27,11 +28,14 @@ import {
   classKey,
   classLabel,
   formatDateTime,
+  formatDuration,
+  formatDurationToMinute,
   formatInteger,
   formatItemLevel,
   formatMoney,
   formatRelative,
   fractionalLevel,
+  PLAYER_TIME_ZONE,
   progressPercent,
   QUALITY_LABELS,
   REACTION_LABELS,
@@ -70,7 +74,7 @@ const SECTIONS: SectionLink[] = [
 
 const percentFormat = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percent = (value: number | null) => (value === null ? null : `${percentFormat.format(value)} %`);
-const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
+const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: PLAYER_TIME_ZONE });
 const levelFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
 
 export default async function CharacterPage({ params }: PageProps<"/characters/[id]">) {
@@ -505,8 +509,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
             <LevelTimeChart levels={levelTimes} />
             <details open className="panel mt-4 overflow-hidden">
               <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des temps par niveau</summary>
-              <div className="overflow-x-auto">
+              <ScrollRegion className="overflow-x-auto" label="Temps par niveau">
                 <table className="data-table">
+                  <caption className="sr-only">Temps par niveau</caption>
                   <thead>
                     <tr>
                       <th scope="col">Niveau</th>
@@ -526,9 +531,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                   <tbody>
                     {[...allLevelTimes].reverse().map((entry) => (
                       <tr key={entry.level} className={entry.playedSeconds === null && entry.wallSeconds === null ? "text-muted" : undefined}>
-                        <td className="whitespace-nowrap">
+                        <th scope="row" className="whitespace-nowrap">
                           {entry.current ? `${entry.level} (en cours)` : `${entry.level} → ${entry.level + 1}`}
-                        </td>
+                        </th>
                         <td className="num">{entry.playedSeconds === null ? "non mesuré" : formatDuration(entry.playedSeconds)}</td>
                         <td className="num">{formatDurationToMinute(cumulativePlayed.get(entry.level) ?? null)}</td>
                         <td className="num">{formatDuration(entry.wallSeconds)}</td>
@@ -538,7 +543,7 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollRegion>
             </details>
           </>
         )}
@@ -567,8 +572,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
             <SessionXpChart sessions={sessions} />
             <details className="panel mt-4 overflow-hidden">
               <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des sessions</summary>
-              <div className="overflow-x-auto">
+              <ScrollRegion className="overflow-x-auto" label="Sessions de jeu">
                 <table className="data-table">
+                  <caption className="sr-only">Sessions de jeu</caption>
                   <thead>
                     <tr>
                       <th scope="col">Début</th>
@@ -591,10 +597,10 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                   <tbody>
                     {[...sessions].reverse().map((session) => (
                       <tr key={session.startedAt}>
-                        <td className="whitespace-nowrap">
+                        <th scope="row" className="whitespace-nowrap">
                           {formatDateTime(session.startedAt)}
                           {session.current && " (en cours)"}
-                        </td>
+                        </th>
                         <td className="num">{formatDuration(session.durationSeconds)}</td>
                         <td className="num">{formatInteger(session.xpGained)}</td>
                         <td className="num">{formatInteger(session.xpPerHour)}</td>
@@ -605,7 +611,7 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ScrollRegion>
             </details>
           </>
         )}
@@ -650,8 +656,9 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
         {character.snapshots.length > 0 && (
           <details className="panel mt-4 overflow-hidden">
             <summary className="cursor-pointer px-5 py-3 text-sm text-muted hover:text-text">Tableau des relevés</summary>
-            <div className="overflow-x-auto">
+            <ScrollRegion className="overflow-x-auto" label="Derniers changements">
               <table className="data-table">
+                <caption className="sr-only">Derniers changements</caption>
                 <thead>
                   <tr>
                     <th scope="col">Relevé en jeu</th>
@@ -672,7 +679,7 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                 <tbody>
                   {[...character.snapshots].reverse().map((snapshot) => (
                     <tr key={snapshot.id}>
-                      <td className="whitespace-nowrap">{formatDateTime(snapshot.capturedAt)}</td>
+                      <th scope="row" className="whitespace-nowrap">{formatDateTime(snapshot.capturedAt)}</th>
                       <td className="num">{snapshot.level ?? "—"}</td>
                       <td className="num">{formatInteger(snapshot.xp)}</td>
                       <td className="num">
@@ -683,7 +690,7 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </details>
         )}
       </section>

@@ -1,4 +1,5 @@
 import { zip } from "@/lib/zip";
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Classeur XLSX (Office Open XML) : feuilles à ligne d'en-tête figée et filtrable. Chaque cellule
 // porte son type : un texte n'est jamais interprété comme une formule, même s'il commence par
@@ -24,7 +25,7 @@ function columnName(index: number): string {
 }
 
 const brussels = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Europe/Brussels",
+  timeZone: PLAYER_TIME_ZONE,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",

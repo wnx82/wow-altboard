@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-or
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { AGENT_NOTICE } from "@/lib/sync/codes";
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 import type { ActivitySnapshot } from "./activity";
 import type { LedgerDayRow } from "./finances";
 import type { MoneySnapshot } from "./gold-history";
@@ -364,11 +365,12 @@ export async function listRecentSnapshots(db: Database, since: Date): Promise<Ac
  * courbe garde un point par jour, et les niveaux gagnés s'additionnent d'un jour à l'autre ; le
  * reste n'était lu que pour être écarté en JavaScript.
  */
+const zoneLiteral = sql.raw(`'${PLAYER_TIME_ZONE}'`);
 const lastSnapshotOfDay = sql`${t.characterSnapshots.id} in (
-    select distinct on (daily.character_id, (daily.captured_at at time zone 'Europe/Brussels')::date) daily.id
+    select distinct on (daily.character_id, (daily.captured_at at time zone ${zoneLiteral})::date) daily.id
     from ${t.characterSnapshots} daily
     where daily.level is not null
-    order by daily.character_id, (daily.captured_at at time zone 'Europe/Brussels')::date, daily.captured_at desc
+    order by daily.character_id, (daily.captured_at at time zone ${zoneLiteral})::date, daily.captured_at desc
   )`;
 
 export async function listLevelSnapshots(db: Database, since: Date | null): Promise<LevelRow[]> {

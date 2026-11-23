@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import { RenameForm, TokenForm } from "@/components/admin-forms";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { agentDirectory, archiveAgent, findAgent, formatAgentSize } from "@/lib/agent-download";
@@ -257,8 +258,9 @@ export default async function MachinesPage() {
         {runs.length === 0 ? (
           <div className="panel p-5 text-sm text-muted">Aucune synchronisation reçue.</div>
         ) : (
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label="Journal des synchronisations">
             <table className="data-table min-w-[820px]">
+              <caption className="sr-only">Journal des synchronisations</caption>
               <thead>
                 <tr>
                   <th scope="col">Date</th>
@@ -295,9 +297,9 @@ export default async function MachinesPage() {
                   return (
                     <Fragment key={run.id}>
                       <tr>
-                        <td className="whitespace-nowrap" title={formatRelative(run.startedAt, now)}>
+                        <th scope="row" className="whitespace-nowrap" title={formatRelative(run.startedAt, now)}>
                           {formatDateTime(run.startedAt)}
-                        </td>
+                        </th>
                         <td>{run.machineHostname === null && run.machineDisplayName === null ? "—" : machineLabel({ displayName: run.machineDisplayName, hostname: run.machineHostname })}</td>
                         <td>
                           <span className="badge" data-tone={status.tone}>
@@ -340,7 +342,7 @@ export default async function MachinesPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
       </section>
     </>

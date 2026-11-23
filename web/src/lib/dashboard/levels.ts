@@ -1,5 +1,4 @@
-import { fractionalLevel, progressPercent } from "@/lib/wow/format";
-import { dayKey } from "./activity";
+import { brusselsDay, fractionalLevel, PLAYER_TIME_ZONE, progressPercent } from "@/lib/wow/format";
 
 // Évolution des niveaux de tous les personnages sur une période, lue dans leurs relevés. Un niveau
 // gagné porte la date du relevé qui le montre, pas celle où il s'est produit en jeu.
@@ -100,8 +99,8 @@ export function buildLevelProgress(rows: LevelRow[], since: Date | null, now: Da
   const unit: BucketUnit = days <= 31 ? "day" : days <= 183 ? "week" : "month";
 
   const buckets = new Map<string, LevelBucket>();
-  const last = bucketStart(dayKey.format(to), unit);
-  for (let start = bucketStart(dayKey.format(from), unit); start <= last; start = nextBucket(start, unit)) {
+  const last = bucketStart(brusselsDay(to), unit);
+  for (let start = bucketStart(brusselsDay(from), unit); start <= last; start = nextBucket(start, unit)) {
     buckets.set(start, { start, gained: 0, details: [] });
   }
 
@@ -117,7 +116,7 @@ export function buildLevelProgress(rows: LevelRow[], since: Date | null, now: Da
     let lastLevelUpAt: Date | null = null;
     for (const row of inside) {
       if (row.level > level) {
-        const bucket = buckets.get(bucketStart(dayKey.format(row.capturedAt), unit))!;
+        const bucket = buckets.get(bucketStart(brusselsDay(row.capturedAt), unit))!;
         const detail = bucket.details.find((entry) => entry.id === row.characterId);
         if (detail) detail.to = row.level;
         else bucket.details.push({ id: row.characterId, name: row.name, from: level, to: row.level });
@@ -130,7 +129,7 @@ export function buildLevelProgress(rows: LevelRow[], since: Date | null, now: Da
     }
 
     // Sur une longue période, un point par jour suffit à la courbe : le dernier relevé du jour.
-    const kept = unit === "day" ? inside : [...Map.groupBy(inside, (row) => dayKey.format(row.capturedAt)).values()].map((sameDay) => sameDay.at(-1)!);
+    const kept = unit === "day" ? inside : [...Map.groupBy(inside, (row) => brusselsDay(row.capturedAt)).values()].map((sameDay) => sameDay.at(-1)!);
     const toPoint = (row: LevelRow, carried: boolean): LevelPoint => ({
       at: carried ? from : row.capturedAt,
       observedAt: row.capturedAt,
@@ -166,7 +165,7 @@ export function buildLevelProgress(rows: LevelRow[], since: Date | null, now: Da
   return { from, to, unit, series, buckets: [...buckets.values()], totalGained: series.reduce((total, entry) => total + entry.gained, 0) };
 }
 
-const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+const clock = new Intl.DateTimeFormat("en-GB", { timeZone: PLAYER_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
 
 /** Minuit, heure de Bruxelles, du jour de `date` ; à une heure près le jour d'un changement d'heure. */
 function startOfDay(date: Date): Date {

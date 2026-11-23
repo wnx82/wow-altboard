@@ -1,7 +1,7 @@
 import { ColumnChart, type Column } from "@/components/column-chart";
-import { formatDuration, type LevelTime } from "@/lib/dashboard/level-times";
+import { type LevelTime } from "@/lib/dashboard/level-times";
 import { sessionTagLabel, type Session } from "@/lib/dashboard/sessions";
-import { formatDateTime, formatInteger } from "@/lib/wow/format";
+import { formatDateTime, formatDuration, formatInteger, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Graphiques des données de l'addon Allemano Ledger. Les libellés sont préparés ici, côté serveur :
 // le composant de tracé ne reçoit que du texte.
@@ -36,7 +36,7 @@ export function LevelTimeChart({ levels }: { levels: LevelTime[] }) {
 
 /** Sessions tracées : au-delà, les colonnes deviennent illisibles sur un écran étroit. */
 export const SESSIONS_CHARTED = 30;
-const day = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Brussels" });
+const day = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", timeZone: PLAYER_TIME_ZONE });
 
 /** Expérience gagnée par session : une colonne par session, la session en cours atténuée. */
 export function SessionXpChart({ sessions }: { sessions: Session[] }) {

@@ -7,12 +7,12 @@ import { requireSession } from "@/lib/auth/session";
 import { buildActivity, CHANGE_KIND_LABELS, filterActivity, isChangeKind } from "@/lib/dashboard/activity";
 import { ACTIVITY_DAYS, listRecentSnapshots } from "@/lib/dashboard/queries";
 import { accountOptions, param, readRosterFilter, rosterActive } from "@/lib/dashboard/roster-filter";
-import { classKey, formatDateTime } from "@/lib/wow/format";
+import { classKey, formatDateTime, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Activité" };
 
-const dayLabel = new Intl.DateTimeFormat("fr-BE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Brussels" });
-const hour = new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
+const dayLabel = new Intl.DateTimeFormat("fr-BE", { weekday: "long", day: "numeric", month: "long", timeZone: PLAYER_TIME_ZONE });
+const hour = new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", timeZone: PLAYER_TIME_ZONE });
 
 export default async function ActivityPage({ searchParams }: PageProps<"/activity">) {
   await requireSession();

@@ -1,5 +1,5 @@
 import { categoryLabel } from "@/lib/wow/item-categories";
-import { classLabel, QUALITY_LABELS } from "@/lib/wow/format";
+import { brusselsDay, classLabel, QUALITY_LABELS } from "@/lib/wow/format";
 import type { Cell, Sheet } from "@/lib/xlsx/workbook";
 import {
   buckets,
@@ -26,9 +26,7 @@ const gold = (copper: number | null) => (copper === null ? null : copper / 10_00
 const hours = (seconds: number) => Math.round((seconds / 3600) * 100) / 100;
 const quality = (value: number | null) => (value === null ? null : (QUALITY_LABELS[value] ?? String(value)));
 
-const brusselsDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" });
-
-export const viewExportFileName = (view: "inventaires" | "finances", now: Date) => `AltBoard-${view}-${brusselsDay.format(now)}.xlsx`;
+export const viewExportFileName = (view: "inventaires" | "finances", now: Date) => `AltBoard-${view}-${brusselsDay(now)}.xlsx`;
 
 /** Filtres de la vue, lisibles : « q=épée · lieux=sacs », ou « aucun ». */
 export function describeFilters(search: string): string {

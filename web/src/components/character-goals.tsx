@@ -11,9 +11,9 @@ import {
 } from "@/lib/goals/actions";
 import { formatProgress, KIND_SPECS } from "@/lib/goals/evaluate";
 import type { CharacterGoal } from "@/lib/goals/store";
-import { formatDateTime } from "@/lib/wow/format";
+import { formatDateTime, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
-const day = new Intl.DateTimeFormat("fr-BE", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Brussels" });
+const day = new Intl.DateTimeFormat("fr-BE", { day: "numeric", month: "long", year: "numeric", timeZone: PLAYER_TIME_ZONE });
 
 /** Section « Objectifs » de la fiche : liste ordonnée, progression, ajout et modèles. */
 export function CharacterGoals({

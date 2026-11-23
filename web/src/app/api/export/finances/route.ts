@@ -1,11 +1,11 @@
 import { getDatabase } from "@/db/client";
 import { getSession } from "@/lib/auth/session";
 import { distinctDays, financePeriod, periodStart } from "@/lib/dashboard/finances";
-import { brusselsDay } from "@/lib/dashboard/gold-history";
 import { listLedgerDays } from "@/lib/dashboard/queries";
 import { financeSheets, viewExportFileName } from "@/lib/dashboard/view-export";
 import { buildWorkbook } from "@/lib/xlsx/workbook";
 import { unauthorized, xlsxResponse } from "@/lib/xlsx/response";
+import { brusselsDay } from "@/lib/wow/format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

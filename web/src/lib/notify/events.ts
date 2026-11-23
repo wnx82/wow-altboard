@@ -1,5 +1,4 @@
-import { formatDuration } from "@/lib/dashboard/level-times";
-import { formatMoney } from "@/lib/wow/format";
+import { formatDuration, formatMoney } from "@/lib/wow/format";
 import type { NotifyEventKey } from "./config";
 
 // Événements envoyés au webhook, et leur texte en français. Pur, sans base ni réseau : n8n reçoit

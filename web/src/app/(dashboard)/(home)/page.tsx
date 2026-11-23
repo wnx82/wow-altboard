@@ -23,11 +23,11 @@ import { formatCopperShort, formatDay, itemHref } from "@/lib/economy/view";
 import { isConfigured } from "@/lib/status/config";
 import { syncStatusRuntime } from "@/lib/status/runtime";
 import { getServiceSummaries } from "@/lib/status/view";
-import { formatDateTime, formatMoney, formatRelative } from "@/lib/wow/format";
+import { formatDateTime, formatMoney, formatRelative, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Mes personnages" };
 
-const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "numeric", month: "short", timeZone: "Europe/Brussels" });
+const shortDate = new Intl.DateTimeFormat("fr-BE", { day: "numeric", month: "short", timeZone: PLAYER_TIME_ZONE });
 const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? "s" : ""}`;
 
 export default async function CharactersPage() {

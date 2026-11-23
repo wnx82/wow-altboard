@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -57,8 +58,9 @@ function Matrix({ matrix }: { matrix: TemplateMatrix }) {
       {matrix.rows.length === 0 ? (
         <p className="panel px-5 py-4 text-sm text-muted">Aucun personnage n&apos;a encore ce modèle.</p>
       ) : (
-        <div className="panel overflow-x-auto">
+        <ScrollRegion className="panel overflow-x-auto" label="Objectifs par personnage">
           <table className="data-table">
+            <caption className="sr-only">Objectifs par personnage</caption>
             <thead>
               <tr>
                 <th scope="col">Personnage</th>
@@ -93,7 +95,7 @@ function Matrix({ matrix }: { matrix: TemplateMatrix }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       )}
     </section>
   );

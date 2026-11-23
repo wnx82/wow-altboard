@@ -1,3 +1,4 @@
+import { brusselsDay } from "@/lib/wow/format";
 import { buildHistory, type Change, type SnapshotLike } from "./history";
 import { matchesRoster, type RosterFilter } from "./roster-filter";
 
@@ -5,9 +6,6 @@ export type ActivityCharacter = { id: number; name: string; class: string | null
 export type ActivitySnapshot = SnapshotLike & { character: ActivityCharacter };
 export type ActivityEntry = { at: Date; character: ActivityCharacter; changes: Change[] };
 export type ActivityDay = { day: string; entries: ActivityEntry[] };
-
-/** Jour civil d'un instant, heure de Bruxelles : AAAA-MM-JJ. */
-export const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" });
 
 /**
  * Changements de tous les personnages depuis `since`, du plus récent au plus ancien, regroupés
@@ -24,7 +22,7 @@ export function buildActivity(snapshots: ActivitySnapshot[], since: Date): Activ
   }
   entries.sort((a, b) => b.at.getTime() - a.at.getTime() || a.character.name.localeCompare(b.character.name, "fr"));
 
-  return [...Map.groupBy(entries, (entry) => dayKey.format(entry.at))].map(([day, dayEntries]) => ({ day, entries: dayEntries }));
+  return [...Map.groupBy(entries, (entry) => brusselsDay(entry.at))].map(([day, dayEntries]) => ({ day, entries: dayEntries }));
 }
 
 export const CHANGE_KIND_LABELS: Record<Change["kind"], string> = {

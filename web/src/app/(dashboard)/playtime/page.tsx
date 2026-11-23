@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { formatDuration } from "@/lib/dashboard/level-times";
 import { hourlyHeatmap, PLAYTIME_WEEKS, playtimeByAccount, playtimeByCharacter, weeklySummary } from "@/lib/dashboard/playtime";
 import { listPlaytimeRows, listSessionFacts } from "@/lib/dashboard/queries";
 import { sessionTagLabel } from "@/lib/dashboard/sessions";
-import { classKey, formatDateTime, formatInteger } from "@/lib/wow/format";
+import { classKey, formatDateTime, formatDuration, formatInteger } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Temps de jeu" };
 
@@ -61,8 +61,9 @@ export default async function PlaytimePage() {
 
           <section aria-label="Par compte">
             <SectionTitle>Par compte</SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Temps de jeu par compte">
               <table className="data-table">
+                <caption className="sr-only">Temps de jeu par compte</caption>
                 <thead>
                   <tr>
                     <th scope="col">Compte</th>
@@ -89,13 +90,14 @@ export default async function PlaytimePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </section>
 
           <section aria-label="Par personnage">
             <SectionTitle aside={`/played et sessions des ${PLAYTIME_WEEKS} dernières semaines`}>Par personnage</SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Temps de jeu par personnage">
               <table className="data-table min-w-[720px]">
+                <caption className="sr-only">Temps de jeu par personnage</caption>
                 <thead>
                   <tr>
                     <th scope="col">Personnage</th>
@@ -132,13 +134,14 @@ export default async function PlaytimePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </section>
 
           <section aria-label="Par semaine">
             <SectionTitle aside="Durée connectée, pauses exclues">Par semaine</SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Temps de jeu par semaine">
               <table className="data-table min-w-[720px]">
+                <caption className="sr-only">Temps de jeu par semaine</caption>
                 <thead>
                   <tr>
                     <th scope="col">Semaine du</th>
@@ -181,7 +184,7 @@ export default async function PlaytimePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </section>
 
           <section aria-label="Jour et heure">
@@ -189,7 +192,7 @@ export default async function PlaytimePage() {
             {peak === 0 ? (
               <p className="panel px-5 py-4 text-sm text-muted">Aucune session sur la période.</p>
             ) : (
-              <div className="panel overflow-x-auto p-4">
+              <ScrollRegion className="panel overflow-x-auto p-4" label="Quand je joue : temps de jeu par jour de la semaine et par heure">
                 <table className="heatmap min-w-[640px]">
                   <caption className="sr-only">Temps de jeu par jour de la semaine et par heure</caption>
                   <thead>
@@ -226,7 +229,7 @@ export default async function PlaytimePage() {
                 <p className="mt-2 text-xs text-faint">
                   Le temps connecté de chaque session est compté d&apos;un seul tenant à partir de son début : l&apos;addon ne date pas les pauses.
                 </p>
-              </div>
+              </ScrollRegion>
             )}
           </section>
         </div>

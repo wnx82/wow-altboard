@@ -2,15 +2,12 @@
 // entre deux relevés, chaque personnage garde sa dernière valeur connue. Un personnage n'entre dans
 // le total qu'à partir de son premier relevé.
 
+import { brusselsDay } from "@/lib/wow/format";
+
 export const GOLD_HISTORY_DAYS = 90;
 
 export type MoneySnapshot = { characterId: number; capturedAt: Date; moneyCopper: number | null };
 export type GoldDay = { day: string; copper: number; characters: number };
-
-const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" });
-
-/** Jour calendaire à Bruxelles, « AAAA-MM-JJ ». */
-export const brusselsDay = (date: Date) => dayKey.format(date);
 
 /** Jours de `from` à `to` inclus, au format « AAAA-MM-JJ ». */
 export function daysBetween(from: string, to: string): string[] {

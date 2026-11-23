@@ -2,6 +2,8 @@
 // l'heure locale du PC de jeu. Le jour est la seule granularité que l'addon conserve : aucune
 // heure de relevé n'existe dans le fichier.
 
+import { brusselsDay } from "@/lib/wow/format";
+
 const DAY_MS = 86_400_000;
 const EPOCH = Date.UTC(2020, 0, 1);
 
@@ -20,9 +22,9 @@ export function daysBetween(a: string, b: string): number {
   return dateToAuctionDay(b) - dateToAuctionDay(a);
 }
 
-/** Date ISO du jour, dans le fuseau du joueur (Europe/Brussels), comme les jours d'Auctionator. */
+/** Date ISO du jour, dans le fuseau du joueur, comme les jours d'Auctionator. */
 export function todayInBrussels(now: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  return brusselsDay(now);
 }
 
 /** Date ISO décalée de n jours. */

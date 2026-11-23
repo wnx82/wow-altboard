@@ -1,3 +1,4 @@
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 import type { ServiceKey, StatusConfig } from "./config";
 import type { ProbeResult } from "./probe";
 
@@ -83,7 +84,7 @@ export function isStatus(value: string): value is Status {
   return value in STATUS_LABELS;
 }
 
-const checkTime = new Intl.DateTimeFormat("fr-BE", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Brussels" });
+const checkTime = new Intl.DateTimeFormat("fr-BE", { dateStyle: "short", timeStyle: "medium", timeZone: PLAYER_TIME_ZONE });
 
 /** Date et heure d'un contrôle, à la seconde, en heure de Bruxelles. */
 export function formatCheckTime(date: Date | string | null): string {

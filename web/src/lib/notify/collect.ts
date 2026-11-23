@@ -4,6 +4,7 @@ import * as t from "@/db/schema";
 import { weekOf } from "@/lib/dashboard/playtime";
 import { machineLabel } from "@/lib/dashboard/queries";
 import { addDays } from "@/lib/economy/days";
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 import type { NotifyEventKey, NotifySettings } from "./config";
 import { goalEvent, levelEvent, serverEvent, silentEvent, silentMachines, weeklyEvent, type NotificationEvent, type WeeklyFacts } from "./events";
 
@@ -20,7 +21,7 @@ export const MIN_DOWN_CHECKS = 2;
 export const WEEKLY_REPORT_HOUR = 9;
 
 const HOUR = 3600 * 1000;
-const hourFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", hour: "2-digit", hourCycle: "h23" });
+const hourFormat = new Intl.DateTimeFormat("en-GB", { timeZone: PLAYER_TIME_ZONE, hour: "2-digit", hourCycle: "h23" });
 
 /** Minuit à Bruxelles du jour donné (AAAA-MM-JJ), en instant. */
 export function brusselsMidnight(day: string): Date {

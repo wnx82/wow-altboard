@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Confidence, ItemName, MarketSelector, MarketSource, Reasons } from "@/components/economy";
 import { FarmSessionControls, FarmStartForm } from "@/components/economy-forms";
+import { ScrollRegion } from "@/components/scroll-region";
 import { Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
-import { formatDuration } from "@/lib/dashboard/level-times";
 import { farmSessionAction } from "@/lib/economy/actions";
 import { loadEconomy, realizableValueOf } from "@/lib/economy/load";
 import { compareSessions, listFarmCharacters, listFarmSessions, MAX_LABEL_LENGTH, type FarmComparison } from "@/lib/economy/sessions";
 import { formatChange, formatDay, formatPercent, marketParam, marketQuery } from "@/lib/economy/view";
-import { classKey, formatDateTime, formatInteger } from "@/lib/wow/format";
+import { classKey, formatDateTime, formatDuration, formatInteger } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Farm" };
 
@@ -59,8 +59,9 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
             {context ? "Aucun composant de vos recettes connues n'a de prix relevé." : "Aucun prix reçu : le signal de marché attend un scan Auctionator."}
           </div>
         ) : (
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label="Bon moment pour farmer ?">
             <table className="data-table min-w-[960px]">
+              <caption className="sr-only">Bon moment pour farmer ?</caption>
               <thead>
                 <tr>
                   <th scope="col">Ressource</th>
@@ -85,9 +86,9 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
               <tbody>
                 {context.farmSignals.slice(0, SIGNALS_SHOWN).map((signal) => (
                   <tr key={signal.itemKey}>
-                    <td>
+                    <th scope="row">
                       <ItemName itemKey={signal.itemKey} names={names} query={itemQuery} />
-                    </td>
+                    </th>
                     <td className="num font-semibold">{signal.score}</td>
                     <td className="num">{formatChange(signal.premium)}</td>
                     <td className="num">{signal.supplyRatio === null ? "—" : formatPercent(signal.supplyRatio)}</td>
@@ -104,7 +105,7 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
         <p className="mt-3 text-xs text-faint">
           Score sur 100 : prix au-dessus de sa médiane (moitié du score), offre moins abondante que d&apos;habitude (un quart), marché stable (un
@@ -156,8 +157,9 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
         )}
 
         {done.length > 0 && (
-          <div className="panel mt-4 overflow-x-auto">
+          <ScrollRegion className="panel mt-4 overflow-x-auto" label="Sessions de farm terminées">
             <table className="data-table min-w-[980px]">
+              <caption className="sr-only">Sessions de farm terminées</caption>
               <thead>
                 <tr>
                   <th scope="col">Session</th>
@@ -183,7 +185,7 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
                   const valuation = session.valuation!;
                   return (
                     <tr key={session.id}>
-                      <td data-class={classKey(session.character.class)}>
+                      <th scope="row" data-class={classKey(session.character.class)}>
                         <span className="font-semibold">{session.label ?? "Sans libellé"}</span> ·{" "}
                         <span className="class-text">{session.character.name}</span>
                         <div className="text-xs text-muted">
@@ -205,7 +207,7 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
                             ))}
                           </ul>
                         </details>
-                      </td>
+                      </th>
                       <td className="num">{formatDuration(valuation.durationSeconds)}</td>
                       <td className="num">
                         <Money copper={valuation.moneyDelta} />
@@ -224,7 +226,7 @@ export default async function FarmingPage({ searchParams }: PageProps<"/farming"
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
         <p className="mt-3 text-xs text-faint">
           Sacs et banque comptés ensemble : un objet déposé à la banque n&apos;est ni gagné ni perdu. Objets valorisés à la valeur de marché
@@ -247,8 +249,9 @@ function Comparison({ title, rows }: { title: string; rows: FarmComparison[] }) 
   return (
     <section aria-label={title}>
       <SectionTitle>{title}</SectionTitle>
-      <div className="panel overflow-x-auto">
+      <ScrollRegion className="panel overflow-x-auto" label={title}>
         <table className="data-table">
+          <caption className="sr-only">{title}</caption>
           <thead>
             <tr>
               <th scope="col">{title === "Par libellé" ? "Libellé" : "Personnage"}</th>
@@ -266,7 +269,7 @@ function Comparison({ title, rows }: { title: string; rows: FarmComparison[] }) 
           <tbody>
             {rows.map((row) => (
               <tr key={row.key}>
-                <td className="font-semibold">{row.label}</td>
+                <th scope="row" className="font-semibold">{row.label}</th>
                 <td className="num">{row.sessions}</td>
                 <td className="num">{formatDuration(row.seconds)}</td>
                 <td className="num">
@@ -276,7 +279,7 @@ function Comparison({ title, rows }: { title: string; rows: FarmComparison[] }) 
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </section>
   );
 }

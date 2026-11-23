@@ -3,7 +3,7 @@ import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
 import { evaluateGoal, formatProgress, KIND_SPECS, readKind, readParams } from "@/lib/goals/evaluate";
 import { loadGoalFacts } from "@/lib/goals/store";
-import { classLabel, progressPercent, QUALITY_LABELS, REACTION_LABELS, SLOT_LABELS } from "@/lib/wow/format";
+import { brusselsDay, classLabel, progressPercent, QUALITY_LABELS, REACTION_LABELS, SLOT_LABELS } from "@/lib/wow/format";
 import { buildWorkbook, type Sheet } from "@/lib/xlsx/workbook";
 import { getOverview, listAccounts, listCharacters, listMachines } from "./queries";
 
@@ -12,8 +12,7 @@ import { getOverview, listAccounts, listCharacters, listMachines } from "./queri
 const gold = (copper: number | null) => (copper === null ? null : copper / 10_000);
 
 export function exportFileName(now: Date): string {
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" }).format(now);
-  return `AltBoard-export-${day}.xlsx`;
+  return `AltBoard-export-${brusselsDay(now)}.xlsx`;
 }
 
 export async function buildExport(db: Database, now: Date): Promise<Buffer> {

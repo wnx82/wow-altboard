@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classKey, classLabel, formatItemLevel, formatMoney, formatRelative, fractionalLevel, progressPercent, splitMoney } from "./format";
+import {
+  brusselsDay,
+  classKey,
+  classLabel,
+  formatDuration,
+  formatDurationToMinute,
+  formatItemLevel,
+  formatMoney,
+  formatRelative,
+  fractionalLevel,
+  progressPercent,
+  splitMoney,
+} from "./format";
 
 const nbsp = (text: string) => text.replace(/[  ]/g, " ");
 
@@ -56,4 +68,26 @@ test("les durées relatives sont exprimées en français", () => {
   assert.equal(formatRelative(new Date("2026-10-04T09:00:00Z"), now), "il y a 3 heures");
   assert.equal(formatRelative(new Date("2026-10-03T12:00:00Z"), now), "hier");
   assert.equal(formatRelative(null, now), "jamais");
+});
+
+test("les durées sont lisibles à toutes les échelles", () => {
+  assert.deepEqual(
+    [0, 45, 60, 725, 3600, 11_100, 86_399, 86_400, 187_200].map(formatDuration),
+    ["0 s", "45 s", "1 min", "12 min", "1 h", "3 h 05", "23 h 59", "1 j", "2 j 4 h"],
+  );
+  assert.equal(formatDuration(null), "—");
+});
+
+test("un cumul garde les minutes au-delà d'un jour", () => {
+  assert.deepEqual(
+    [45, 11_100, 86_399, 86_400, 187_500].map(formatDurationToMinute),
+    ["45 s", "3 h 05", "23 h 59", "1 j 0 h 00", "2 j 4 h 05"],
+  );
+  assert.equal(formatDurationToMinute(null), "—");
+});
+
+test("le jour civil est celui de Bruxelles, heure d'été comprise", () => {
+  assert.equal(brusselsDay(new Date("2026-11-08T23:30:00Z")), "2026-11-09");
+  assert.equal(brusselsDay("2026-07-01T21:59:00Z"), "2026-07-01");
+  assert.equal(brusselsDay("2026-07-01T22:00:00Z"), "2026-07-02");
 });

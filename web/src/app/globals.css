@@ -971,6 +971,7 @@ body {
   /* En-tête de ligne (scope="row") : une cellule ordinaire pour l'œil, un en-tête pour les lecteurs d'écran. */
   .data-table tbody th {
     font-size: inherit;
+    font-weight: inherit;
     letter-spacing: normal;
     text-transform: none;
     color: inherit;
@@ -1007,15 +1008,15 @@ body {
   .trend-axis { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   .trend-line { fill: none; stroke: var(--series); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
   .trend-marker { fill: var(--series); stroke: #131b2c; stroke-width: 2; outline: none; }
-  .trend-marker:focus-visible { stroke: var(--gold); }
+  /* Un graphique est un seul arrêt de tabulation : au clavier, la valeur désignée est cerclée d'or. */
+  .trend-chart:focus-visible .trend-marker[data-active] { stroke: var(--gold); }
   .trend-value { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .trend-baseline { stroke: rgb(255 255 255 / 0.22); stroke-width: 1; }
   .column-bar { fill: var(--series); }
   .column-bar[data-partial] { fill-opacity: 0.45; }
   .column-bar[data-active] { fill: color-mix(in srgb, var(--series) 75%, white); fill-opacity: 1; }
   .column-unknown { fill: none; stroke: var(--muted); stroke-width: 1.5; }
-  .trend-chart rect[tabindex] { outline: none; }
-  .trend-chart rect[tabindex]:focus-visible { stroke: var(--gold); stroke-width: 1.5; }
+  .trend-chart:focus-visible .chart-band[data-active] { stroke: var(--gold); stroke-width: 1.5; }
   .trend-crosshair { stroke: rgb(255 255 255 / 0.28); stroke-width: 1; }
   .trend-tooltip rect { fill: #0a0f1b; stroke: var(--line-strong); }
   .trend-tooltip-value { fill: var(--text); font-size: 12.5px; font-weight: 600; }

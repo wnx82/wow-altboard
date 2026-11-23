@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LevelGainsChart, LevelProgressChart } from "@/components/level-charts";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -99,8 +100,9 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
             <SectionTitle aside={`${progress.series.length} personnage${progress.series.length > 1 ? "s" : ""} · ${period.span}`}>
               <span id="by-character">Par personnage</span>
             </SectionTitle>
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Progression par personnage">
               <table className="data-table min-w-[720px]">
+                <caption className="sr-only">Progression par personnage</caption>
                 <thead>
                   <tr>
                     <th scope="col">Personnage</th>
@@ -123,12 +125,12 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
                     const last = entry.points[entry.points.length - 1];
                     return (
                       <tr key={entry.id} data-class={classKey(entry.class)}>
-                        <td>
+                        <th scope="row">
                           <Link href={`/characters/${entry.id}`} prefetch={false} className="font-semibold class-text hover:underline">
                             {entry.name}
                           </Link>
                           <span className="block text-xs text-muted">{entry.account}</span>
-                        </td>
+                        </th>
                         <td className="num">
                           {entry.startLevel}
                           {first.percent !== null && <span className="text-muted"> · {Math.min(first.percent, 99)} %</span>}
@@ -147,7 +149,7 @@ export default async function LevelsPage({ searchParams }: PageProps<"/levels">)
                   })}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           </section>
         </>
       )}

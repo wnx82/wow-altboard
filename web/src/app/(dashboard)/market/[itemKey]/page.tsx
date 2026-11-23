@@ -6,6 +6,7 @@ import { ColumnChart } from "@/components/column-chart";
 import { Change, Confidence, ItemName, Reasons } from "@/components/economy";
 import { PriceAlertForm } from "@/components/economy-forms";
 import { PriceChart } from "@/components/price-chart";
+import { ScrollRegion } from "@/components/scroll-region";
 import { TrendChart } from "@/components/trend-chart";
 import { Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -377,8 +378,9 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
       {days.length > 0 && (
         <section aria-label="Relevés" className="mt-8">
           <SectionTitle aside={`${days.length} jour${days.length > 1 ? "s" : ""} relevé${days.length > 1 ? "s" : ""}`}>Relevés journaliers</SectionTitle>
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label="Relevés par jour">
             <table className="data-table min-w-[520px]">
+              <caption className="sr-only">Relevés par jour</caption>
               <thead>
                 <tr>
                   <th scope="col">Jour</th>
@@ -396,7 +398,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
               <tbody>
                 {days.toReversed().map((d) => (
                   <tr key={d.day}>
-                    <td>{formatDay(d.day)}</td>
+                    <th scope="row">{formatDay(d.day)}</th>
                     <td className="num">
                       <Money copper={d.low} />
                     </td>
@@ -408,7 +410,7 @@ export default async function ItemPage({ params, searchParams }: PageProps<"/mar
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         </section>
       )}
     </>

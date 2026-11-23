@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { ScrollRegion } from "@/components/scroll-region";
 import { groupByAccount } from "@/lib/dashboard/account-groups";
 import {
   type Filters,
@@ -544,8 +545,9 @@ function CharacterCard({ character, now, rank }: { character: CharacterListItem;
 
 function CharacterTable({ characters, now, ranks }: { characters: CharacterListItem[]; now: Date; ranks: Ranks }) {
   return (
-    <div className="panel overflow-x-auto">
+    <ScrollRegion className="panel overflow-x-auto" label="Personnages">
       <table className="data-table min-w-[1060px]">
+        <caption className="sr-only">Personnages</caption>
         <thead>
           <tr>
             <th scope="col">Personnage</th>
@@ -571,7 +573,7 @@ function CharacterTable({ characters, now, ranks }: { characters: CharacterListI
         <tbody>
           {characters.map((character) => (
             <tr key={character.id} data-class={classKey(character.class)}>
-              <td>
+              <th scope="row">
                 <Link href={`/characters/${character.id}`} prefetch={false} className="flex items-center gap-3 font-semibold class-text hover:underline">
                   <ClassAvatar name={character.name} classToken={character.class} size="sm" />
                   <span className="max-w-56 truncate" title={character.name}>
@@ -584,7 +586,7 @@ function CharacterTable({ characters, now, ranks }: { characters: CharacterListI
                     </>
                   )}
                 </Link>
-              </td>
+              </th>
               <td>
                 {classLabel(character.class)}
                 {character.race && <span className="block text-xs text-muted">{character.race}</span>}
@@ -621,6 +623,6 @@ function CharacterTable({ characters, now, ranks }: { characters: CharacterListI
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }

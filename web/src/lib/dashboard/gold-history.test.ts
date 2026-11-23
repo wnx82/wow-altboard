@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { brusselsDay, buildGoldHistory, daysBetween } from "./gold-history";
+import { brusselsDay } from "@/lib/wow/format";
+import { buildGoldHistory, daysBetween } from "./gold-history";
 
 describe("or cumulé", () => {
   test("jours calendaires à Bruxelles", () => {

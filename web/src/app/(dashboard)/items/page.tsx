@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -72,7 +73,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
                     </span>
                   </div>
                   {item.holdings.length > 0 && (
-                    <div className="mt-3 overflow-x-auto">
+                    <ScrollRegion className="mt-3 overflow-x-auto" label="Détenteurs">
                       <table className="data-table min-w-[520px]">
                         <caption className="sr-only">Détenteurs de {item.name ?? `l'objet n° ${item.itemId}`}</caption>
                         <thead>
@@ -109,7 +110,7 @@ export default async function ItemsPage({ searchParams }: PageProps<"/items">) {
                           ))}
                         </tbody>
                       </table>
-                    </div>
+                    </ScrollRegion>
                   )}
                 </li>
               ))}

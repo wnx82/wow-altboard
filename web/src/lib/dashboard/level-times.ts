@@ -129,22 +129,3 @@ export function cumulativePlayedSeconds(levels: LevelTime[], totalSeconds: numbe
 
   return cumulative;
 }
-
-/** « 45 s », « 12 min », « 3 h 05 », « 2 j 4 h ». */
-export function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "—";
-  const total = Math.max(0, Math.round(seconds));
-  if (total < 60) return `${total} s`;
-  const minutes = Math.floor(total / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ${String(minutes % 60).padStart(2, "0")}`;
-  return `${Math.floor(hours / 24)} j ${hours % 24} h`;
-}
-
-/** Comme formatDuration, minutes gardées au-delà d'un jour : « 2 j 4 h 07 ». Pour un cumul, où deux lignes voisines diffèrent de moins d'une heure. */
-export function formatDurationToMinute(seconds: number | null): string {
-  if (seconds === null || Math.round(seconds) < 86_400) return formatDuration(seconds);
-  const minutes = Math.floor(Math.round(seconds) / 60);
-  return `${Math.floor(minutes / 1440)} j ${Math.floor(minutes / 60) % 24} h ${String(minutes % 60).padStart(2, "0")}`;
-}

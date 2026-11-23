@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import { ChartAnnouncer, ChartGrid, ChartTooltip, tooltipHeight, useChartKeyboard, useChartWidth } from "@/components/chart-parts";
+import { nearestIndex, niceTicks, tooltipLeft } from "@/lib/chart/scale";
 
 /** valueLabel : valeur courte posée au bout de la courbe ; à défaut, la valeur au format des graduations. */
 export type TrendPoint = { at: string; value: number; label: string; dateLabel: string; valueLabel?: string };
@@ -24,43 +26,19 @@ const MIN_STEP: Record<Props["series"], number> = { level: 0, gold: 0.0001 };
 
 const HEIGHT = 200;
 const MARGIN = { top: 16, right: 64, bottom: 28, left: 46 };
-
-/** Graduations « rondes » couvrant [min, max], jamais plus serrées que minStep. */
-export function niceTicks(min: number, max: number, integer: boolean, minStep = 0): number[] {
-  if (min === max) {
-    if (integer) return [min - 1, min, min + 1];
-    return min === 0 ? [0, 1] : [min * 0.9, min, min * 1.1];
-  }
-  const rough = (max - min) / 3;
-  const magnitude = 10 ** Math.floor(Math.log10(rough));
-  let step = [1, 2, 2.5, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= rough) ?? rough;
-  if (integer) step = Math.max(1, Math.round(step));
-  step = Math.max(step, minStep);
-  const start = Math.floor(min / step) * step;
-  const ticks: number[] = [];
-  for (let tick = start; tick < max + step; tick += step) ticks.push(Number(tick.toFixed(10)));
-  return ticks;
-}
+const TOOLTIP_WIDTH = 148;
 
 /**
  * Courbe d'une seule série dans le temps. Une mesure par graphique, un seul axe. Chaque valeur
- * reste accessible sans survol : au clavier (points focalisables) et dans le tableau de
- * l'historique affiché sous les courbes.
+ * reste accessible sans survol : au clavier (un arrêt de tabulation, puis les flèches) et dans le
+ * tableau de l'historique affiché sous les courbes.
  */
 export function TrendChart({ title, points, series }: Props) {
   const integer = series === "level";
   const titleId = useId();
-  const frame = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(560);
+  const [frame, width] = useChartWidth(560);
   const [active, setActive] = useState<number | null>(null);
-
-  useEffect(() => {
-    const element = frame.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const keyboard = useChartKeyboard(points.length, active, setActive);
 
   const layout = useMemo(() => {
     const times = points.map((point) => Date.parse(point.at));
@@ -80,19 +58,8 @@ export function TrendChart({ title, points, series }: Props) {
   const formatTick = (value: number) => TICK_FORMAT[series](value, tickStep);
   const last = coordinates[coordinates.length - 1];
   const current = active === null ? null : { point: points[active], ...coordinates[active] };
-
-  const nearest = (clientX: number, target: SVGRectElement) => {
-    const pointerX = clientX - target.getBoundingClientRect().left + MARGIN.left;
-    let best = 0;
-    coordinates.forEach((coordinate, index) => {
-      if (Math.abs(coordinate.x - pointerX) < Math.abs(coordinates[best].x - pointerX)) best = index;
-    });
-    setActive(best);
-  };
-
-  const tooltipWidth = 148;
-  const tooltipX = current ? Math.min(Math.max(current.x - tooltipWidth / 2, 4), width - tooltipWidth - 4) : 0;
-  const tooltipY = current ? (current.y > MARGIN.top + 56 ? current.y - 54 : current.y + 14) : 0;
+  const tooltipLines = current ? [current.point.label, current.point.dateLabel] : [];
+  const tooltipY = current ? (current.y > MARGIN.top + 56 ? current.y - tooltipHeight(2) - 12 : current.y + 14) : 0;
 
   return (
     <figure className="panel p-4" data-series={series}>
@@ -100,15 +67,8 @@ export function TrendChart({ title, points, series }: Props) {
         {title}
       </figcaption>
       <div ref={frame}>
-        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId}>
-          {layout.ticks.map((tick) => (
-            <g key={tick}>
-              <line className="trend-grid" x1={MARGIN.left} x2={width - MARGIN.right} y1={layout.y(tick)} y2={layout.y(tick)} />
-              <text className="trend-axis" x={MARGIN.left - 8} y={layout.y(tick)} textAnchor="end" dominantBaseline="middle">
-                {formatTick(tick)}
-              </text>
-            </g>
-          ))}
+        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId} {...keyboard.svgProps}>
+          <ChartGrid ticks={layout.ticks} y={layout.y} left={MARGIN.left} right={width - MARGIN.right} label={formatTick} />
           <text className="trend-axis" x={MARGIN.left} y={HEIGHT - 8} textAnchor="start">
             {points[0].dateLabel}
           </text>
@@ -121,18 +81,7 @@ export function TrendChart({ title, points, series }: Props) {
           {current && <line className="trend-crosshair" x1={current.x} x2={current.x} y1={MARGIN.top} y2={HEIGHT - MARGIN.bottom} />}
           <polyline className="trend-line" points={coordinates.map((c) => `${c.x},${c.y}`).join(" ")} />
           {coordinates.map((coordinate, index) => (
-            <circle
-              key={points[index].at}
-              className="trend-marker"
-              cx={coordinate.x}
-              cy={coordinate.y}
-              r={active === index ? 5.5 : 4}
-              tabIndex={0}
-              role="img"
-              aria-label={`${points[index].dateLabel} : ${points[index].label}`}
-              onFocus={() => setActive(index)}
-              onBlur={() => setActive(null)}
-            />
+            <circle key={points[index].at} className="trend-marker" cx={coordinate.x} cy={coordinate.y} r={active === index ? 5.5 : 4} data-active={active === index || undefined} />
           ))}
           {/* Valeur courante, directement au bout de la courbe. */}
           <text className="trend-value" x={last.x + 10} y={last.y} dominantBaseline="middle">
@@ -146,23 +95,16 @@ export function TrendChart({ title, points, series }: Props) {
             width={Math.max(layout.plotWidth, 0)}
             height={layout.plotHeight}
             fill="transparent"
-            onPointerMove={(event) => nearest(event.clientX, event.currentTarget)}
+            onPointerMove={(event) =>
+              setActive(nearestIndex(coordinates.map((c) => c.x), event.clientX - event.currentTarget.getBoundingClientRect().left + MARGIN.left))
+            }
             onPointerLeave={() => setActive(null)}
           />
 
-          {current && (
-            <g className="trend-tooltip" transform={`translate(${tooltipX}, ${tooltipY})`} pointerEvents="none">
-              <rect width={tooltipWidth} height={42} rx={8} />
-              <text className="trend-tooltip-value" x={10} y={18}>
-                {current.point.label}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={33}>
-                {current.point.dateLabel}
-              </text>
-            </g>
-          )}
+          {current && <ChartTooltip x={tooltipLeft(current.x, TOOLTIP_WIDTH, width)} y={tooltipY} width={TOOLTIP_WIDTH} lines={tooltipLines} />}
         </svg>
       </div>
+      <ChartAnnouncer hintId={keyboard.hintId} text={current ? `${current.point.dateLabel} : ${current.point.label}` : null} />
     </figure>
   );
 }

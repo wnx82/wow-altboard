@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FlowChart } from "@/components/flow-chart";
+import { ScrollRegion } from "@/components/scroll-region";
 import { ClassAvatar, EmptyState, Meter, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -24,11 +25,9 @@ import {
   type FinanceBucket,
   type IncomeSource,
 } from "@/lib/dashboard/finances";
-import { brusselsDay } from "@/lib/dashboard/gold-history";
-import { formatDuration } from "@/lib/dashboard/level-times";
 import { hasLedgerDays, listLedgerDays } from "@/lib/dashboard/queries";
 import { formatChange, formatCopperShort, formatDay, formatPercent, formatShortDay } from "@/lib/economy/view";
-import { classKey, formatMoney } from "@/lib/wow/format";
+import { brusselsDay, classKey, formatDuration, formatMoney } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Finances" };
 
@@ -269,8 +268,9 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
 
         <section aria-label="Par personnage">
           <SectionTitle aside={`bilan par heure à partir de ${formatDuration(MIN_SECONDS_FOR_RATE)} de jeu`}>Par personnage</SectionTitle>
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label="Bilan par personnage">
             <table className="data-table min-w-[880px]">
+              <caption className="sr-only">Bilan par personnage</caption>
               <thead>
                 <tr>
                   <th scope="col">Personnage</th>
@@ -334,13 +334,14 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         </section>
 
         <section aria-label={grouping === "day" ? "Détail par jour" : "Détail par mois"}>
           <SectionTitle aside="du plus récent au plus ancien">{grouping === "day" ? "Détail par jour" : "Détail par mois"}</SectionTitle>
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label={grouping === "day" ? "Détail par jour" : "Détail par mois"}>
             <table className="data-table min-w-[640px]">
+              <caption className="sr-only">{grouping === "day" ? "Détail par jour" : "Détail par mois"}</caption>
               <thead>
                 <tr>
                   <th scope="col">{grouping === "day" ? "Jour" : "Mois"}</th>
@@ -386,7 +387,7 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
                   ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         </section>
       </div>
     </>

@@ -1,6 +1,7 @@
 import { and, inArray, lt, notInArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Durée de conservation des tables qui ne font que grossir. Seuls le journal des synchronisations
 // et les calculs d'opportunités sont purgés : ils se refont ou ne servent qu'au diagnostic.
@@ -53,7 +54,7 @@ export async function pruneHistory(db: Database, now: Date): Promise<RetentionRe
 }
 
 /** Fuseau des jours de résumé : celui des autres pages (Activité, Finances…). */
-export const SCAN_DAY_TIME_ZONE = "Europe/Brussels";
+export const SCAN_DAY_TIME_ZONE = PLAYER_TIME_ZONE;
 
 /**
  * Résume les relevés de scan des jours (heure de Bruxelles) antérieurs à la fenêtre gardée : plus

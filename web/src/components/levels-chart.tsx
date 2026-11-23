@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { niceTicks } from "@/components/trend-chart";
+import { useId, useMemo, useState } from "react";
+import { ChartAnnouncer, ChartGrid, ChartTooltip, tooltipHeight, useChartKeyboard, useChartWidth } from "@/components/chart-parts";
+import { niceTicks, tooltipLeft } from "@/lib/chart/scale";
 
 export type LevelsChartSeries = {
   id: number;
@@ -30,6 +31,7 @@ const HEIGHT = 300;
 const MARGIN = { top: 16, bottom: 30, left: 46 };
 /** Au-delà, une marque par relevé noierait la courbe : seuls son bout et le point survolé sont marqués. */
 const MAX_MARKERS = 45;
+const TOOLTIP_WIDTH = 188;
 
 /** Distance du point (px, py) au segment [a, b]. */
 function segmentDistance(px: number, py: number, a: Coordinate, b: Coordinate): number {
@@ -42,24 +44,15 @@ function segmentDistance(px: number, py: number, a: Coordinate, b: Coordinate): 
 /**
  * Courbes de plusieurs personnages sur un même axe : une seule est en couleur, les autres restent
  * en contexte. Le pointeur met en avant la courbe la plus proche, la légende en choisit une au
- * clic ou au clavier. Chaque valeur reste accessible sans survol, dans le tableau qui accompagne
- * le graphique.
+ * clic ou au clavier ; sur le graphique, les flèches parcourent les relevés de la courbe mise en
+ * avant. Chaque valeur reste accessible sans survol, dans le tableau qui accompagne le graphique.
  */
 export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
   const titleId = useId();
-  const frame = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(960);
+  const [frame, width] = useChartWidth(960);
   const [selected, setSelected] = useState(series[0].id);
   // index null : courbe désignée par la légende, sans point survolé.
   const [hover, setHover] = useState<{ id: number; index: number | null } | null>(null);
-
-  useEffect(() => {
-    const element = frame.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   // Sur un écran étroit, le nom au bout de la courbe prendrait la place du tracé : la légende suffit.
   const labelled = width >= 560;
@@ -89,6 +82,7 @@ export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
   const current = pointIndex === null ? null : { point: active.entry.points[pointIndex], ...active.coordinates[pointIndex] };
   const end = active.coordinates[active.coordinates.length - 1];
   const baseline = HEIGHT - MARGIN.bottom;
+  const keyboard = useChartKeyboard(active.coordinates.length, pointIndex, (index) => setHover(index === null ? null : { id: active.entry.id, index }));
 
   // La courbe la plus proche du pointeur, puis son relevé le plus proche : personne ne vise un trait de 2 px.
   const locate = (clientX: number, clientY: number, target: SVGRectElement) => {
@@ -108,9 +102,7 @@ export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
     return best;
   };
 
-  const tooltipWidth = 188;
-  const tooltipX = current ? Math.min(Math.max(current.x - tooltipWidth / 2, 4), width - tooltipWidth - 4) : 0;
-  const tooltipY = current ? (current.y > MARGIN.top + 72 ? current.y - 70 : current.y + 14) : 0;
+  const tooltipY = current ? (current.y > MARGIN.top + 72 ? current.y - tooltipHeight(3) - 12 : current.y + 14) : 0;
 
   return (
     <figure className="panel p-4" data-series="level">
@@ -119,15 +111,8 @@ export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
         <span className="text-xs text-muted">{note}</span>
       </figcaption>
       <div ref={frame}>
-        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId}>
-          {layout.levelTicks.map((tick) => (
-            <g key={tick}>
-              <line className="trend-grid" x1={MARGIN.left} x2={width - marginRight} y1={layout.y(tick)} y2={layout.y(tick)} />
-              <text className="trend-axis" x={MARGIN.left - 8} y={layout.y(tick)} textAnchor="end" dominantBaseline="middle">
-                {tick}
-              </text>
-            </g>
-          ))}
+        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId} {...keyboard.svgProps}>
+          <ChartGrid ticks={layout.levelTicks} y={layout.y} left={MARGIN.left} right={width - marginRight} label={String} />
           <line className="trend-baseline" x1={MARGIN.left} x2={width - marginRight} y1={baseline} y2={baseline} />
           {layout.timeTicks.map((tick) => (
             <g key={tick.x}>
@@ -150,7 +135,16 @@ export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
             {active.coordinates.map((coordinate, index) => {
               const last = index === active.coordinates.length - 1;
               if (!last && index !== pointIndex && active.coordinates.length > MAX_MARKERS) return null;
-              return <circle key={active.entry.points[index].at} className="trend-marker" cx={coordinate.x} cy={coordinate.y} r={index === pointIndex ? 5.5 : 4} />;
+              return (
+                <circle
+                  key={active.entry.points[index].at}
+                  className="trend-marker"
+                  cx={coordinate.x}
+                  cy={coordinate.y}
+                  r={index === pointIndex ? 5.5 : 4}
+                  data-active={index === pointIndex || undefined}
+                />
+              );
             })}
             {labelled && (
               <text className="levels-label" x={end.x + 10} y={end.y} dominantBaseline="middle">
@@ -175,21 +169,11 @@ export function LevelsChart({ title, note, series, from, to, ticks }: Props) {
           />
 
           {current && (
-            <g className="trend-tooltip" transform={`translate(${tooltipX}, ${tooltipY})`} pointerEvents="none">
-              <rect width={tooltipWidth} height={58} rx={8} />
-              <text className="trend-tooltip-value" x={10} y={18}>
-                {current.point.label}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={34}>
-                {active.entry.name}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={49}>
-                {current.point.dateLabel}
-              </text>
-            </g>
+            <ChartTooltip x={tooltipLeft(current.x, TOOLTIP_WIDTH, width)} y={tooltipY} width={TOOLTIP_WIDTH} lines={[current.point.label, active.entry.name, current.point.dateLabel]} />
           )}
         </svg>
       </div>
+      <ChartAnnouncer hintId={keyboard.hintId} text={current ? `${active.entry.name}, ${current.point.dateLabel} : ${current.point.label}` : null} />
       {series.length > 1 && (
         <ul className="levels-legend" aria-label="Personnages tracés">
           {series.map((entry) => (

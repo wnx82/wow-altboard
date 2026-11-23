@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ColumnChart } from "@/components/column-chart";
 import { MarketSelector } from "@/components/economy";
+import { ScrollRegion } from "@/components/scroll-region";
 import { EmptyState, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -85,8 +86,9 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
 
       <section aria-label="Relevés Auctionator" className="mt-8">
         <SectionTitle aside="un même fichier n'est importé qu'une fois">Relevés Auctionator reçus</SectionTitle>
-        <div className="panel overflow-x-auto">
+        <ScrollRegion className="panel overflow-x-auto" label="Relevés Auctionator reçus">
           <table className="data-table min-w-[900px]">
+            <caption className="sr-only">Relevés Auctionator reçus</caption>
             <thead>
               <tr>
                 <th scope="col">Reçu le</th>
@@ -106,7 +108,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
             <tbody>
               {imports.map((row) => (
                 <tr key={row.id}>
-                  <td>{formatDateTime(row.receivedAt)}</td>
+                  <th scope="row">{formatDateTime(row.receivedAt)}</th>
                   <td>{row.account}</td>
                   <td className="text-muted">{row.machine ?? "—"}</td>
                   <td>{formatDateTime(row.fileModifiedAt)}</td>
@@ -122,7 +124,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       </section>
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">

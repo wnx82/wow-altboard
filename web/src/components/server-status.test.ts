@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ServiceHistory, ServiceView } from "@/lib/status/view";
-import { formatDuration, ServerStatusTable, ServerStatusTiles, ServiceHistoryPanel, StatusBadge, StatusLegend, TransitionsTable } from "./server-status";
+import { ServerStatusTable, ServerStatusTiles, ServiceHistoryPanel, StatusBadge, StatusLegend, TransitionsTable } from "./server-status";
 
 const service = (overrides: Partial<ServiceView>): ServiceView => ({
   service: "auth",
@@ -134,7 +134,7 @@ test("disponibilité et frise des 24 dernières heures", () => {
   );
   const content = text(html);
 
-  assert.match(content, /Disponibilité sur 24 heures 92,86 % sur 2 h 20 min mesurées, dont 10 min hors ligne/);
+  assert.match(content, /Disponibilité sur 24 heures 92,86 % sur 2 h 20 mesurées, dont 10 min hors ligne/);
   assert.match(content, /Disponibilité sur 7 jours Échantillon insuffisant/);
   assert.equal(html.match(/class="status-cell"/g)?.length, 24);
   assert.equal(html.match(/data-status="(up|degraded|down)"/g)?.length, 3);
@@ -190,8 +190,4 @@ test("les miniatures de l'accueil mènent à la page Serveurs et y résument l'�
   assert.equal(html.match(/class="status-strip mt-3" data-size="sm" aria-hidden="true"/g)?.length, 3);
   assert.equal(html.match(/class="status-cell"/g)?.length, 3 * 24);
   assert.doesNotMatch(html, /style=/);
-});
-
-test("les durées restent lisibles de la minute à la semaine", () => {
-  assert.deepEqual([0, 59, 600, 3_600, 8_400, 86_400, 100_800].map(formatDuration), ["0 min", "1 min", "10 min", "1 h", "2 h 20 min", "1 j", "1 j 4 h"]);
 });

@@ -3,6 +3,7 @@ import Form from "next/form";
 import Link from "next/link";
 import { Change, Confidence, ItemName, MarketSelector, MarketSource } from "@/components/economy";
 import { DeleteAlertButton } from "@/components/economy-forms";
+import { ScrollRegion } from "@/components/scroll-region";
 import { Sparkline } from "@/components/sparkline";
 import { EmptyState, Money, PageHeader, SectionTitle, StatTile } from "@/components/ui";
 import { getDatabase } from "@/db/client";
@@ -113,8 +114,9 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
         {view.rows.length === 0 ? (
           <div className="panel p-5 text-sm text-muted">Aucun objet ne correspond.</div>
         ) : (
-          <div className="panel overflow-x-auto">
+          <ScrollRegion className="panel overflow-x-auto" label="Tous les objets">
             <table className="data-table min-w-[980px]">
+              <caption className="sr-only">Tous les objets</caption>
               <thead>
                 <tr>
                   <th scope="col">Objet</th>
@@ -143,7 +145,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
               <tbody>
                 {view.rows.map((row) => (
                   <tr key={row.itemKey}>
-                    <td>
+                    <th scope="row">
                       <ItemName itemKey={row.itemKey} names={context.names} query={itemQuery} />
                       {row.stats.outlier && (
                         <span className="badge ml-2" data-tone="warn">
@@ -155,7 +157,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
                           alerte
                         </span>
                       )}
-                    </td>
+                    </th>
                     <td>
                       <Sparkline values={row.spark} label={sparkLabel(row)} />
                     </td>
@@ -178,7 +180,7 @@ export default async function MarketPage({ searchParams }: PageProps<"/market">)
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
 
         {view.pages > 1 && (
@@ -269,8 +271,9 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
   return (
     <section aria-label="Scans EZAuctioneer" className="mt-8">
       <SectionTitle aside="addon EZAuctioneer : chaque scan complet, à son heure">Scans EZAuctioneer</SectionTitle>
-      <div className="panel overflow-x-auto">
+      <ScrollRegion className="panel overflow-x-auto" label="Scans EZAuctioneer">
         <table className="data-table min-w-[720px]">
+          <caption className="sr-only">Scans EZAuctioneer</caption>
           <thead>
             <tr>
               <th scope="col">Marché</th>
@@ -289,7 +292,7 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
           <tbody>
             {markets.map((market) => (
               <tr key={market.id}>
-                <td>{market.label}</td>
+                <th scope="row">{market.label}</th>
                 <td>
                   {formatDateTime(market.lastScanAt)} <span className="text-xs text-faint">{formatRelative(market.lastScanAt)}</span>
                 </td>
@@ -300,7 +303,7 @@ function ScanMarketList({ markets }: { markets: ScanMarketSummary[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       <p className="mt-3 text-xs text-faint">
         Enchères et objets : ceux du dernier scan dont l&apos;addon a gardé le rapport. Royaume : le nom que donne le jeu, qui peut différer de
         celui de la liste des royaumes.

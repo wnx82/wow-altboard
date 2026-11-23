@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dayKey } from "./activity";
+import { brusselsDay } from "@/lib/wow/format";
 import { buildLevelProgress, dayTicks, type LevelRow } from "./levels";
 
 const CHARACTERS: Record<number, string> = { 1: "Aedot", 2: "Brumelle", 3: "Cendrine" };
@@ -153,7 +153,7 @@ test("les graduations du temps sont des débuts de journée espacés d'un nombre
   assert.equal(dayTicks(new Date("2026-09-27T09:00:00Z"), NOW)[0].toISOString(), "2026-09-27T22:00:00.000Z");
   // Changement d'heure du 25 octobre 2026 : une graduation par jour, sans doublon ni jour sauté.
   assert.deepEqual(
-    dayTicks(new Date("2026-10-20T22:00:00Z"), new Date("2026-10-28T12:00:00Z")).map((tick) => dayKey.format(new Date(tick.getTime() + 6 * 3600 * 1000))),
+    dayTicks(new Date("2026-10-20T22:00:00Z"), new Date("2026-10-28T12:00:00Z")).map((tick) => brusselsDay(new Date(tick.getTime() + 6 * 3600 * 1000))),
     ["2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"],
   );
   assert.ok(dayTicks(new Date("2020-01-01T00:00:00Z"), NOW).length <= 8);

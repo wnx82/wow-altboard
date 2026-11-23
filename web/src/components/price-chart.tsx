@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { niceTicks } from "@/components/trend-chart";
+import { useId, useMemo, useState } from "react";
+import { ChartAnnouncer, ChartGrid, ChartTooltip, tooltipHeight, useChartKeyboard, useChartWidth } from "@/components/chart-parts";
+import { coinUnit, nearestIndex, niceTicks, tooltipLeft } from "@/lib/chart/scale";
 
 /** Relevé d'un jour : prix en pièces de cuivre, libellés déjà formatés par la page. */
 export type PricePoint = { day: string; low: number; high: number; dateLabel: string; lowLabel: string; highLabel: string; availableLabel: string };
@@ -11,34 +12,21 @@ type Props = { title: string; note: string; points: PricePoint[] };
 const HEIGHT = 220;
 const MARGIN = { top: 16, right: 74, bottom: 28, left: 58 };
 const DAY_MS = 86_400_000;
+const TOOLTIP_WIDTH = 196;
 const tickNumber = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-
-/** Graduations dans l'unité de la plus grande : po, pa ou pc. */
-function tickFormatter(max: number): (copper: number) => string {
-  if (max >= 10_000) return (copper) => `${tickNumber.format(copper / 10_000)} po`;
-  if (max >= 100) return (copper) => `${tickNumber.format(copper / 100)} pa`;
-  return (copper) => `${tickNumber.format(copper)} pc`;
-}
 
 /**
  * Prix d'un objet jour par jour : la courbe suit le plus bas du jour (prix de référence), la bande
  * l'écart entre le plus bas et le plus haut des prix minimums vus ce jour-là. Un seul axe, une seule
  * mesure. Un jour sans relevé n'est pas tracé : la courbe relie les jours relevés, les marques les
- * situent. Chaque valeur reste lisible sans survol (points focalisables, tableau sous le graphique).
+ * situent. Chaque valeur reste lisible sans survol (un arrêt de tabulation puis les flèches, tableau
+ * sous le graphique).
  */
 export function PriceChart({ title, note, points }: Props) {
   const titleId = useId();
-  const frame = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+  const [frame, width] = useChartWidth(640);
   const [active, setActive] = useState<number | null>(null);
-
-  useEffect(() => {
-    const element = frame.current;
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(280, Math.round(entry.contentRect.width))));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const keyboard = useChartKeyboard(points.length, active, setActive);
 
   const layout = useMemo(() => {
     const times = points.map((point) => Date.parse(`${point.day}T00:00:00Z`));
@@ -51,26 +39,17 @@ export function PriceChart({ title, note, points }: Props) {
     const y = (value: number) => MARGIN.top + plotHeight - ((value - yMin) / (yMax - yMin || 1)) * plotHeight;
     const coordinates = points.map((point, index) => ({ x: x(times[index]), low: y(point.low), high: y(point.high) }));
     const band = [...coordinates.map((c) => `${c.x},${c.high}`), ...coordinates.toReversed().map((c) => `${c.x},${c.low}`)].join(" ");
-    return { ticks, y, coordinates, band, plotWidth, plotHeight, format: tickFormatter(yMax) };
+    // Graduations dans l'unité de la plus grande : po, pa ou pc.
+    const unit = coinUnit(yMax);
+    return { ticks, y, coordinates, band, plotWidth, plotHeight, format: (copper: number) => `${tickNumber.format(copper / unit.size)}${unit.suffix}` };
   }, [points, width]);
 
   const { coordinates } = layout;
   const last = coordinates[coordinates.length - 1];
   const current = active === null ? null : { point: points[active], ...coordinates[active] };
-
-  const nearest = (clientX: number, target: SVGRectElement) => {
-    const pointerX = clientX - target.getBoundingClientRect().left + MARGIN.left;
-    let best = 0;
-    coordinates.forEach((coordinate, index) => {
-      if (Math.abs(coordinate.x - pointerX) < Math.abs(coordinates[best].x - pointerX)) best = index;
-    });
-    setActive(best);
-  };
-
-  const tooltipWidth = 196;
-  const tooltipHeight = 74;
-  const tooltipX = current ? Math.min(Math.max(current.x - tooltipWidth / 2, 4), width - tooltipWidth - 4) : 0;
-  const tooltipY = current ? (current.high > MARGIN.top + tooltipHeight + 8 ? current.high - tooltipHeight - 8 : current.low + 12) : 0;
+  const tooltipLines = current ? [`Plus bas ${current.point.lowLabel}`, `Plus haut ${current.point.highLabel}`, current.point.availableLabel, current.point.dateLabel] : [];
+  const boxHeight = tooltipHeight(4);
+  const tooltipY = current ? (current.high > MARGIN.top + boxHeight + 8 ? current.high - boxHeight - 8 : current.low + 12) : 0;
 
   return (
     <figure className="panel p-4" data-series="gold">
@@ -79,15 +58,8 @@ export function PriceChart({ title, note, points }: Props) {
         <span className="text-xs text-muted">{note}</span>
       </figcaption>
       <div ref={frame}>
-        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId}>
-          {layout.ticks.map((tick) => (
-            <g key={tick}>
-              <line className="trend-grid" x1={MARGIN.left} x2={width - MARGIN.right} y1={layout.y(tick)} y2={layout.y(tick)} />
-              <text className="trend-axis" x={MARGIN.left - 8} y={layout.y(tick)} textAnchor="end" dominantBaseline="middle">
-                {layout.format(tick)}
-              </text>
-            </g>
-          ))}
+        <svg className="trend-chart" width={width} height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`} role="group" aria-labelledby={titleId} {...keyboard.svgProps}>
+          <ChartGrid ticks={layout.ticks} y={layout.y} left={MARGIN.left} right={width - MARGIN.right} label={layout.format} />
           <text className="trend-axis" x={MARGIN.left} y={HEIGHT - 8} textAnchor="start">
             {points[0].dateLabel}
           </text>
@@ -107,11 +79,7 @@ export function PriceChart({ title, note, points }: Props) {
               cx={coordinate.x}
               cy={coordinate.low}
               r={active === index ? 5.5 : points.length > 45 ? 2.5 : 4}
-              tabIndex={0}
-              role="img"
-              aria-label={`${points[index].dateLabel} : plus bas ${points[index].lowLabel}, plus haut ${points[index].highLabel}, ${points[index].availableLabel}`}
-              onFocus={() => setActive(index)}
-              onBlur={() => setActive(null)}
+              data-active={active === index || undefined}
             />
           ))}
           <text className="trend-value" x={last.x + 10} y={last.low} dominantBaseline="middle">
@@ -124,29 +92,19 @@ export function PriceChart({ title, note, points }: Props) {
             width={Math.max(layout.plotWidth, 0)}
             height={layout.plotHeight}
             fill="transparent"
-            onPointerMove={(event) => nearest(event.clientX, event.currentTarget)}
+            onPointerMove={(event) =>
+              setActive(nearestIndex(coordinates.map((c) => c.x), event.clientX - event.currentTarget.getBoundingClientRect().left + MARGIN.left))
+            }
             onPointerLeave={() => setActive(null)}
           />
 
-          {current && (
-            <g className="trend-tooltip" transform={`translate(${tooltipX}, ${tooltipY})`} pointerEvents="none">
-              <rect width={tooltipWidth} height={tooltipHeight} rx={8} />
-              <text className="trend-tooltip-value" x={10} y={18}>
-                Plus bas {current.point.lowLabel}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={34}>
-                Plus haut {current.point.highLabel}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={50}>
-                {current.point.availableLabel}
-              </text>
-              <text className="trend-tooltip-date" x={10} y={66}>
-                {current.point.dateLabel}
-              </text>
-            </g>
-          )}
+          {current && <ChartTooltip x={tooltipLeft(current.x, TOOLTIP_WIDTH, width)} y={tooltipY} width={TOOLTIP_WIDTH} lines={tooltipLines} />}
         </svg>
       </div>
+      <ChartAnnouncer
+        hintId={keyboard.hintId}
+        text={current ? `${current.point.dateLabel} : plus bas ${current.point.lowLabel}, plus haut ${current.point.highLabel}, ${current.point.availableLabel}` : null}
+      />
     </figure>
   );
 }

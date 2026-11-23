@@ -1,15 +1,16 @@
 import { ColumnChart, type Column } from "@/components/column-chart";
 import { LevelsChart, type LevelsChartSeries } from "@/components/levels-chart";
 import { dayTicks, type LevelProgress } from "@/lib/dashboard/levels";
+import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Graphiques de l'évolution des niveaux, tous personnages confondus. Les libellés sont préparés
 // ici, côté serveur : les composants de tracé ne reçoivent que du texte.
 
 const HOUR = 3600 * 1000;
 const levelFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const pointDate = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
-const tickDay = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Brussels" });
-const tickMonth = new Intl.DateTimeFormat("fr-BE", { month: "short", year: "2-digit", timeZone: "Europe/Brussels" });
+const pointDate = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: PLAYER_TIME_ZONE });
+const tickDay = new Intl.DateTimeFormat("fr-BE", { day: "2-digit", month: "2-digit", timeZone: PLAYER_TIME_ZONE });
+const tickMonth = new Intl.DateTimeFormat("fr-BE", { month: "short", year: "2-digit", timeZone: PLAYER_TIME_ZONE });
 
 /** Courbe de chaque personnage en progression sur la période ; null si aucun n'a progressé. */
 export function LevelProgressChart({ progress }: { progress: LevelProgress }) {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Form from "next/form";
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { ClassAvatar, EmptyState, PageHeader, SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
 import { requireSession } from "@/lib/auth/session";
@@ -19,8 +20,7 @@ import {
   type CompareRow,
   type ReputationCompareRow,
 } from "@/lib/dashboard/compare";
-import { formatDuration } from "@/lib/dashboard/level-times";
-import { classKey, classLabel, formatItemLevel, formatMoney, REACTION_LABELS } from "@/lib/wow/format";
+import { classKey, classLabel, formatDuration, formatItemLevel, formatMoney, REACTION_LABELS } from "@/lib/wow/format";
 
 export const metadata: Metadata = { title: "Comparer" };
 
@@ -129,8 +129,9 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
           {gear.length === 0 ? (
             <p className="panel px-5 py-4 text-sm text-muted">Aucun équipement relevé.</p>
           ) : (
-            <div className="panel overflow-x-auto">
+            <ScrollRegion className="panel overflow-x-auto" label="Équipement comparé">
               <table className="data-table compare-table">
+                <caption className="sr-only">Équipement comparé</caption>
                 <CompareHead characters={characters} first="Emplacement" />
                 <tbody>
                   {gear.map((row) => (
@@ -154,7 +155,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/compare"
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollRegion>
           )}
         </section>
 
@@ -226,8 +227,9 @@ function CompareTable({
       {rows.length === 0 ? (
         <p className="panel px-5 py-4 text-sm text-muted">{empty}</p>
       ) : (
-        <div className="panel overflow-x-auto">
+        <ScrollRegion className="panel overflow-x-auto" label={title}>
           <table className="data-table compare-table">
+            <caption className="sr-only">{title}</caption>
             <CompareHead characters={characters} first="" />
             <tbody>
               {rows.map((row) => (
@@ -235,7 +237,7 @@ function CompareTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       )}
     </section>
   );
@@ -263,8 +265,9 @@ function ReputationTable({ characters, rows }: { characters: ComparedCharacter[]
       {rows.length === 0 ? (
         <p className="panel px-5 py-4 text-sm text-muted">Aucune réputation connue.</p>
       ) : (
-        <div className="panel overflow-x-auto">
+        <ScrollRegion className="panel overflow-x-auto" label="Réputations comparées">
           <table className="data-table compare-table">
+            <caption className="sr-only">Réputations comparées</caption>
             <CompareHead characters={characters} first="Faction" />
             {[...Map.groupBy(rows, (row) => row.group)].map(([group, list]) => (
               <tbody key={group}>
@@ -279,7 +282,7 @@ function ReputationTable({ characters, rows }: { characters: ComparedCharacter[]
               </tbody>
             ))}
           </table>
-        </div>
+        </ScrollRegion>
       )}
     </section>
   );

@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { ScrollRegion } from "@/components/scroll-region";
 import { formatCheckTime, formatLatency, STATUS_HELP, STATUS_LABELS, STATUS_TONES, type Status } from "@/lib/status/status";
 import type { Availability, HourCell, ServiceHistory, ServiceSummary, ServiceView, TransitionView } from "@/lib/status/view";
-import { formatRelative } from "@/lib/wow/format";
+import { formatDuration, formatRelative, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // État des serveurs de jeu : briques d'affichage sans état, rendues côté serveur. Le statut n'est
 // jamais porté par la couleur seule : chaque badge l'écrit, chaque case de la frise le dit en
@@ -20,8 +21,9 @@ export function StatusBadge({ status }: { status: Status }) {
 
 export function ServerStatusTable({ services }: { services: ServiceView[] }) {
   return (
-    <div className="panel overflow-x-auto">
+    <ScrollRegion className="panel overflow-x-auto" label="État des serveurs">
       <table className="data-table min-w-[720px]">
+        <caption className="sr-only">État des serveurs</caption>
         <thead>
           <tr>
             <th scope="col">Service</th>
@@ -36,7 +38,7 @@ export function ServerStatusTable({ services }: { services: ServiceView[] }) {
         <tbody>
           {services.map((service) => (
             <tr key={service.service}>
-              <td className="whitespace-nowrap font-medium">{service.label}</td>
+              <th scope="row" className="whitespace-nowrap font-medium">{service.label}</th>
               <td>
                 <StatusBadge status={service.status} />
               </td>
@@ -57,7 +59,7 @@ export function ServerStatusTable({ services }: { services: ServiceView[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -84,15 +86,6 @@ const WINDOW_LABELS = { "24h": "24 heures", "7d": "7 jours" } as const;
 
 const percent = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** « 3 h 20 min », « 45 min », « 2 j 4 h ». */
-export function formatDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
-  return hours % 24 === 0 ? `${Math.floor(hours / 24)} j` : `${Math.floor(hours / 24)} j ${hours % 24} h`;
-}
-
 function AvailabilityTile({ availability }: { availability: Availability }) {
   return (
     <div>
@@ -112,7 +105,7 @@ function AvailabilityTile({ availability }: { availability: Availability }) {
   );
 }
 
-const hourOfDay = new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Brussels" });
+const hourOfDay = new Intl.DateTimeFormat("fr-BE", { hour: "2-digit", minute: "2-digit", timeZone: PLAYER_TIME_ZONE });
 
 function hourTitle(cell: HourCell): string {
   const start = new Date(cell.start);
@@ -225,8 +218,9 @@ export function ServerStatusTiles({ services, now }: { services: ServiceSummary[
 
 export function TransitionsTable({ transitions }: { transitions: TransitionView[] }) {
   return (
-    <div className="panel overflow-x-auto">
+    <ScrollRegion className="panel overflow-x-auto" label="Changements d'état">
       <table className="data-table min-w-[720px]">
+        <caption className="sr-only">Changements d&apos;état</caption>
         <thead>
           <tr>
             <th scope="col">Date</th>
@@ -238,9 +232,9 @@ export function TransitionsTable({ transitions }: { transitions: TransitionView[
         <tbody>
           {transitions.map((transition) => (
             <tr key={`${transition.service}-${transition.at}`}>
-              <td className="whitespace-nowrap">
+              <th scope="row" className="whitespace-nowrap">
                 <time dateTime={transition.at}>{formatCheckTime(transition.at)}</time>
-              </td>
+              </th>
               <td className="whitespace-nowrap">{transition.label}</td>
               <td className="whitespace-nowrap">
                 <StatusBadge status={transition.from} />
@@ -255,6 +249,6 @@ export function TransitionsTable({ transitions }: { transitions: TransitionView[
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
