@@ -55,6 +55,8 @@ que le schéma du serveur. Toute décision métier (fraîcheur, historique) est 
 | `src/lib/sync` | Schéma Zod du document, traitement transactionnel, gestionnaire HTTP ; `inventory.ts` applique le bloc Baganator |
 | `src/lib/dashboard` | Lectures en nombre fixe de requêtes, historique, export, suppression d'un compte, actions serveur ; calculs purs testés sans base : bloc « À surveiller », or cumulé, temps de jeu, réputations comparées, personnages comparés, patrimoine, filtres des pages, classeurs de la vue affichée |
 | `src/lib/goals` | Objectifs par personnage : évaluation, modèles, tableau d'un modèle par personnage |
+| `src/lib/notebook` | Carnet d'un personnage : note libre et étiquettes |
+| `src/lib/checklists` | Listes à cocher chaque jour ou chaque semaine : périodes (heure de Bruxelles), tâches, coches |
 | `src/lib/auth` | Mots de passe scrypt, sessions en base, cookie, mot de passe redemandé avant une suppression définitive |
 | `src/lib/xlsx` | Écriture XLSX sans dépendance |
 | `src/lib/notify` | Notifications sortantes : réglages, événements relevés chaque minute, envoi au webhook ([NOTIFICATIONS](NOTIFICATIONS.md)) |

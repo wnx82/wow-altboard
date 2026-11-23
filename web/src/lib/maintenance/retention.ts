@@ -1,7 +1,8 @@
 import { and, inArray, lt, notInArray, sql } from "drizzle-orm";
 import type { Database } from "@/db/client";
 import * as t from "@/db/schema";
-import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
+import { purgeOldChecks } from "@/lib/checklists/store";
+import { brusselsDay, PLAYER_TIME_ZONE } from "@/lib/wow/format";
 
 // Durée de conservation des tables qui ne font que grossir. Seuls le journal des synchronisations
 // et les calculs d'opportunités sont purgés : ils se refont ou ne servent qu'au diagnostic.
@@ -9,7 +10,7 @@ import { PLAYER_TIME_ZONE } from "@/lib/wow/format";
 // perdus : ils n'existent nulle part ailleurs. Seuls les relevés de chaque scan d'EZAuctioneer,
 // plusieurs par jour, sont ramenés à un résumé par jour au-delà de 60 jours. Les relevés des
 // serveurs de jeu et les sessions de connexion ont déjà leur purge (lib/status/store.ts,
-// lib/auth/session.ts).
+// lib/auth/session.ts). Les coches des listes ne valent que pour leur période : gardées 30 jours.
 
 /** Journal des synchronisations gardé 180 jours ; la dernière synchronisation de chaque PC reste. */
 export const SYNC_RUNS_KEPT_DAYS = 180;
@@ -17,10 +18,12 @@ export const SYNC_RUNS_KEPT_DAYS = 180;
 export const OPPORTUNITY_RUNS_KEPT = 30;
 /** Relevés de scan gardés tels quels ; les jours plus anciens (heure de Bruxelles) sont résumés dans market_item_scan_days. */
 export const SCAN_SAMPLES_KEPT_DAYS = 60;
+/** Coches des listes à cocher : la plus longue période dure une semaine. */
+export const CHECKLIST_CHECKS_KEPT_DAYS = 30;
 /** Jours résumés au plus par passage : une requête par jour, chacune sous le délai du client. */
 const SCAN_DAYS_PER_PRUNE = 400;
 
-export type RetentionResult = { syncRuns: number; opportunityRuns: number; scanSamplesFolded: number };
+export type RetentionResult = { syncRuns: number; opportunityRuns: number; scanSamplesFolded: number; checklistChecks: number };
 
 export async function pruneHistory(db: Database, now: Date): Promise<RetentionResult> {
   const before = new Date(now.getTime() - SYNC_RUNS_KEPT_DAYS * 24 * 60 * 60_000);
@@ -50,7 +53,8 @@ export async function pruneHistory(db: Database, now: Date): Promise<RetentionRe
   // Les opportunités de ces calculs suivent (cascade).
   const opportunityRuns = staleRuns.length > 0 ? ((await db.delete(t.opportunityRuns).where(inArray(t.opportunityRuns.id, staleRuns))).rowCount ?? 0) : 0;
 
-  return { syncRuns: syncRuns.rowCount ?? 0, opportunityRuns, scanSamplesFolded: await foldOldScans(db, now) };
+  const checklistChecks = await purgeOldChecks(db, brusselsDay(now.getTime() - CHECKLIST_CHECKS_KEPT_DAYS * 24 * 60 * 60_000));
+  return { syncRuns: syncRuns.rowCount ?? 0, opportunityRuns, scanSamplesFolded: await foldOldScans(db, now), checklistChecks };
 }
 
 /** Fuseau des jours de résumé : celui des autres pages (Activité, Finances…). */

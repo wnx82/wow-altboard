@@ -118,8 +118,10 @@ personnage recréé, et à tous les autres.
   (site 0.28.0, audit du 2026-11-13).
 - [x] **P3 · S** — Export Excel de la vue affichée de **Inventaires** et **Finances**. Fait le
   2026-11-14 (site 0.28.0, audit du 2026-11-13).
-- [ ] **P3 · S** — Notes libres et étiquettes par personnage (principal, reroll, banque), saisies
-  sur le site.
+- [x] **P3 · S** — Notes libres et étiquettes par personnage (principal, reroll, banque), saisies
+  sur le site. Fait le 2026-11-23 (site 0.34.0) : section **Carnet** de la fiche, étiquettes en
+  pastilles et filtre « Étiquette » sur l'accueil, recherche dans les notes ; avec les listes à
+  cocher chaque jour ou chaque semaine (page **Listes**).
 - [x] **P3 · S** — Site installable sur le téléphone (manifeste et icônes). Fait le 2026-11-09
   (site 0.9.0).
 

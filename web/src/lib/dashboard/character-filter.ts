@@ -32,7 +32,7 @@ function sortValue(character: CharacterListItem, key: SortKey): number | string 
 
 export type CharacterQuery = { query: string; filters: Filters; favoritesOnly: boolean };
 
-/** Personnages qui passent la recherche (nom, classe, race, royaume, compte, guilde, métier) et chaque filtre. */
+/** Personnages qui passent la recherche (nom, classe, race, royaume, compte, guilde, métier, étiquette, note) et chaque filtre. */
 export function filterCharacters<T extends CharacterListItem>(characters: T[], { query, filters, favoritesOnly }: CharacterQuery): T[] {
   const needle = fold(query.trim());
   const minLevel = filters.minLevel === "" ? null : Number(filters.minLevel);
@@ -47,10 +47,11 @@ export function filterCharacters<T extends CharacterListItem>(characters: T[], {
     if (filters.profession && !c.professions.some((p) => p.name === filters.profession)) return false;
     if (filters.machine && !c.machines.some((m) => String(m.id) === filters.machine)) return false;
     if (filters.goals && goalState(c.goals) !== filters.goals) return false;
+    if (filters.tag && !c.tags.includes(filters.tag)) return false;
     if (minLevel !== null && (c.level === null || c.level < minLevel)) return false;
     if (maxLevel !== null && (c.level === null || c.level > maxLevel)) return false;
     if (!needle) return true;
-    const haystack = [c.name, classLabel(c.class), c.race, c.realm, c.account.label, c.guild, ...c.professions.map((p) => p.name)];
+    const haystack = [c.name, classLabel(c.class), c.race, c.realm, c.account.label, c.guild, ...c.professions.map((p) => p.name), ...c.tags, c.note];
     return haystack.some((value) => value && fold(value).includes(needle));
   });
 }

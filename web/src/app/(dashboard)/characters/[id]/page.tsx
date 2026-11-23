@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { CharacterEquipment, type EquipmentRow } from "@/components/character-equipment";
 import { CharacterGoals } from "@/components/character-goals";
+import { CharacterNotebook } from "@/components/character-notebook";
 import { CharacterInventory, type CharacterInventoryPlace } from "@/components/character-inventory";
 import { SectionNav, type SectionLink } from "@/components/section-nav";
 import { SectionTitle } from "@/components/ui";
 import { getDatabase } from "@/db/client";
+import { listChecklist, loadResetRule } from "@/lib/checklists/store";
 import { describeError } from "@/lib/errors";
 import { requireSession } from "@/lib/auth/session";
 import { getCharacterDetail, getCharacterNeighbors, type CharacterDetail } from "@/lib/dashboard/queries";
@@ -17,6 +19,7 @@ import { isGear } from "@/lib/wow/gear";
 import { loadItemSpecs } from "@/lib/wow/item-specs";
 import { equippedItemKey, getEnchantText } from "@/lib/wow/item-tooltips";
 import { listCharacterGoals, listTemplates } from "@/lib/goals/store";
+import { loadNotebook, usedTags } from "@/lib/notebook/store";
 import { classKey, formatRelative, QUALITY_LABELS } from "@/lib/wow/format";
 import { CharacterHero, OverviewTiles } from "./hero";
 import { HistorySection } from "./history";
@@ -42,6 +45,7 @@ export async function generateMetadata({ params }: PageProps<"/characters/[id]">
 
 // Sommaire de la fiche : les identifiants sont ceux des titres de section, plus bas.
 const SECTIONS: SectionLink[] = [
+  { id: "notebook", label: "Carnet" },
   { id: "goals", label: "Objectifs" },
   { id: "professions", label: "Métiers" },
   { id: "currencies", label: "Monnaies" },
@@ -62,14 +66,18 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
   const now = new Date();
   const heldKeys = [...character.bags, ...character.bank, ...character.mail, ...character.auctions].map((item) => item.itemKey);
   const equipmentKeys = character.equipment.flatMap((item) => (item.itemId === null ? [] : [String(item.itemId)]));
-  const [goals, templates, itemNames, values, specs, neighbors] = await Promise.all([
+  const [goals, templates, itemNames, values, specs, neighbors, notebook, knownTags, rule] = await Promise.all([
     listCharacterGoals(db, character.id),
     listTemplates(db),
     loadItemNames(db, [...heldKeys, ...equipmentKeys]),
     loadMarketValues(db, heldKeys, now),
     loadItemSpecs(db, [...heldKeys, ...equipmentKeys]),
     getCharacterNeighbors(db, character.id),
+    loadNotebook(db, character.id),
+    usedTags(db),
+    loadResetRule(db),
   ]);
+  const checklist = await listChecklist(db, now, rule, character.id);
   // Nom relevé par l'addon, sinon celui de la table du jeu, rangé sous l'identifiant de base.
   const slotItems = Object.fromEntries(
     [...new Set(heldKeys)].map((key) => {
@@ -143,6 +151,8 @@ export default async function CharacterPage({ params }: PageProps<"/characters/[
       <OverviewTiles character={character} now={now} />
 
       <SectionNav label="Sections de la fiche" items={SECTIONS} />
+
+      <CharacterNotebook characterId={character.id} notebook={notebook} knownTags={knownTags} checklist={checklist} rule={rule} now={now} />
 
       <CharacterGoals
         characterId={character.id}

@@ -16,6 +16,9 @@ export type Settings = {
   marketHistoryFrom: Date | null;
   /** Commission de l'hôtel des ventes, en pourcentage. Null : 5 %. */
   auctionCutPercent: number | null;
+  /** Réinitialisation des listes à cocher (heure de Bruxelles, jour 1 lundi à 7 dimanche). Null : 5 h, mercredi. */
+  resetHour: number | null;
+  resetWeekday: number | null;
 };
 
 const DEFAULTS: Settings = {
@@ -26,6 +29,8 @@ const DEFAULTS: Settings = {
   charactersResetAt: null,
   marketHistoryFrom: null,
   auctionCutPercent: null,
+  resetHour: null,
+  resetWeekday: null,
 };
 
 export async function readSettings(db: DatabaseOrTransaction): Promise<Settings> {
@@ -38,6 +43,8 @@ export async function readSettings(db: DatabaseOrTransaction): Promise<Settings>
       charactersResetAt: appSettings.charactersResetAt,
       marketHistoryFrom: appSettings.marketHistoryFrom,
       auctionCutPercent: appSettings.auctionCutPercent,
+      resetHour: appSettings.resetHour,
+      resetWeekday: appSettings.resetWeekday,
     })
     .from(appSettings)
     .where(eq(appSettings.id, 1));

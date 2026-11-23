@@ -28,7 +28,7 @@
 - Variables `WOW_DATABASE_URL`, `WOW_DATABASE_URL_DIRECT`, `WOW_TEST_DATABASE_URL` : jamais de nom
   générique, qui pourrait exister dans l'environnement pour un autre projet.
 
-## Tables (58)
+## Tables (63)
 
 Conventions : clés `bigint` générées, dates en `timestamptz`, argent en pièces de cuivre.
 
@@ -137,6 +137,20 @@ reste. Un objectif `manual` se coche sur la fiche.
 | `goal_templates` | `id` | Un modèle, par son nom (unique). Indépendant des personnages : survit à leur réinitialisation |
 | `goal_template_items` | `id` | Objectif d'un modèle, sans date : position, libellé, sorte, paramètres |
 
+### Carnet : notes, étiquettes et listes à cocher
+
+Saisis sur le site, jamais par l'agent. Une coche vaut pour la période commencée à la dernière
+remise à zéro (jour de Bruxelles, `web/src/lib/checklists/period.ts`) : la suivante repart à zéro
+sans rien effacer.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `character_notes` | `character_id` | Note libre d'un personnage, 1 à 2 000 caractères ; pas de ligne sans note. Supprimée en cascade avec le personnage |
+| `character_tags` | `(character_id, tag)` | Étiquette d'un personnage (« principal », « reroll », « banque »…), en minuscules, 24 caractères au plus, 8 par personnage. Supprimée en cascade avec le personnage |
+| `checklist_items` | `id` | Une tâche : intitulé (80 caractères au plus), période (`daily`, `weekly`), position. Survit à la réinitialisation des personnages |
+| `checklist_item_characters` | `(item_id, character_id)` | Personnage concerné par une tâche. Supprimé avec la tâche ou le personnage |
+| `checklist_checks` | `(item_id, character_id, period_start)` | Coche d'une tâche par un personnage pour la période qui commence ce jour-là. Supprimée avec son lien ; purgée au-delà de 30 jours |
+
 ### Surveillance des serveurs de jeu
 
 | Table | Contenu |
@@ -147,7 +161,7 @@ reste. Un objectif `manual` se coche sur la fiche.
 
 | Table | Contenu |
 |---|---|
-| `app_settings` | Réglages de la page **Paramètres**, sur une seule ligne (`id = 1`), créée à la première écriture. Adresses surveillées par service (vide : rien n'est surveillé ; absente : l'environnement du serveur s'applique) et libellé d'environnement ([SERVER-STATUS](SERVER-STATUS.md)) ; date limite et date de la dernière réinitialisation des personnages ; début de l'historique des prix et commission de l'hôtel des ventes ; webhook des notifications (adresse, jeton, événements, délai d'un PC muet) |
+| `app_settings` | Réglages de la page **Paramètres**, sur une seule ligne (`id = 1`), créée à la première écriture. Adresses surveillées par service (vide : rien n'est surveillé ; absente : l'environnement du serveur s'applique) et libellé d'environnement ([SERVER-STATUS](SERVER-STATUS.md)) ; date limite et date de la dernière réinitialisation des personnages ; début de l'historique des prix et commission de l'hôtel des ventes ; webhook des notifications (adresse, jeton, événements, délai d'un PC muet) ; heure et jour de la remise à zéro des listes à cocher (null : 5 h, mercredi) |
 | `notification_state` | Où en sont les notifications, sur une seule ligne (`id = 1`), créée au premier passage : dernier relevé et dernier contrôle de serveur examinés, PC muets déjà signalés (`jsonb`), semaine du dernier rapport hebdomadaire ([NOTIFICATIONS](NOTIFICATIONS.md)) |
 
 ### Accès au tableau de bord
@@ -198,7 +212,7 @@ avec une **date limite** (par défaut : l'instant de la demande).
 | Suppression | tout personnage dont `source_last_seen_at` est antérieur à la date limite, avec ses tables filles et ses snapshots |
 | Royaumes | un royaume resté sans personnage est supprimé |
 | Date limite | retenue dans `app_settings.characters_cutoff_at` ; la date de la demande dans `characters_reset_at` |
-| Conservés | comptes, machines, jetons, journal des synchronisations, référentiel d'objets, historique des serveurs, modèles d'objectifs (les objectifs des personnages supprimés partent avec eux) |
+| Conservés | comptes, machines, jetons, journal des synchronisations, référentiel d'objets, historique des serveurs, modèles d'objectifs et tâches des listes à cocher (les objectifs, notes, étiquettes, liens et coches des personnages supprimés partent avec eux) |
 
 Une transaction, sous le verrou des synchronisations : aucune ne s'intercale. La suppression est
 définitive ; seule une sauvegarde de la base permet de revenir en arrière
@@ -287,6 +301,7 @@ chaque jour) ne touche que ce qui se refait ou ne sert qu'au diagnostic :
 | `opportunity_runs` (et `opportunities`, en cascade) | les 30 derniers calculs de chaque marché, plus ceux qu'un audit du jour cite |
 | `server_status_checks` | 8 jours ([SERVER-STATUS](SERVER-STATUS.md)) |
 | `sessions` | jusqu'à leur expiration |
+| `checklist_checks` | 30 jours : une coche ne vaut que pour sa période, d'une semaine au plus |
 | `market_item_scans` | 60 jours entiers (heure de Bruxelles) ; les jours plus anciens sont résumés dans `market_item_scan_days`, puis supprimés. Un relevé arrivé après le résumé de son jour s'y ajoute (bornes et comptes exacts, médiane de la partie la mieux relevée) |
 
 L'historique des personnages (relevés, sessions, temps par niveau, finances) et celui des prix
@@ -335,6 +350,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0021_notifications` | `notification_state`, colonnes `app_settings.notify_*` et `character_goals.notified_at` (ajouts seuls). Les objectifs déjà atteints reçoivent `notified_at = achieved_at` : rien n'est annoncé pour eux. Aucune ligne supprimée |
 | `0022_agent_notices` | données seulement : l'avertissement « Baganator : N personnages absents d'AltBoard » des agents 0.8.x passe de `agent_warning` à `agent_notice` dans `sync_errors`, puis `errors_count` et `status` des synchronisations partielles concernées sont recalculés (`success` s'il ne reste aucune autre erreur). Aucune ligne supprimée |
 | `0023_ezauctioneer_scans` | `scan_markets`, `scan_imports`, `market_scans`, `market_item_scans`, `market_item_scan_days` et leurs index (ajouts seuls) |
+| `0024_notes_checklists` | `character_notes`, `character_tags`, `checklist_items`, `checklist_item_characters`, `checklist_checks` et leurs index, colonnes `app_settings.reset_hour` et `reset_weekday` (ajouts seuls) |
 
 ## Checkpoint B
 

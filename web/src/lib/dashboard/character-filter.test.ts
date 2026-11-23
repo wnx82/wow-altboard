@@ -25,6 +25,8 @@ function character(id: number, name: string, extra: Partial<CharacterListItem> =
     machines: [{ id: 1, label: "MSI" }],
     professions: [],
     goals: { done: 0, total: 0 },
+    tags: [],
+    note: null,
     sourceLastSeenAt: "2026-11-20T10:00:00Z",
     lastSyncAt: "2026-11-20T10:00:00Z",
     ...extra,
@@ -59,6 +61,18 @@ test("filtres : compte, niveaux, objectifs, favoris", () => {
   assert.deepEqual(filterCharacters(list, { ...ALL, filters: { ...NO_FILTERS, goals: "none" } }).map((c) => c.id), [3]);
   assert.deepEqual(filterCharacters(list, { ...ALL, favoritesOnly: true }).map((c) => c.id), [2]);
   assert.equal(goalState({ done: 2, total: 2 }), "done");
+});
+
+test("étiquette : filtre exact ; la recherche lit aussi les étiquettes et la note", () => {
+  const list = [
+    character(1, "A", { tags: ["principal"], note: "Farm du cuir à Tanaris" }),
+    character(2, "B", { tags: ["banque", "reroll"] }),
+    character(3, "C"),
+  ];
+  assert.deepEqual(filterCharacters(list, { ...ALL, filters: { ...NO_FILTERS, tag: "banque" } }).map((c) => c.id), [2]);
+  assert.deepEqual(filterCharacters(list, { ...ALL, filters: { ...NO_FILTERS, tag: "ban" } }).map((c) => c.id), []);
+  assert.deepEqual(filterCharacters(list, { ...ALL, query: "reroll" }).map((c) => c.id), [2]);
+  assert.deepEqual(filterCharacters(list, { ...ALL, query: "tanaris" }).map((c) => c.id), [1]);
 });
 
 test("tri : valeurs absentes à la fin dans les deux sens, nom à égalité", () => {

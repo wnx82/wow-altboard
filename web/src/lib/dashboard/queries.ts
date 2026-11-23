@@ -43,15 +43,18 @@ export type CharacterListItem = {
   professions: { skillLine: number; name: string; rank: number | null; maxRank: number | null; isPrimary: boolean }[];
   /** Objectifs atteints (datés) sur le total ; total 0 sans objectif. */
   goals: { done: number; total: number };
+  /** Étiquettes du carnet, dans l'ordre de leur ajout, et note libre (null sans note). */
+  tags: string[];
+  note: string | null;
   /** Dernière collecte par l'addon (lastSeen) : la donnée n'est jamais du temps réel. */
   sourceLastSeenAt: string;
   lastSyncAt: string;
 };
 
 export async function listCharacters(db: Database): Promise<CharacterListItem[]> {
-  // Quatre lectures lancées ensemble : métiers, machines et objectifs de tous les personnages, sans
+  // Lectures lancées ensemble : métiers, machines, objectifs et carnet de tous les personnages, sans
   // attendre la liste pour les filtrer (elle les contient tous).
-  const [rows, professions, machines, goals] = await Promise.all([
+  const [rows, professions, machines, goals, tags, notes] = await Promise.all([
     db
       .select({
         id: t.characters.id,
@@ -108,12 +111,19 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
       })
       .from(t.characterGoals)
       .groupBy(t.characterGoals.characterId),
+    db
+      .select({ characterId: t.characterTags.characterId, tag: t.characterTags.tag })
+      .from(t.characterTags)
+      .orderBy(asc(t.characterTags.createdAt), asc(t.characterTags.tag)),
+    db.select({ characterId: t.characterNotes.characterId, body: t.characterNotes.body }).from(t.characterNotes),
   ]);
   if (rows.length === 0) return [];
 
   const professionsBy = Map.groupBy(professions, (profession) => profession.characterId);
   const machinesBy = Map.groupBy(machines, (machine) => machine.characterId);
   const goalsBy = new Map(goals.map((row) => [row.characterId, { done: row.done, total: row.total }]));
+  const tagsBy = Map.groupBy(tags, (row) => row.characterId);
+  const notesBy = new Map(notes.map((row) => [row.characterId, row.body]));
 
   return rows.map((row) => ({
     id: row.id,
@@ -138,6 +148,8 @@ export async function listCharacters(db: Database): Promise<CharacterListItem[]>
     machines: (machinesBy.get(row.id) ?? []).map((machine) => ({ id: machine.id, label: machineLabel(machine) })),
     professions: (professionsBy.get(row.id) ?? []).map(({ skillLine, name, rank, maxRank, isPrimary }) => ({ skillLine, name, rank, maxRank, isPrimary })),
     goals: goalsBy.get(row.id) ?? { done: 0, total: 0 },
+    tags: (tagsBy.get(row.id) ?? []).map((entry) => entry.tag),
+    note: notesBy.get(row.id) ?? null,
     sourceLastSeenAt: row.sourceLastSeenAt.toISOString(),
     lastSyncAt: row.lastSyncAt.toISOString(),
   }));

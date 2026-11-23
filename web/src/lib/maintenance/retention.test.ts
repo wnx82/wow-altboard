@@ -88,7 +88,7 @@ describe("durée de conservation", () => {
   test("rien à purger : aucune ligne touchée", async () => {
     const pc = await machine("PC");
     await run(pc, daysAgo(1));
-    assert.deepEqual(await pruneHistory(database.db, NOW), { syncRuns: 0, opportunityRuns: 0, scanSamplesFolded: 0 });
+    assert.deepEqual(await pruneHistory(database.db, NOW), { syncRuns: 0, opportunityRuns: 0, scanSamplesFolded: 0, checklistChecks: 0 });
   });
 });
 

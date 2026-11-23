@@ -55,6 +55,8 @@ describe("réglages", () => {
       charactersResetAt: null,
       marketHistoryFrom: null,
       auctionCutPercent: null,
+      resetHour: null,
+      resetWeekday: null,
     });
   });
 
@@ -71,6 +73,8 @@ describe("réglages", () => {
       charactersResetAt: RELEASE,
       marketHistoryFrom: null,
       auctionCutPercent: null,
+      resetHour: null,
+      resetWeekday: null,
     });
     assert.equal(await count(t.appSettings), 1);
   });

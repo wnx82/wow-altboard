@@ -9,6 +9,20 @@ import { ClassAvatar, FactionBadge, Meter, Money, ProfessionIcon, RankMedal } fr
 /** Place sur le podium de l'accueil, par identifiant de personnage. */
 export type Ranks = Record<number, number>;
 
+/** Étiquettes du carnet, en pastilles ; rien sans étiquette. */
+export function TagList({ tags, className = "" }: { tags: string[]; className?: string }) {
+  if (tags.length === 0) return null;
+  return (
+    <ul className={`flex flex-wrap gap-1 ${className}`} aria-label="Étiquettes">
+      {tags.map((tag) => (
+        <li key={tag} className="badge" data-tone="gold">
+          {tag}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 const rankTitle = (rank: number) => (rank === 1 ? "Le plus haut niveau" : `${rank}e plus haut niveau`);
 
 export function CharacterCard({ character, now, rank }: { character: CharacterListItem; now: Date; rank?: number }) {
@@ -31,6 +45,7 @@ export function CharacterCard({ character, now, rank }: { character: CharacterLi
           </p>
           <p className="mt-0.5 truncate text-xs text-muted">{[character.race, character.realm].filter(Boolean).join(" • ")}</p>
           {character.guild && <p className="mt-0.5 truncate text-xs text-ok/85">&lt;{character.guild}&gt;</p>}
+          <TagList tags={character.tags} className="mt-2" />
         </div>
         <div className="flex flex-none flex-col items-end gap-2">
           <FactionBadge faction={character.faction} />
@@ -98,6 +113,13 @@ export function CharacterCard({ character, now, rank }: { character: CharacterLi
         </ul>
       )}
 
+      {character.note && (
+        <p className="mt-4 line-clamp-2 whitespace-pre-line text-xs italic text-muted" title={character.note}>
+          <span className="sr-only">Note : </span>
+          {character.note}
+        </p>
+      )}
+
       <p className="mt-4 flex items-baseline justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
         <span className="flex-none" title={`Dernière donnée AltBoard connue : ${formatDateTime(character.sourceLastSeenAt)}`}>
           Vu en jeu {formatRelative(character.sourceLastSeenAt, now)}
@@ -156,6 +178,7 @@ export function CharacterTable({ characters, now, ranks }: { characters: Charact
                     </>
                   )}
                 </Link>
+                <TagList tags={character.tags} className="mt-1.5 pl-11" />
               </th>
               <td>
                 {classLabel(character.class)}

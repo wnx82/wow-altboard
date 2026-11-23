@@ -398,6 +398,20 @@ body {
   .segmented > a:hover { color: var(--text); background: rgb(255 255 255 / 0.06); }
   .segmented > a:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
   .segmented > a[aria-current="true"] { color: #1a1306; font-weight: 600; background: linear-gradient(180deg, #f0cf85, #d2a24b); }
+  /* Variante à boutons radio : la case cachée porte le focus et l'état. */
+  .segmented-option > span {
+    display: block;
+    padding: 0.35rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background-color 120ms, color 120ms;
+  }
+  .segmented-option:hover > span { color: var(--text); background: rgb(255 255 255 / 0.06); }
+  .segmented-option > input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .segmented-option > input:checked + span { color: #1a1306; font-weight: 600; background: linear-gradient(180deg, #f0cf85, #d2a24b); }
 
   /* Bilan de la période : chiffre phare, halo vert ou rouge selon son signe. */
   .finance-hero {
@@ -959,6 +973,18 @@ body {
   }
   .goal-check[data-auto] { border-style: dashed; }
   button.goal-check { cursor: pointer; }
+  .tag-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    color: var(--muted);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .tag-remove:hover { color: var(--danger); background: rgb(240 98 95 / 0.14); }
+  .tag-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
   button.goal-check:hover { border-color: var(--gold); }
   [data-reached] .goal-check { border-color: rgb(227 189 106 / 0.6); background: rgb(227 189 106 / 0.14); }
 

@@ -22,6 +22,7 @@ describe("état de la liste de l'accueil dans l'adresse", () => {
         profession: "Couture",
         machine: "3",
         goals: "open",
+        tag: "banque principale",
         minLevel: "10",
         maxLevel: "60",
       },

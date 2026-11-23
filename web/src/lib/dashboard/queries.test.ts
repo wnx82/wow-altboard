@@ -128,9 +128,10 @@ describe("lecture du tableau de bord", () => {
       return queries;
     };
 
-    assert.equal(await measure(1), 4);
-    assert.equal(await measure(5), 4);
-    assert.equal(await measure(50), 4);
+    // Personnages, métiers, machines, objectifs, étiquettes et notes.
+    assert.equal(await measure(1), 6);
+    assert.equal(await measure(5), 6);
+    assert.equal(await measure(50), 6);
   });
 
   test("la fiche rassemble toutes les sections", async () => {

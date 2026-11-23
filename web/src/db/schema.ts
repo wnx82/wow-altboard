@@ -5,6 +5,7 @@ import {
   check,
   date,
   doublePrecision,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -1078,6 +1079,81 @@ export const characterGoals = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Carnet : notes, étiquettes et listes à cocher (saisies sur le site)
+// ---------------------------------------------------------------------------
+
+// Note libre d'un personnage ; pas de ligne sans note.
+export const characterNotes = pgTable(
+  "character_notes",
+  {
+    characterId: characterId().primaryKey(),
+    body: text("body").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("character_notes_body_check", sql`char_length(${t.body}) between 1 and 2000`)],
+);
+
+// Étiquettes d'un personnage (« principal », « reroll », « banque »…), en minuscules.
+export const characterTags = pgTable(
+  "character_tags",
+  {
+    characterId: characterId(),
+    tag: text("tag").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.characterId, t.tag] }),
+    index("character_tags_tag_idx").on(t.tag),
+    check("character_tags_tag_check", sql`char_length(${t.tag}) between 1 and 24 and ${t.tag} = lower(${t.tag})`),
+  ],
+);
+
+// Tâche à refaire chaque jour ou chaque semaine, pour les personnages choisis. Survit à la
+// réinitialisation des personnages ; ses liens et ses coches, non.
+export const checklistItems = pgTable(
+  "checklist_items",
+  {
+    id: id(),
+    label: text("label").notNull(),
+    period: text("period").notNull(),
+    position: integer("position").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    check("checklist_items_period_check", sql`${t.period} in ('daily', 'weekly')`),
+    check("checklist_items_label_check", sql`char_length(${t.label}) between 1 and 80`),
+  ],
+);
+
+export const checklistItemCharacters = pgTable(
+  "checklist_item_characters",
+  {
+    itemId: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => checklistItems.id, { onDelete: "cascade" }),
+    characterId: characterId(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.characterId] }), index("checklist_item_characters_character_idx").on(t.characterId)],
+);
+
+// Coche d'une tâche pour un personnage, valable pour la période qui commence ce jour-là (jour de
+// Bruxelles de la dernière réinitialisation). Une coche d'une période passée ne compte plus.
+export const checklistChecks = pgTable(
+  "checklist_checks",
+  {
+    itemId: bigint("item_id", { mode: "number" }).notNull(),
+    characterId: bigint("character_id", { mode: "number" }).notNull(),
+    periodStart: date("period_start", { mode: "string" }).notNull(),
+    checkedAt: ts("checked_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.itemId, t.characterId, t.periodStart] }),
+    foreignKey({ columns: [t.itemId, t.characterId], foreignColumns: [checklistItemCharacters.itemId, checklistItemCharacters.characterId] }).onDelete("cascade"),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Surveillance des serveurs de jeu
 // ---------------------------------------------------------------------------
 
@@ -1139,9 +1215,16 @@ export const appSettings = pgTable(
     notifyEvents: jsonb("notify_events").$type<string[]>(),
     // Un PC sans synchronisation depuis ce nombre de jours est signalé. Null : 3.
     notifySilentDays: smallint("notify_silent_days"),
+    // Réinitialisation des listes à cocher, heure de Bruxelles : heure du jour (0 à 23, null : 5)
+    // et jour de la semaine (1 lundi à 7 dimanche, null : 3, mercredi).
+    resetHour: smallint("reset_hour"),
+    resetWeekday: smallint("reset_weekday"),
     updatedAt: updatedAt(),
   },
-  (t) => [check("app_settings_single_row_check", sql`${t.id} = 1`)],
+  (t) => [
+    check("app_settings_single_row_check", sql`${t.id} = 1`),
+    check("app_settings_reset_check", sql`(${t.resetHour} is null or ${t.resetHour} between 0 and 23) and (${t.resetWeekday} is null or ${t.resetWeekday} between 1 and 7)`),
+  ],
 );
 
 // Où en sont les notifications : ce qui a déjà été examiné. Une seule ligne (id = 1), créée au

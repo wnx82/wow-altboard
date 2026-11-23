@@ -140,6 +140,7 @@ export function CharacterBrowser({
       races: distinct(characters.map((c) => c.race)),
       factions: distinct(characters.map((c) => c.faction)),
       professions: distinct(characters.flatMap((c) => c.professions.map((p) => p.name))),
+      tags: distinct(characters.flatMap((c) => c.tags)),
     }),
     [characters],
   );
@@ -155,6 +156,9 @@ export function CharacterBrowser({
     const search = writeBrowserState({ query, filters, sort, favoritesOnly }, window.location.search);
     if (search !== window.location.search) window.history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
   }, [favoritesOnly, filters, query, sort]);
+
+  // Filtre des étiquettes : affiché dès qu'une étiquette existe, ou qu'un lien en impose une.
+  const showTags = options.tags.length > 0 || filters.tag !== "";
 
   const hasFavorites = useMemo(() => characters.some((c) => c.account.featured), [characters]);
 
@@ -256,7 +260,10 @@ export function CharacterBrowser({
           </div>
         </div>
 
-        <div id="character-filters" className={filtersOpen ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10" : "hidden"}>
+        <div
+          id="character-filters"
+          className={filtersOpen ? (showTags ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 2xl:grid-cols-11" : "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10") : "hidden"}
+        >
           <FilterSelect label="Compte" value={filters.account} onChange={setFilter("account")} options={options.accounts} />
           <FilterSelect label="Royaume" value={filters.realm} onChange={setFilter("realm")} options={same(options.realms)} />
           <FilterSelect
@@ -275,6 +282,7 @@ export function CharacterBrowser({
           />
           <FilterSelect label="PC" value={filters.machine} onChange={setFilter("machine")} options={options.machines} />
           <FilterSelect label="Objectifs" value={filters.goals} onChange={setFilter("goals")} options={[...GOAL_FILTERS]} />
+          {showTags && <FilterSelect label="Étiquette" value={filters.tag} onChange={setFilter("tag")} options={same(options.tags)} />}
           <input
             type="number"
             min={0}

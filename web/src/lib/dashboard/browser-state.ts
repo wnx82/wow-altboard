@@ -18,6 +18,7 @@ export type Filters = {
   profession: string;
   machine: string;
   goals: "" | GoalState;
+  tag: string;
   minLevel: string;
   maxLevel: string;
 };
@@ -33,6 +34,7 @@ export const NO_FILTERS: Filters = {
   profession: "",
   machine: "",
   goals: "",
+  tag: "",
   minLevel: "",
   maxLevel: "",
 };
@@ -54,6 +56,7 @@ const FILTER_PARAMS: Record<keyof Filters, string> = {
   profession: "metier",
   machine: "pc",
   goals: "objectifs",
+  tag: "etiquette",
   minLevel: "niveau-min",
   maxLevel: "niveau-max",
 };

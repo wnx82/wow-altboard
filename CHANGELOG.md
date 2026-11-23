@@ -4,6 +4,25 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.34.0 — 2026-11-23
+
+Carnet des personnages et listes à cocher. Migration `0024_notes_checklists` : cinq tables et deux
+colonnes de `app_settings`, ajouts seuls.
+
+### Ajouté
+
+- Section **Carnet** sur la fiche d'un personnage : étiquettes (« principal », « reroll »,
+  « banque »…, 8 au plus, proposées d'après celles déjà employées) et note libre de 2 000 caractères.
+- Accueil : étiquettes en pastilles sur les cartes et dans le tableau, note sous la carte, filtre
+  « Étiquette » (paramètre `etiquette` de l'adresse) ; la recherche lit aussi étiquettes et notes.
+  Une étiquette de la fiche mène à l'accueil filtré.
+- Page **Listes** (menu Personnages) : tâches à refaire chaque jour ou chaque semaine pour les
+  personnages choisis, cochées personnage par personnage. Une coche vaut jusqu'à la remise à zéro
+  suivante (par défaut chaque jour à 5 h et le mercredi, heure de Bruxelles, heure d'été comprise),
+  réglable sur la page. Choix des personnages d'un coup par compte ou par étiquette ; bilan du jour et
+  de la semaine. La fiche montre et coche les tâches du personnage.
+- Les coches de plus de 30 jours sont purgées avec le reste de la maintenance quotidienne.
+
 ## Site 0.33.0 — 2026-11-23
 
 Page **Craft** plus lisible. Aucune migration.
