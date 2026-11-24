@@ -296,6 +296,24 @@ public class EzAuctioneerReaderTests
     }
 
     [Fact]
+    public void A_market_without_realm_is_kept_for_the_site_to_complete()
+    {
+        // WoW Forever, build 71037 : GetRealmName() rend "", la clé n'a plus de royaume.
+        const string lua = """
+            EZAuctioneerDB = { ["schema"] = 5, ["markets"] = {
+            ["3::Alliance:faction"] = { ["history"] = { ["i:2"] = { ["samples"] = { { ["ts"] = 1795079144, ["p"] = 7, ["units"] = 3 } } } } },
+            ["3::neutral"] = { ["history"] = { ["i:3"] = { ["samples"] = { { ["ts"] = 1795079144, ["p"] = 9, ["units"] = 1 } } } } },
+            } }
+            """;
+        var warnings = new List<string>();
+
+        var markets = Read(lua, warnings)!.Markets;
+
+        Assert.Equal(["3::Alliance:faction", "3::neutral"], markets.Select(m => m.Key));
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
     public void Content_hash_follows_the_samples_only()
     {
         var first = Read(MinimalFile(5, "{ [\"ts\"] = 1795079141, [\"p\"] = 5, [\"units\"] = 2 }"))!.Markets.Single();

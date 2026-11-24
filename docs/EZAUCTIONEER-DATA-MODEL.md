@@ -34,6 +34,11 @@ EZAuctioneerDB = {
   (« PvE »). Le moteur ne s'y fie donc pas : il relie un marché d'EZAuctioneer à un marché
   d'Auctionator quand leurs prix concordent (voir [ECONOMY-ENGINE](ECONOMY-ENGINE.md), « Scans
   EZAuctioneer »).
+  Depuis le build 71037 de WoW Forever (2026-11-21), `GetRealmName()` rend `""` : les scans suivants
+  sont rangés sous `3::Alliance:faction`. L'agent 0.11.1 transmet ces marchés (0.11.0 les écartait :
+  « marché non reconnu ») ; le site leur donne le royaume des personnages du compte joués sans
+  royaume, écrit comme dans les marchés déjà connus (`3:CAMWOW EU5 Realm 5 PvE:Alliance:faction`),
+  et les écarte avec un avertissement quand ces personnages sont de plusieurs royaumes.
 - **Clé d'objet** : `i:<objet>`, `i:<objet>:s<suffixe>` ou `i:<objet>:s<suffixe négatif>:f<facteur>`.
   Une variante à suffixe (« de l'Ours », etc.) a son propre prix.
 - **Relevé** (`samples`) : `ts`, heure du serveur du jeu (`GetServerTime()`, secondes Unix) ;

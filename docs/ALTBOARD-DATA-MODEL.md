@@ -129,6 +129,13 @@ Il n'existe **aucune** information de compte, de machine ni de version d'addon d
   par une espace (`Compat.lua:18`) et « les prénoms ne sont pas uniques ». Les 6 personnages ont
   une espace dans leur nom.
 - Aucune région (EU/US) ni genre du personnage n'est disponible.
+- **Royaume vide depuis le build 71037 de WoW Forever (2026-11-21).** `GetNormalizedRealmName()` et
+  `GetRealmName()` rendent `""` : chaque personnage connecté depuis enregistre `realm = ""`. L'agent
+  0.11.1 le transmet quand même (0.11.0 et avant l'écartaient : « nom, royaume ou lastSeen absent »).
+  Le site déduit le royaume du personnage déjà connu par son GUID, sinon des personnages du même
+  serveur (`Player-6947-…`), dans le document puis en base (`web/src/lib/sync/realms.ts`). Sur les
+  fichiers réels du 2026-11-24 : 6947 = `CAMWOWEU5Realm5PvE`, 6855 = `CAMWOWEU5Realm1PvE`,
+  4620 = `ClassicBetaPvE2`.
 
 ## 5. Personnage — `chars[guid]`
 

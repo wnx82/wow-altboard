@@ -80,9 +80,10 @@ public static partial class EzAuctioneerReader
 
     /// <summary>
     /// Clé de marché : <c>région:royaume:faction:faction</c> (HV de faction) ou <c>région:royaume:neutral</c>
-    /// (HV neutre). Le royaume est celui que rend le jeu (<c>GetRealmName</c>).
+    /// (HV neutre). Le royaume est celui que rend le jeu (<c>GetRealmName</c>) : vide depuis le build 71037
+    /// de WoW Forever (<c>3::Alliance:faction</c>), le site le déduit des personnages du compte.
     /// </summary>
-    [GeneratedRegex(@"^([0-9]{1,4}|\?):[^\x00-\x1F]{1,80}:([^:\x00-\x1F]{1,40}:faction|neutral)\z", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^([0-9]{1,4}|\?):[^\x00-\x1F]{0,80}:([^:\x00-\x1F]{1,40}:faction|neutral)\z", RegexOptions.CultureInvariant)]
     private static partial Regex MarketKeyPattern();
 
     [GeneratedRegex(@"^[a-z][a-z0-9_-]{0,19}\z", RegexOptions.CultureInvariant)]

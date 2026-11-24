@@ -181,7 +181,9 @@ const ledgerDay = z.strictObject({
 const character = z.strictObject({
   guid: z.string().regex(/^[A-Za-z0-9-]{1,64}$/),
   name,
-  realm: name,
+  // Vide quand le jeu ne donne plus le royaume (WoW Forever, build 71037, agent 0.11.1) : le serveur
+  // le déduit (realms.ts) avant tout traitement.
+  realm: z.literal("").or(name),
   lastSeen: unixSeconds,
   class: name.optional(),
   race: name.optional(),
@@ -261,7 +263,9 @@ const auctionator = z.strictObject({
 // secondes Unix, à l'heure du serveur du jeu, du 2020-01-01 au 2100-01-01.
 const scanInstant = z.int().min(1_577_836_800).max(4_102_444_800);
 export const SCAN_ITEM_KEY_PATTERN = /^i:(\d{1,9})(?::s-?\d{1,9}(?::f\d{1,5})?)?$/;
-export const SCAN_MARKET_KEY_PATTERN = /^(\d{1,4}|\?):([^\u0000-\u001f]{1,80}):(?:([^:\u0000-\u001f]{1,40}):faction|neutral)$/;
+// Royaume vide : scans faits depuis que le jeu ne le donne plus (WoW Forever, build 71037) ; le
+// serveur le déduit (realms.ts) avant tout traitement.
+export const SCAN_MARKET_KEY_PATTERN = /^(\d{1,4}|\?):([^\u0000-\u001f]{0,80}):(?:([^:\u0000-\u001f]{1,40}):faction|neutral)$/;
 const scanCount = z.int().min(0).max(1_000_000_000);
 const scanMarket = z.strictObject({
   key: z.string().max(120).regex(SCAN_MARKET_KEY_PATTERN),

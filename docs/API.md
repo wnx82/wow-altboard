@@ -79,6 +79,11 @@ Règles :
 - un champ sans valeur est **omis**, jamais envoyé à `null` ;
 - les horodatages issus d'AltBoard (`lastSeen`, `statsAt`, `bags.at`, `bank.at`) restent des
   secondes Unix, telles qu'écrites par l'addon ;
+- `realm` peut être vide (agent 0.11.1) : depuis le build 71037 de WoW Forever, le jeu ne donne plus
+  le royaume. Le serveur reprend celui du personnage déjà connu par son GUID, sinon celui des
+  personnages du même serveur (`Player-<serveur>-…`), dans le document puis en base. Un personnage
+  dont le royaume reste introuvable est écarté avec un avertissement (synchronisation `partial`) ;
+  aucun royaume vide n'est enregistré ;
 - `bank` et `bags` sont absents tant que l'addon ne les a jamais datés ;
 - `playtime` est absent sans l'addon Allemano Ledger ([LEDGER-DATA-MODEL](LEDGER-DATA-MODEL.md)).
   `levels[].level` est le niveau quitté ; `playedSeconds` est omis quand plusieurs niveaux ont été
@@ -213,7 +218,10 @@ au moins un relevé :
 - `samples` : `[heure, prix, unités]`, heure en secondes Unix, prix (25e percentile) en pièces de
   cuivre, au moins 1. `key` d'un marché : `<région>:<royaume>:<faction>:faction` ou
   `<région>:<royaume>:neutral` ; d'un objet : `i:<objet>`, avec suffixe facultatif. Une autre forme
-  fait refuser le document (422 `invalid_payload`). 20 marchés au plus, 50 scans par marché,
+  fait refuser le document (422 `invalid_payload`). Royaume vide (`3::Alliance:faction`, agent
+  0.11.1, jeu au build 71037) : le serveur le remplace, dans `markets`, `deals` et les `market` des
+  annonces, par le royaume des personnages du compte joués sans royaume, écrit comme dans les marchés
+  déjà connus ; plusieurs royaumes possibles : marché écarté avec un avertissement. 20 marchés au plus, 50 scans par marché,
   20 000 objets par marché, 1 à 50 relevés par objet. Format et sens des champs :
   [EZAUCTIONEER-DATA-MODEL](EZAUCTIONEER-DATA-MODEL.md).
 - Un contenu déjà reçu (même marché, compte et `contentHash`) n'est pas réimporté ; un relevé déjà

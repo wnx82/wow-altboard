@@ -224,6 +224,24 @@ public class AltBoardReaderTests
     }
 
     [Fact]
+    public void A_character_without_realm_is_kept_with_an_empty_realm()
+    {
+        // WoW Forever, build 71037 : le jeu ne donne plus le royaume, l'addon enregistre "".
+        var document = AltBoardReader.Read(SavedVariablesParser.Parse("""
+            AltBoardDB = { schema = 2, chars = {
+            ["Player-9999-0000B001"] = { name = "Élodie Brisefer", realm = "", lastSeen = 1795488898, level = 47 },
+            ["Player-9999-0000B002"] = { name = "Zoé D'Ambre", lastSeen = 1794538560, level = 6 },
+            ["Player-9999-0000B003"] = { realm = "", lastSeen = 1795467430 },
+            } }
+            """));
+
+        Assert.Equal(
+            [("Player-9999-0000B001", "Élodie Brisefer", "", (int?)47), ("Player-9999-0000B002", "Zoé D'Ambre", "", 6)],
+            document.Characters.Select(c => (c.Guid, c.Name, c.Realm, c.Level)));
+        Assert.Equal(["personnage Player-9999-0000B003 ignoré : nom ou lastSeen absent"], document.Warnings);
+    }
+
+    [Fact]
     public void Unknown_structures_are_reported_as_warnings()
     {
         var warnings = Fixture.Read("partial-data.lua").Warnings;

@@ -172,12 +172,15 @@ public static partial class AltBoardReader
         }
 
         var name = Text(c.Get("name"), MaxName);
-        var realm = Text(c.Get("realm"), MaxName);
+        // Depuis le build 71037 de WoW Forever (2026-11-21), le jeu ne donne plus le royaume : l'addon
+        // enregistre "". Le personnage est transmis quand même, royaume vide ; le site le déduit du
+        // GUID (serveur « Player-6947-… ») et des personnages qu'il connaît déjà.
+        var realm = Text(c.Get("realm"), MaxName) ?? "";
         var lastSeen = Timestamp(c.Get("lastSeen"));
-        if (name is null || realm is null || lastSeen is null)
+        if (name is null || lastSeen is null)
         {
             // L'addon lui-même ignore un personnage sans nom (entrée créée avant la première collecte).
-            warnings.Add($"personnage {guid} ignoré : nom, royaume ou lastSeen absent");
+            warnings.Add($"personnage {guid} ignoré : nom ou lastSeen absent");
             return null;
         }
 

@@ -4,6 +4,37 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.37.1 — 2026-11-24
+
+Pour l'agent 0.11.1. Aucune migration.
+
+### Corrigé
+
+- Depuis le build 71037 de WoW Forever (2026-11-21), le jeu ne donne plus le royaume
+  (`GetRealmName()` rend `""`). `POST /api/sync` accepte un `realm` vide et une clé de marché
+  d'EZAuctioneer sans royaume (`3::Alliance:faction`). Le royaume manquant est déduit avant tout
+  traitement (`lib/sync/realms.ts`) : celui du personnage déjà connu par son GUID, sinon celui des
+  personnages du même serveur (`Player-6947-…`), dans le document puis en base. Un marché sans
+  royaume prend celui des personnages du compte joués sans royaume, écrit comme dans les marchés
+  connus (« CAMWOW EU5 Realm 5 PvE ») : ses scans rejoignent l'historique existant. Ce qui reste
+  introuvable est écarté avec un avertissement ; aucun royaume vide n'est enregistré.
+
+## Agent 0.11.1 — 2026-11-24
+
+S'installe seul depuis un agent 0.9.0 ou plus récent une fois le site 0.37.1 déployé (un site plus
+ancien refuserait un royaume vide).
+
+### Corrigé
+
+- Les personnages connectés depuis le build 71037 de WoW Forever n'étaient plus envoyés : l'addon
+  enregistre un royaume vide, que l'agent prenait pour un personnage inexploitable (« nom, royaume ou
+  lastSeen absent »). Leur niveau, leur or et le reste restaient figés sur le site à la dernière
+  synchronisation du 21 novembre. Ils sont transmis avec un royaume vide, que le site déduit.
+- Les scans d'EZAuctioneer faits depuis le même build étaient écartés (« marché « 3::Alliance:faction »
+  non reconnu ») : ils sont transmis, le site leur rend leur royaume.
+- Document au format 8 : chaque compte est renvoyé une fois après la mise à jour, sans attendre que
+  le jeu réécrive ses fichiers.
+
 ## Site 0.37.0 — 2026-11-23
 
 Pour le portefeuille de revente, les donjons et les erreurs d'addon de l'agent 0.11.0. Migration

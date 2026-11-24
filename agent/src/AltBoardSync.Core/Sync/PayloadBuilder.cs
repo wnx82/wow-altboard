@@ -36,8 +36,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// 3 : finances par jour d'Allemano Ledger (0.7.0). 4 : courrier, enchères et banques de guilde de
     /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0). 6 : scans d'EZAuctioneer (0.10.0).
     /// 7 : portefeuilles et bonnes affaires d'EZAuctioneer, erreurs d'AltBoard, runs d'Allemano Ledger (0.11.0).
+    /// 8 : personnages et marchés d'EZAuctioneer au royaume vide, que l'agent écartait (0.11.1).
     /// </summary>
-    public const string PayloadFormat = "7";
+    public const string PayloadFormat = "8";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)

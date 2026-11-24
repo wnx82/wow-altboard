@@ -12,6 +12,7 @@ import { blockColumns, identityColumns, replaceDetails } from "./character-detai
 import { chunks, fromUnix, uniqueBy } from "./helpers";
 import { applyBaganator } from "./inventory";
 import { applyLedger } from "./ledger";
+import { resolveMissingRealms } from "./realms";
 import { applyAddonErrors, applyResale } from "./resale";
 import { applyEzAuctioneer } from "./scans";
 import type { AccountPayload, CharacterPayload, SyncPayload } from "./schema";
@@ -141,12 +142,14 @@ function snapshotData(character: CharacterPayload) {
   };
 }
 
-export async function processSync(db: Database, payload: SyncPayload, context: SyncContext): Promise<SyncResult> {
+export async function processSync(db: Database, document: SyncPayload, context: SyncContext): Promise<SyncResult> {
   const { now } = context;
   const started = Date.now();
 
   return db.transaction(async (tx) => {
     await takeSyncLock(tx, context);
+    // Royaumes que le jeu ne donne plus (WoW Forever, build 71037) : déduits avant tout le reste.
+    const payload = await resolveMissingRealms(tx, document);
 
     const [machine] = await tx
       .insert(t.machines)
