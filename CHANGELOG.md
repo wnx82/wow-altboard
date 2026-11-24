@@ -4,6 +4,19 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.37.2 — 2026-11-24
+
+Aucune migration, aucun changement d'agent.
+
+### Ajouté
+
+- Page **Finances** : une note sous la dépense « Courrier » dit ce qu'elle contient (port,
+  contre-remboursements, or envoyé aux personnages d'un autre compte WoW) et prévient
+  qu'Allemano Ledger 0.7.3 y range parfois des achats et des dépôts à l'hôtel des ventes. Le
+  2026-11-19, 6,67 po d'achats notés par EZAuctioneer y figuraient, avec 0 au poste « Hôtel des
+  ventes ». Les montants déjà relevés ne peuvent pas être corrigés : l'addon ne garde que des
+  totaux par jour ([LEDGER-DATA-MODEL](docs/LEDGER-DATA-MODEL.md)).
+
 ## Agent 0.11.2 — 2026-11-24
 
 S'installe seul depuis un agent 0.9.0 ou plus récent une fois le site redéployé avec lui.

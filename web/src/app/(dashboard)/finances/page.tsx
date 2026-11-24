@@ -11,6 +11,7 @@ import {
   change,
   distinctDays,
   EXPENSE_LABELS,
+  EXPENSE_NOTES,
   FINANCE_PERIODS,
   financePeriod,
   goldPerHour,
@@ -262,7 +263,11 @@ export default async function FinancesPage({ searchParams }: PageProps<"/finance
             title="Dépenses par source"
             tone="expense"
             total={totals.expense}
-            entries={(Object.keys(EXPENSE_LABELS) as ExpenseSource[]).map((source) => [EXPENSE_LABELS[source], totals.expenseBySource[source]])}
+            entries={(Object.keys(EXPENSE_LABELS) as ExpenseSource[]).map((source) => [
+              EXPENSE_LABELS[source],
+              totals.expenseBySource[source],
+              EXPENSE_NOTES[source],
+            ])}
           />
         </div>
 
@@ -413,8 +418,18 @@ function Delta({ change: value, upIsGood, against }: { change: Change; upIsGood:
   );
 }
 
-/** Sources classées de la plus grosse à la plus petite : montant, part et barre de la part. */
-function SourceBars({ title, tone, total, entries }: { title: string; tone: "income" | "expense"; total: number; entries: [string, number][] }) {
+/** Sources classées de la plus grosse à la plus petite : montant, part, barre de la part et note éventuelle. */
+function SourceBars({
+  title,
+  tone,
+  total,
+  entries,
+}: {
+  title: string;
+  tone: "income" | "expense";
+  total: number;
+  entries: [label: string, amount: number, note?: string][];
+}) {
   const shown = entries.filter(([, amount]) => amount > 0).sort(([, a], [, b]) => b - a);
   return (
     <section aria-label={title}>
@@ -423,7 +438,7 @@ function SourceBars({ title, tone, total, entries }: { title: string; tone: "inc
         <p className="panel px-5 py-4 text-sm text-muted">Rien sur la période.</p>
       ) : (
         <ul className="panel space-y-4 px-5 py-5">
-          {shown.map(([label, amount]) => (
+          {shown.map(([label, amount, note]) => (
             <li key={label}>
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                 <span className="legend-key font-medium">
@@ -436,6 +451,7 @@ function SourceBars({ title, tone, total, entries }: { title: string; tone: "inc
                 </span>
               </div>
               <Meter value={amount} max={total} label={`${label} : part du total`} tone={tone} />
+              {note && <p className="mt-1.5 text-xs text-muted">{note}</p>}
             </li>
           ))}
         </ul>

@@ -132,6 +132,18 @@ réglages et les erreurs de l'addon ne sont ni lus ni transmis.
   **Donjons** de la fiche du personnage.
 - Aucune courbe d'expérience à l'intérieur d'une session : la seule série temporelle de l'addon
   concerne l'or.
+- La source d'un mouvement d'or est déduite de la fenêtre ouverte (`Ledger.lua`, `classifyOut`) :
+  marchand, échange, **courrier**, puis hôtel des ventes, maître et vol. Une fenêtre compte encore
+  3 s après sa fermeture. Quand l'addon croit la boîte aux lettres encore ouverte, les achats et
+  les dépôts à l'hôtel des ventes tombent dans `exp.mail` (relevé le 2026-11-19 sur Allemano
+  Ledger 0.7.3 : 6,67 po d'achats notés par EZAuctioneer, `exp.ah` à 0 pour la session).
+  L'addon n'est pas à nous et sa licence en interdit la modification sans accord écrit : la
+  correction revient à son auteur. Les journées ne gardant que des totaux, le site ne peut pas les
+  corriger : la page **Finances** le dit sous « Courrier ».
+- Un transfert entre ses propres personnages n'est reconnu que si le destinataire est connu du
+  **même compte WoW** (`IsOwnCharacter` lit `AllemanoLedgerDB.chars`, propre à chaque compte).
+  L'or envoyé à un personnage d'un autre compte est une dépense `mail` chez l'expéditeur et un
+  revenu `mail` chez le destinataire.
 
 ## 4. Traitement
 

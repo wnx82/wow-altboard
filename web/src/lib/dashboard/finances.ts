@@ -29,6 +29,17 @@ export const EXPENSE_LABELS: Record<ExpenseSource, string> = {
   other: "Autres",
 };
 
+/**
+ * Ce qu'une source de dépense contient de surprenant, affiché sous sa barre. Allemano Ledger 0.7.3
+ * classe une dépense d'après la fenêtre ouverte, et teste le courrier avant l'hôtel des ventes :
+ * quand il croit encore la boîte aux lettres ouverte, il range les achats et les dépôts à l'hôtel
+ * des ventes dans le courrier (relevé le 2026-11-19 : 6,67 po d'achats notés par EZAuctioneer,
+ * 0 au poste « Hôtel des ventes »). Les journées ne gardent que des totaux : impossible de corriger.
+ */
+export const EXPENSE_NOTES: Partial<Record<ExpenseSource, string>> = {
+  mail: "Port, contre-remboursements et or envoyé à vos personnages d'un autre compte WoW. Allemano Ledger 0.7.3 y range parfois aussi des achats et des dépôts à l'hôtel des ventes : ce montant peut être trop haut, et celui de l'hôtel des ventes trop bas.",
+};
+
 export type FinancePeriod = { key: "7" | "30" | "90" | "all"; days: number | null; label: string };
 export const FINANCE_PERIODS: readonly FinancePeriod[] = [
   { key: "7", days: 7, label: "7 jours" },
