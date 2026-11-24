@@ -37,6 +37,15 @@ public static partial class AuctionatorReader
     [GeneratedRegex(@"^(\d{1,9}|g:\d{1,9}:\d{1,5}|p:\d{1,9})$", RegexOptions.CultureInvariant)]
     private static partial Regex ItemKeyPattern();
 
+    /// <summary>
+    /// Variante à suffixe aléatoire (WoW Forever, Auctionator 352) : <c>gr:&lt;objet&gt;:&lt;suffixe anglais&gt;</c>,
+    /// par exemple <c>gr:15502:of the Monkey</c>. Auctionator range chaque enchère sous cette clé et sous
+    /// la clé simple de l'objet, qui porte donc déjà le plus bas prix de toutes ses variantes. Ces clés ne
+    /// sont pas transmises, sans avertissement : les prix par variante viennent des scans d'EZAuctioneer.
+    /// </summary>
+    [GeneratedRegex(@"^gr:\d{1,9}:", RegexOptions.CultureInvariant)]
+    private static partial Regex SuffixVariantKeyPattern();
+
     /// <summary>Lit les données, ou null si le fichier n'a pas de base de prix exploitable (un avertissement l'explique).</summary>
     public static AuctionatorData? Read(IReadOnlyDictionary<string, LuaValue> globals, List<string> warnings)
     {
@@ -102,6 +111,7 @@ public static partial class AuctionatorReader
             // La table contient aussi des marqueurs internes (version = 2) : seules les tables d'objet comptent.
             if (value.AsTable() is not { } entry) continue;
             var itemKey = key.Kind == LuaKeyKind.String ? key.Text : key.AsInt64()?.ToString(CultureInfo.InvariantCulture);
+            if (itemKey is not null && SuffixVariantKeyPattern().IsMatch(itemKey)) continue;
             if (itemKey is null || !ItemKeyPattern().IsMatch(itemKey))
             {
                 badKeys++;

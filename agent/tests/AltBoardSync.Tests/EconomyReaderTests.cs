@@ -160,6 +160,29 @@ public class AuctionatorReaderTests
     }
 
     [Fact]
+    public void Suffix_variant_keys_are_skipped_without_warning()
+    {
+        // WoW Forever, Auctionator 352 : chaque enchère d'une variante est rangée sous « gr: » ET sous la
+        // clé simple, qui garde le plus bas prix de toutes les variantes.
+        const string lua = """
+            AUCTIONATOR_PRICE_DATABASE = {
+            ["__dbversion"] = 8,
+            ["PvE Alliance"] = {
+            ["15502"] = { ["m"] = 900, ["h"] = { ["2520"] = 900 } },
+            ["gr:15502:of the Monkey"] = { ["m"] = 1500, ["h"] = { ["2520"] = 1500 } },
+            ["gr:15502:of Nature Protection"] = { ["m"] = 900, ["h"] = { ["2520"] = 900 } },
+            },
+            }
+            """;
+        var warnings = new List<string>();
+
+        var data = AuctionatorReader.Read(SavedVariablesParser.ParseBinary(Encoding.UTF8.GetBytes(lua)), warnings)!;
+
+        Assert.Equal(["15502"], data.Markets.Single().Items.Select(i => i.Key));
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
     public void Invalid_keys_and_values_are_ignored_and_counted()
     {
         const string lua = """

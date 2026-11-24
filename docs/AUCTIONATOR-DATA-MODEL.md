@@ -31,6 +31,14 @@ AUCTIONATOR_PRICE_DATABASE = {
 
 Clé : `"1234"` (objet), `"g:1234:60"` (équipement, avec son niveau d'objet), `"p:1234"` (mascotte).
 
+Sur WoW Forever, Auctionator 352 ajoute `"gr:1234:of the Monkey"` : une variante à suffixe aléatoire,
+nommée par son suffixe en anglais (`Source/Utilities/DBKeyFromLink.lua`). Chaque enchère d'une
+variante est rangée sous cette clé **et** sous la clé simple `"1234"`, qui garde donc le plus bas prix
+de toutes les variantes. L'agent 0.11.2 ignore ces clés sans avertissement (32 935 sur un fichier
+réel du 2026-11-24, contre 7 588 clés simples) ; avant lui, chaque synchronisation devenait
+`partial` (« clés d'objet non reconnues »). Les prix par variante viennent des scans
+d'EZAuctioneer (`i:1234:s<suffixe>`).
+
 | Champ | Contenu |
 |---|---|
 | `m` | dernier prix minimum vu, en pièces de cuivre |

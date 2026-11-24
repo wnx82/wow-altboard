@@ -4,6 +4,18 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Agent 0.11.2 — 2026-11-24
+
+S'installe seul depuis un agent 0.9.0 ou plus récent une fois le site redéployé avec lui.
+
+### Corrigé
+
+- Chaque synchronisation était marquée `partial` : Auctionator 352 range sur WoW Forever les
+  variantes à suffixe aléatoire sous des clés `gr:<objet>:<suffixe anglais>` (« of the Monkey »),
+  que l'agent comptait comme « clés d'objet non reconnues » (32 935 sur un fichier réel). Elles sont
+  ignorées sans avertissement : la clé simple de l'objet, déjà transmise, porte le plus bas prix de
+  toutes ses variantes, et les prix par variante viennent des scans d'EZAuctioneer.
+
 ## Site 0.37.1 — 2026-11-24
 
 Pour l'agent 0.11.1. Aucune migration.
