@@ -21,9 +21,12 @@ désinstallé le même jour : voir [Ancien hôte : contabo](#ancien-hôte--conta
 
 ## Conventions suivies
 
-- **Komodo fait tout** : il clone le dépôt, écrit le `.env`, puis lance `docker compose up -d`. Le
-  fichier compose reconstruit l'image (`pull_policy: build`) et applique les migrations par un
-  service dédié, dont dépend le démarrage de `web`. Aucune option de construction sur la pile.
+- **Komodo fait tout** : il clone le dépôt, écrit le `.env`, puis lance `docker compose up -d`.
+  Seul `web` reconstruit l'image (`pull_policy: build`) ; `migrate` et `tools` réutilisent celle
+  qu'il vient de construire (`pull_policy: never`). Quand `build:` était partagé par plusieurs
+  services, chaque déploiement lançait deux `next build` en parallèle, ce qui a saturé la mémoire
+  du CT 102 le 2026-11-24. Les migrations passent par un service dédié, dont dépend le démarrage
+  de `web`. Aucune option de construction sur la pile.
 - **Base dans la pile** : pas de PgBouncer, l'application se connecte directement. L'instance est
   initialisée avec la locale ICU `fr`, pour que les listes triées en SQL suivent l'ordre
   alphabétique (sur contabo, `C.UTF-8` triait par octets).

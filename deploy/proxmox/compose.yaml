@@ -6,17 +6,10 @@ name: wow-altboard
 
 x-app: &app
   image: wow-altboard-web:${WOW_IMAGE_TAG:-latest}
-  build:
-    context: ../../web
-    # Le dépôt cloné, réduit par son .dockerignore au commit extrait et à la version de l'agent :
-    # le site les affiche en pied de page.
-    additional_contexts:
-      repo: ../..
-    args:
-      WOW_BASE_PATH: ${WOW_BASE_PATH:-}
-  # « docker compose up -d » reconstruit toujours l'image depuis les sources clonées : un
-  # déploiement Komodo suffit, sans option de construction à régler sur la pile.
-  pull_policy: build
+  # Seul « web » construit l'image ; « migrate » et « tools » réutilisent celle qu'il vient de
+  # construire. Placée dans cette ancre, la construction partait une fois par service : deux
+  # « next build » en parallèle ont saturé la mémoire du CT 102 le 2026-11-24.
+  pull_policy: never
   environment:
     # Le mot de passe entre tel quel dans l'URL : hexadécimal uniquement (openssl rand -hex 24).
     WOW_DATABASE_URL: "postgresql://wow_altboard:${WOW_DB_PASSWORD:?mot de passe de la base manquant}@db:5432/wow_altboard"
@@ -87,6 +80,17 @@ services:
   web:
     <<: *app
     container_name: wow-altboard-web
+    build:
+      context: ../../web
+      # Le dépôt cloné, réduit par son .dockerignore au commit extrait et à la version de l'agent :
+      # le site les affiche en pied de page.
+      additional_contexts:
+        repo: ../..
+      args:
+        WOW_BASE_PATH: ${WOW_BASE_PATH:-}
+    # « docker compose up -d » reconstruit toujours l'image depuis les sources clonées : un
+    # déploiement Komodo suffit, sans option de construction à régler sur la pile.
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       db:
@@ -104,7 +108,8 @@ services:
   tools:
     <<: *app
     profiles: ["tools"]
-    # L'image du dernier déploiement, jamais une reconstruction depuis des sources plus récentes.
+    # L'image du dernier déploiement, jamais une reconstruction depuis des sources plus récentes
+    # (déjà le cas par l'ancre, répété ici parce que c'est la raison d'être du service).
     pull_policy: never
     restart: "no"
     depends_on:
