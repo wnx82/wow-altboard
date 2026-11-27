@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { after, before, beforeEach, describe, test } from "node:test";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import * as t from "@/db/schema";
 import { countRows, openTestDatabase, type TestDatabase } from "@/db/testing";
 import { createAgentToken, revokeAgentToken } from "@/lib/agent-tokens";
@@ -495,6 +495,38 @@ describe("mise à jour d'un personnage existant", () => {
     assert.deepEqual([result.charactersCreated, result.charactersUnchanged], [1, 6]);
     assert.equal((await character("Player-9999-000000FF")).name, "Nouveau D'Été 日本語 🐉");
     assert.equal(await count(t.realms), 2);
+  });
+
+  // WoW Forever, 2026-11-27 : AltBoard a relevé l'identité juste après un passage de niveau (ancien
+  // niveau, expérience 0 / 0, sans guilde) ; Allemano Ledger, dans le même fichier, connaît le niveau.
+  test("une identité relevée trop tôt prend le niveau d'Allemano Ledger et garde la guilde", async () => {
+    const first = clone();
+    Object.assign(mageOf(first), { restedXp: 9370 });
+    await ok(first);
+    const next = clone();
+    const mage = mageOf(next);
+    Object.assign(mage, { lastSeen: mage.lastSeen + 7200, xp: 0, xpMax: 0, guild: undefined, restedXp: undefined, moneyCopper: 95000 });
+    mage.playtime = { totalSeconds: 100_000, measuredAt: mage.lastSeen, current: { level: 26 }, levels: [{ level: 25, playedSeconds: 3600, reachedAt: mage.lastSeen - 7000 }] };
+
+    const result = await ok(next);
+
+    assert.deepEqual([result.charactersUpdated, result.snapshotsCreated], [1, 1]);
+    const stored = await character(MAGE);
+    assert.deepEqual(
+      [stored.level, stored.xp, stored.xpMax, stored.restedXp, stored.guild, stored.moneyCopper],
+      [26, null, null, 9370, "Les Sans-Souci", 95000],
+    );
+    const [snapshot] = await database.db
+      .select({ level: t.characterSnapshots.level, xpMax: t.characterSnapshots.xpMax, data: t.characterSnapshots.data })
+      .from(t.characterSnapshots)
+      .where(eq(t.characterSnapshots.characterId, stored.id))
+      .orderBy(desc(t.characterSnapshots.capturedAt))
+      .limit(1);
+    assert.deepEqual([snapshot.level, snapshot.xpMax, (snapshot.data as { guild: string | null }).guild], [26, null, "Les Sans-Souci"]);
+
+    // Le même fichier renvoyé ne change plus rien.
+    const again = await ok(structuredClone(next));
+    assert.deepEqual([again.charactersUpdated, again.snapshotsCreated], [0, 0]);
   });
 });
 

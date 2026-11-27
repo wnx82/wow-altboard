@@ -274,6 +274,18 @@ Table à clé `itemKey`, partagée par tous les personnages du compte (357 et 14
   Tout hash doit donc être calculé sur une forme **canonique** (clés triées), jamais sur le texte brut.
 - **Multi-PC** : les `SavedVariables` sont locales à chaque PC. Deux PC peuvent détenir des versions
   d'âges différents du même personnage ; `lastSeen` permet de départager.
+- **Identité relevée trop tôt** (WoW Forever, constaté le 2026-11-27) : l'identité (`level`, `xp`,
+  `xpMax`, `rested`, `guild`) n'est relue qu'aux événements de connexion, de niveau, d'expérience et
+  de guilde, une seconde après chacun. Juste après un passage de niveau, le client peut encore
+  donner l'ancien niveau, une expérience 0 / 0 et aucune guilde. Sans expérience gagnée ensuite (des
+  heures de cueillette, par exemple), le fichier garde cet état : Aekiss Valtharion, au niveau 49
+  selon Allemano Ledger, restait au niveau 48, en 0 / 0 et sans guilde. Le site 0.37.3 corrige à la
+  réception (`web/src/lib/sync/identity.ts`) :
+  - le niveau en cours d'Allemano Ledger remplace un niveau d'AltBoard plus bas ;
+  - l'expérience devient inconnue, ou reste celle déjà connue quand le niveau n'a pas changé ;
+  - la guilde et l'expérience reposée déjà connues restent, au lieu d'un départ de guilde fictif.
+
+  Une expérience 0 / 0 n'est jamais réelle et suit la même règle, même sans Ledger.
 
 ## 8. Données demandées par le cahier des charges mais absentes d'AltBoard
 

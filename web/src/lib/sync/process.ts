@@ -11,6 +11,7 @@ import { AGENT_NOTICE, AGENT_WARNING } from "./codes";
 import { blockColumns, identityColumns, replaceDetails } from "./character-details";
 import { chunks, fromUnix, uniqueBy } from "./helpers";
 import { applyBaganator } from "./inventory";
+import { repairIdentity, withKnownIdentity } from "./identity";
 import { applyLedger } from "./ledger";
 import { resolveMissingRealms } from "./realms";
 import { applyAddonErrors, applyResale } from "./resale";
@@ -325,11 +326,12 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
       });
   }
 
-  const received = uniqueBy(account.characters, (character) => character.guid);
+  // Identité relevée par AltBoard avant que le client ne la donne : niveau d'Allemano Ledger, expérience inconnue.
+  const received = uniqueBy(account.characters, (character) => character.guid).map(repairIdentity);
   counters.characters += received.length;
   if (received.length === 0) return accountId;
 
-  const guids = received.map((character) => character.guid);
+  const guids = received.map(({ character }) => character.guid);
   const existingRows = await tx
     .select({
       id: t.characters.id,
@@ -339,6 +341,11 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
       statsAt: t.characters.statsAt,
       bagsAt: t.characters.bagsAt,
       bankAt: t.characters.bankAt,
+      level: t.characters.level,
+      xp: t.characters.xp,
+      xpMax: t.characters.xpMax,
+      restedXp: t.characters.restedXp,
+      guild: t.characters.guild,
     })
     .from(t.characters)
     .where(inArray(t.characters.guid, guids));
@@ -347,7 +354,13 @@ async function applyAccount(tx: Transaction, account: AccountPayload, scope: Sco
   // Après une réinitialisation, un personnage inconnu et non vu en jeu depuis la date limite n'est
   // pas recréé : un PC qui garde un ancien fichier (celui de la bêta) le renvoie à chaque envoi.
   const cutoffMs = scope.cutoff?.getTime() ?? null;
-  const characters = received.filter((character) => cutoffMs === null || existing.has(character.guid) || character.lastSeen * 1000 >= cutoffMs);
+  const characters = received
+    .filter(({ character }) => cutoffMs === null || existing.has(character.guid) || character.lastSeen * 1000 >= cutoffMs)
+    // Relevé non fiable : la guilde et l'expérience reposée déjà connues restent, au lieu d'un départ de guilde fictif.
+    .map(({ character, unreliable }) => {
+      const known = existing.get(character.guid);
+      return unreliable && known ? withKnownIdentity(character, known) : character;
+    });
   counters.stale += received.length - characters.length;
   if (characters.length === 0) return accountId;
 

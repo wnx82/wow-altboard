@@ -4,6 +4,20 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.37.3 — 2026-11-27
+
+Aucune migration, aucun changement d'agent.
+
+### Corrigé
+
+- Un personnage pouvait rester un niveau en dessous de son niveau réel, avec une expérience
+  « 0 / 0 » et un départ de guilde qui n'avait pas eu lieu. Sur WoW Forever, AltBoard relève parfois
+  l'identité juste après un passage de niveau, quand le client donne encore l'ancien niveau, et ne la
+  relit plus tant que le personnage ne gagne pas d'expérience. Aekiss Valtharion était à 48 sur le
+  site au lieu de 49. À la réception, le niveau en cours d'Allemano Ledger remplace un niveau
+  d'AltBoard plus bas, une expérience 0 / 0 devient inconnue, et la guilde et l'expérience reposée
+  déjà connues restent ([ALTBOARD-DATA-MODEL](docs/ALTBOARD-DATA-MODEL.md), section 7).
+
 ## Site 0.37.2 — 2026-11-24
 
 Aucune migration, aucun changement d'agent.
