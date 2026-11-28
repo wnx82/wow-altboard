@@ -9,7 +9,7 @@ public sealed record AccountSource(string AccountFolder, string Flavor, string F
     /// <summary>Fichier de l'addon Auctionator du même compte, s'il existe (prix de l'hôtel des ventes).</summary>
     public string? AuctionatorFilePath { get; init; }
 
-    /// <summary>Fichier de l'addon NaowhForever du même compte, s'il existe (recettes apprises).</summary>
+    /// <summary>Fichier de l'addon NaowhForever du même compte, s'il existe (recettes apprises, prix de l'hôtel des ventes).</summary>
     public string? RecipesFilePath { get; init; }
 
     /// <summary>Fichier de Syndicator (données de l'addon Baganator) du même compte, s'il existe (courrier, enchères, banques de guilde).</summary>

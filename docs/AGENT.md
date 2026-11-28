@@ -162,7 +162,7 @@ Dossier `%APPDATA%\AltBoardSync\` (remplaçable par la variable `ALTBOARDSYNC_HO
 |---|---|
 | `config.json` | `machineUuid`, `machineName`, `wowPath`, `serverUrl`, `autoUpdate` (absent : activée) — aucun secret |
 | `token.dat` | jeton chiffré par DPAPI pour l'utilisateur Windows courant ; depuis 0.11.0, écrit dans un fichier temporaire puis substitué d'un coup, comme `config.json` |
-| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets, pour `watch` ; dernière version de l'agent annoncée par le serveur, celle déjà signalée, et celle dont la mise à jour automatique a échoué ; ni contenu ni nom réel de dossier de compte |
+| `state.json` | dernière empreinte envoyée par compte, et par client celle du cache des noms d'objets et celle du flux de prix de NaowhForever (0.12.0), pour `watch` ; dernière version de l'agent annoncée par le serveur, celle déjà signalée, et celle dont la mise à jour automatique a échoué ; ni contenu ni nom réel de dossier de compte |
 | `updates\` | exécutable en cours de téléchargement ou de vérification par la mise à jour automatique ; vidé au démarrage |
 | `journal.jsonl` | journal affiché par la fenêtre : une entrée par envoi, panne ou événement, avec ce qui a changé par personnage ; les 200 dernières sont gardées |
 | `characters.json` | ce que l'agent retient de chaque personnage envoyé (niveau, or, métiers, empreintes) pour dire ce qui change à l'envoi suivant |
@@ -243,8 +243,19 @@ client joué), envoyés quand le fichier a changé depuis le dernier envoi accep
 ([ECONOMY-ENGINE](ECONOMY-ENGINE.md#noms-des-objets-item-namests)). Format lu : « XFTH » version 9 ;
 une autre version donne un avertissement, sans bloquer la synchronisation.
 
-Pour des prix à jour : scan à l'hôtel des ventes avec Auctionator ou EZAuctioneer, `/reload`, puis
-synchroniser.
+Depuis 0.12.0, `NaowhForever.lua` apporte aussi les **prix de l'hôtel des ventes** que relève
+l'addon : plus bas prix, médiane pondérée par la quantité et nombre d'annonces de chaque objet, et
+ses 14 jours d'historique ([NAOWH-MARKET-DATA-MODEL](NAOWH-MARKET-DATA-MODEL.md)). Le fichier est lu
+une seule fois pour les recettes et les prix. L'agent lit aussi, une fois par client, le flux de prix
+livré avec l'addon (`Interface\AddOns\NaowhForever_AuctionData\Prices.lua`) : les prix de tous les
+hôtels des ventes de la région, Horde et Blackwater compris. Il n'en envoie que la région qu'un scan
+Naowh des comptes désigne, et seulement quand le fichier a changé depuis le dernier envoi accepté,
+comme les noms d'objets. `scan` en affiche le résumé :
+`NaowhForever « CAMWOW EU5 Realm 5 PvE-Alliance » : 7356 objets, 10 jours d'historique`, puis
+`Flux de prix de NaowhForever (_forever_, région 3) : 12 hôtels des ventes, 56915 prix`.
+
+Pour des prix à jour : scan à l'hôtel des ventes avec Auctionator, EZAuctioneer ou NaowhForever,
+`/reload`, puis synchroniser.
 `scan --out <fichier>` montre ce qui serait envoyé, prix et recettes compris.
 
 ## Lecture pendant que le jeu écrit

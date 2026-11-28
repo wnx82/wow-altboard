@@ -396,6 +396,78 @@ const recipes = z.strictObject({
     .max(200),
 });
 
+// Prix de l'hôtel des ventes relevés par NaowhForever (voir docs/NAOWH-MARKET-DATA-MODEL.md), envoyés
+// depuis l'agent 0.12.0. Maison : « <royaume>-<camp> », le royaume étant le numéro du serveur quand le
+// jeu n'en donnait pas. Prix à l'unité, en pièces de cuivre ; heures en secondes Unix (serveur du jeu).
+export const NAOWH_HOUSE_KEY_PATTERN = /^([^\u0000-\u001f]{1,80})-(Alliance|Horde|Blackwater)$/;
+export const NAOWH_SIDES = ["Alliance", "Horde", "Blackwater"] as const;
+const naowhItemId = z.int().min(1).max(2_147_483_647);
+const naowhPrice = copper.min(1);
+const naowhListed = z.int().min(0).max(1_000_000_000);
+/** Objets triés et distincts : le premier élément de chaque tableau. */
+const sortedById = (rows: readonly (readonly [number, ...unknown[]])[]) => rows.every((row, index) => index === 0 || rows[index - 1][0] < row[0]);
+const naowhDay = z.strictObject({
+  day: z.iso.date(),
+  // [objet, médiane, annonces]
+  items: z
+    .array(z.tuple([naowhItemId, naowhPrice, naowhListed.nullable()]))
+    .min(1)
+    .max(30_000)
+    .refine(sortedById, { message: "objets non triés ou en double" }),
+});
+const naowhHouse = z.strictObject({
+  key: z.string().max(120).regex(NAOWH_HOUSE_KEY_PATTERN),
+  contentHash: sha256,
+  scannedAt: scanInstant.optional(),
+  medianAt: scanInstant.optional(),
+  recordedAt: scanInstant.optional(),
+  // [objet, plus bas, médiane, annonces, revu à] : au moins un des deux prix.
+  items: z
+    .array(
+      z
+        .tuple([naowhItemId, naowhPrice.nullable(), naowhPrice.nullable(), naowhListed.nullable(), scanInstant.nullable()])
+        .refine(([, low, median]) => low !== null || median !== null, { message: "objet sans prix" }),
+    )
+    .max(30_000)
+    .refine(sortedById, { message: "objets non triés ou en double" }),
+  days: z
+    .array(naowhDay)
+    .max(31)
+    .refine((days) => days.every((day, index) => index === 0 || days[index - 1].day < day.day), { message: "jours non triés ou en double" }),
+});
+const naowhMarket = z.strictObject({
+  file: sourceFile,
+  houses: z
+    .array(naowhHouse)
+    .min(1)
+    .max(20)
+    .refine((rows) => new Set(rows.map((r) => r.key)).size === rows.length, { message: "maison en double" }),
+});
+// Flux de prix livré avec NaowhForever (NaowhForever_AuctionData), un par client, pour la région des
+// scans du joueur. time : heure des données de Blizzard. Maison : identifiant de Blizzard et camp.
+const naowhFeed = z.strictObject({
+  flavor: text(40),
+  file: sourceFile,
+  time: scanInstant,
+  region: z.int().min(1).max(1_000),
+  houses: z
+    .array(
+      z.strictObject({
+        id: naowhItemId,
+        faction: z.enum(NAOWH_SIDES),
+        // [objet, plus bas, médiane, annonces]
+        items: z
+          .array(z.tuple([naowhItemId, naowhPrice, naowhPrice.nullable(), naowhListed.nullable()]))
+          .min(1)
+          .max(30_000)
+          .refine(sortedById, { message: "objets non triés ou en double" }),
+      }),
+    )
+    .min(1)
+    .max(50)
+    .refine((rows) => new Set(rows.map((r) => r.id)).size === rows.length, { message: "maison en double" }),
+});
+
 // Courrier, enchères en cours et banques de guilde relevés par l'addon Baganator (Syndicator.lua),
 // envoyés depuis l'agent 0.8.0. Chaque personnage d'AltBoard que Baganator connaît figure, listes
 // vides comprises : un courrier retiré disparaît.
@@ -459,6 +531,8 @@ const account = z
     baganator: baganator.optional(),
     // Facultatif : un agent antérieur à 0.10.0 ne l'envoie pas.
     ezAuctioneer: ezAuctioneer.optional(),
+    // Facultatif : un agent antérieur à 0.12.0 ne l'envoie pas.
+    naowhMarket: naowhMarket.optional(),
     // Erreurs Lua gardées par l'addon AltBoard (AltBoardDB.errors, 10 au plus), envoyées depuis l'agent
     // 0.11.0. Une liste vide efface les précédentes ; absente (agent plus ancien), elles restent.
     addonErrors: z
@@ -495,9 +569,18 @@ export const syncPayloadSchema = z.strictObject({
     )
     .max(10)
     .optional(),
+  // Flux de prix de NaowhForever, envoyé depuis l'agent 0.12.0 quand son fichier a changé.
+  naowhFeeds: z
+    .array(naowhFeed)
+    .max(10)
+    .refine((rows) => new Set(rows.map((r) => r.flavor)).size === rows.length, { message: "client en double" })
+    .optional(),
 });
 
 export type SyncPayload = z.infer<typeof syncPayloadSchema>;
+export type NaowhFeedPayload = NonNullable<SyncPayload["naowhFeeds"]>[number];
+export type NaowhMarketPayload = NonNullable<AccountPayload["naowhMarket"]>;
+export type NaowhHousePayload = NaowhMarketPayload["houses"][number];
 export type ItemNamesPayload = NonNullable<SyncPayload["itemNames"]>[number];
 export type LedgerDayPayload = NonNullable<CharacterPayload["finances"]>[number];
 export type AccountPayload = SyncPayload["accounts"][number];

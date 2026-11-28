@@ -19,6 +19,12 @@ public sealed record SyncPayload(
     /// n'a pas changé depuis le dernier envoi accepté (voir <see cref="Economy.ItemNameCache"/>).
     /// </summary>
     public IReadOnlyList<ItemNamesPayload>? ItemNames { get; init; }
+
+    /// <summary>
+    /// Flux de prix livré avec NaowhForever, un par client (agent 0.12.0) : seulement la région des
+    /// scans du joueur, et absent quand le fichier n'a pas changé depuis le dernier envoi accepté.
+    /// </summary>
+    public IReadOnlyList<NaowhFeedPayload>? NaowhFeeds { get; init; }
 }
 
 public sealed record MachinePayload(Guid Uuid, string Hostname, string? DisplayName);
@@ -52,6 +58,12 @@ public sealed record AccountPayload(
     /// aucun des trois.
     /// </summary>
     public EzAuctioneerPayload? EzAuctioneer { get; init; }
+
+    /// <summary>
+    /// Prix de l'hôtel des ventes relevés par NaowhForever (Auction Prices, The Market) du même compte
+    /// (agent 0.12.0) : dernier scan et historique journalier de chaque maison ; absents sans maison relevée.
+    /// </summary>
+    public NaowhMarketPayload? NaowhMarket { get; init; }
 
     /// <summary>
     /// Dernières erreurs Lua de l'addon AltBoard (<c>AltBoardDB.errors</c>, agent 0.11.0). Liste vide
@@ -197,6 +209,37 @@ public sealed record CharacterRecipesPayload(string Guid, IReadOnlyList<RecipePa
 public sealed record RecipePayload(int SpellId, int? SkillLine, int OutputItemId, int OutputQuantity, bool Cooldown, IReadOnlyList<ReagentPayload> Reagents);
 
 public sealed record ReagentPayload(int ItemId, int Quantity);
+
+/// <summary>NaowhForever.lua : prix de l'hôtel des ventes, par maison, triés par clé.</summary>
+public sealed record NaowhMarketPayload(SourceFilePayload File, IReadOnlyList<NaowhHousePayload> Houses);
+
+/// <summary>
+/// Une maison, sous la clé de l'addon : <c>&lt;royaume&gt;-&lt;camp&gt;</c>, le camp étant Alliance, Horde
+/// ou Blackwater (HV neutre). ScannedAt : dernier scan complet ; MedianAt : dernier scan rapide, le seul
+/// qui donne les médianes ; RecordedAt : dernière écriture de l'historique (secondes Unix, heure du
+/// serveur du jeu). Items : un tableau <c>[objet, plus bas, médiane, annonces, revu à]</c> par objet, trié
+/// par objet : plus bas prix d'achat immédiat et médiane pondérée par la quantité, à l'unité, en pièces de
+/// cuivre ; annonces avec prix d'achat immédiat (une pile compte une fois) ; « revu à » : prix relevé depuis
+/// le scan en parcourant l'hôtel des ventes. Seul l'objet est toujours présent, avec au moins un des deux
+/// prix. Days : historique de l'addon. ContentHash ne change que si l'un de ces champs change.
+/// </summary>
+public sealed record NaowhHousePayload(
+    string Key, string ContentHash, long? ScannedAt, long? MedianAt, long? RecordedAt, IReadOnlyList<long?[]> Items, IReadOnlyList<NaowhDayPayload> Days);
+
+/// <summary>Un jour d'historique (AAAA-MM-JJ, en UTC comme l'addon) : un tableau <c>[objet, médiane, annonces]</c> par objet, trié par objet.</summary>
+public sealed record NaowhDayPayload(string Day, IReadOnlyList<long?[]> Items);
+
+/// <summary>
+/// Flux de prix de NaowhForever_AuctionData pour une région (1 : Amériques, 3 : Europe). Time : heure
+/// des données de Blizzard (celles de la maison la plus ancienne), pas celle de la publication.
+/// </summary>
+public sealed record NaowhFeedPayload(string Flavor, SourceFilePayload File, long Time, int Region, IReadOnlyList<NaowhFeedHousePayload> Houses);
+
+/// <summary>
+/// Un hôtel des ventes de Blizzard, sous son identifiant, avec son camp (Alliance, Horde, Blackwater).
+/// Items : un tableau <c>[objet, plus bas, médiane, annonces]</c> par objet, trié par objet.
+/// </summary>
+public sealed record NaowhFeedHousePayload(int Id, string Faction, IReadOnlyList<long?[]> Items);
 
 public sealed record CharacterPayload
 {

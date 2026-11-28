@@ -27,6 +27,16 @@ public sealed record AccountReadResult(AccountSource Source, AccountPayload? Pay
 /// </summary>
 public sealed record ItemNamesReadResult(string Flavor, string? FileHash, ItemNamesPayload? Payload, string? Error);
 
+/// <summary>
+/// Lecture du flux de prix de NaowhForever d'un client, sur le modèle de <see cref="ItemNamesReadResult"/>.
+/// FileHash : empreinte à retenir une fois l'envoi accepté (null : rien à retenir) ; Notice : pourquoi
+/// un flux lisible n'est pas envoyé.
+/// </summary>
+public sealed record NaowhFeedReadResult(string Flavor, string? FileHash, NaowhFeedPayload? Payload, string? Error)
+{
+    public string? Notice { get; init; }
+}
+
 public sealed class PayloadBuilder(StableFileReader reader)
 {
     /// <summary>
@@ -37,8 +47,9 @@ public sealed class PayloadBuilder(StableFileReader reader)
     /// Baganator (0.8.0). 5 : informations à part des avertissements (0.9.0). 6 : scans d'EZAuctioneer (0.10.0).
     /// 7 : portefeuilles et bonnes affaires d'EZAuctioneer, erreurs d'AltBoard, runs d'Allemano Ledger (0.11.0).
     /// 8 : personnages et marchés d'EZAuctioneer au royaume vide, que l'agent écartait (0.11.1).
+    /// 9 : prix de l'hôtel des ventes de NaowhForever (0.12.0).
     /// </summary>
-    public const string PayloadFormat = "8";
+    public const string PayloadFormat = "9";
 
     /// <summary>Lit un compte. Une erreur sur un compte n'empêche jamais la lecture des autres.</summary>
     public async Task<AccountReadResult> ReadAccountAsync(AccountSource source, CancellationToken cancellationToken = default)
@@ -51,7 +62,7 @@ public sealed class PayloadBuilder(StableFileReader reader)
             var (characters, ledgerWarnings, ledgerHash) = await AttachLedgerAsync(source, document.Characters, cancellationToken).ConfigureAwait(false);
             var economyWarnings = new List<string>();
             var auctionator = await ReadAuctionatorAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
-            var recipes = await ReadRecipesAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
+            var (recipes, naowhMarket, naowhHash) = await ReadNaowhAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
             var notices = new List<string>();
             var (baganator, baganatorItems) = await ReadBaganatorAsync(source, characters, economyWarnings, notices, cancellationToken).ConfigureAwait(false);
             var ezAuctioneer = await ReadEzAuctioneerAsync(source, economyWarnings, cancellationToken).ConfigureAwait(false);
@@ -71,12 +82,13 @@ public sealed class PayloadBuilder(StableFileReader reader)
                 Recipes = recipes,
                 Baganator = baganator,
                 EzAuctioneer = ezAuctioneer,
+                NaowhMarket = naowhMarket,
                 AddonErrors = document.AddonErrors,
                 Notices = notices.Count > 0 ? PayloadLimits.Warnings(notices) : null,
             };
             return new AccountReadResult(source, payload, null)
             {
-                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{recipes?.File.Hash ?? "-"}:{baganator?.File.Hash ?? "-"}:{ezAuctioneer?.File.Hash ?? "-"}",
+                Fingerprint = $"{PayloadFormat}:{fileHash}:{ledgerHash ?? "-"}:{auctionator?.File.Hash ?? "-"}:{naowhHash ?? "-"}:{baganator?.File.Hash ?? "-"}:{ezAuctioneer?.File.Hash ?? "-"}",
             };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException or AltBoardFormatException)
@@ -175,20 +187,76 @@ public sealed class PayloadBuilder(StableFileReader reader)
         }
     }
 
-    /// <summary>Recettes apprises relevées par NaowhForever. Source facultative, comme Auctionator.</summary>
-    private async Task<RecipesPayload?> ReadRecipesAsync(AccountSource source, List<string> warnings, CancellationToken cancellationToken)
+    /// <summary>
+    /// Recettes apprises et prix de l'hôtel des ventes relevés par NaowhForever, d'une seule lecture du
+    /// fichier. Source facultative, comme Auctionator. FileHash : empreinte du fichier lu, qu'il ait ou
+    /// non de quoi envoyer, pour que « watch » renvoie le compte quand il change.
+    /// </summary>
+    private async Task<(RecipesPayload? Recipes, NaowhMarketPayload? Market, string? FileHash)> ReadNaowhAsync(
+        AccountSource source, List<string> warnings, CancellationToken cancellationToken)
     {
-        if (source.RecipesFilePath is null) return null;
+        if (source.RecipesFilePath is null) return (null, null, null);
         try
         {
             var snapshot = await reader.ReadAsync(source.RecipesFilePath, cancellationToken).ConfigureAwait(false);
-            var characters = RecipeReader.Read(SavedVariablesParser.Parse(snapshot.Content), warnings);
-            return characters.Count == 0 ? null : new RecipesPayload(FileOf(snapshot), characters);
+            var globals = SavedVariablesParser.Parse(snapshot.Content);
+            var file = FileOf(snapshot);
+            var characters = RecipeReader.Read(globals, warnings);
+            var houses = NaowhMarketReader.Read(globals, warnings);
+            return (
+                characters.Count == 0 ? null : new RecipesPayload(file, characters),
+                houses.Count == 0 ? null : new NaowhMarketPayload(file, houses),
+                file.Hash);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
         {
-            warnings.Add(Truncate($"NaowhForever illisible, recettes non transmises : {e.Message}"));
-            return null;
+            warnings.Add(Truncate($"NaowhForever illisible, recettes et prix non transmis : {e.Message}"));
+            return (null, null, null);
+        }
+    }
+
+    /// <summary>
+    /// Flux de prix de NaowhForever d'un client (<see cref="NaowhFeedReader"/>), pour la région des scans
+    /// Naowh des comptes de ce client. Source facultative : null sans l'addon ; une lecture en échec ne
+    /// fait jamais échouer la synchronisation. Le fichier n'est décodé que si son empreinte diffère de
+    /// knownHash, celle du dernier envoi accepté. Sans scan qui désigne une région, rien n'est envoyé et
+    /// FileHash reste null : le flux partira quand un scan le permettra.
+    /// </summary>
+    public async Task<NaowhFeedReadResult?> ReadNaowhFeedAsync(
+        string flavor, string flavorPath, string? knownHash, IEnumerable<NaowhHousePayload> houses, CancellationToken cancellationToken = default)
+    {
+        string? path;
+        try
+        {
+            path = NaowhFeedReader.Find(flavorPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new NaowhFeedReadResult(flavor, null, null, Truncate($"flux de prix de NaowhForever introuvable : {e.Message}"));
+        }
+
+        if (path is null) return null;
+        try
+        {
+            var snapshot = await reader.ReadAsync(path, cancellationToken).ConfigureAwait(false);
+            var file = FileOf(snapshot);
+            if (file.Hash == knownHash) return new NaowhFeedReadResult(flavor, file.Hash, null, null);
+            var warnings = new List<string>();
+            var feed = NaowhFeedReader.Read(snapshot.Content, warnings);
+            if (feed is null) return new NaowhFeedReadResult(flavor, null, null, warnings.Count > 0 ? Truncate(warnings[0]) : null);
+            if (NaowhFeedReader.MatchRegion(feed, houses) is not { } region)
+            {
+                return new NaowhFeedReadResult(flavor, null, null, null)
+                {
+                    Notice = "NaowhForever : flux de prix non transmis, aucun scan Naowh ne désigne la région (scannez l'hôtel des ventes avec NaowhForever).",
+                };
+            }
+
+            return new NaowhFeedReadResult(flavor, file.Hash, new NaowhFeedPayload(flavor, file, feed.Time, region, feed.Regions[region]), null);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or LuaParseException)
+        {
+            return new NaowhFeedReadResult(flavor, null, null, Truncate($"flux de prix de NaowhForever illisible, non transmis : {e.Message}"));
         }
     }
 
@@ -301,10 +369,20 @@ public sealed class PayloadBuilder(StableFileReader reader)
 
     private static string Truncate(string message) => message.Length > 300 ? message[..300] : message;
 
+    /// <summary>Maisons Naowh relevées par les comptes d'un client : de quoi désigner la région de son flux de prix.</summary>
+    public static IEnumerable<NaowhHousePayload> NaowhHouses(IEnumerable<AccountPayload> accounts, string flavor) =>
+        accounts.Where(account => string.Equals(account.Flavor, flavor, StringComparison.OrdinalIgnoreCase)).SelectMany(account => account.NaowhMarket?.Houses ?? []);
+
     public static SyncPayload Build(
-        MachinePayload machine, IEnumerable<AccountPayload> accounts, string agentVersion, DateTimeOffset now, IReadOnlyList<ItemNamesPayload>? itemNames = null) =>
+        MachinePayload machine,
+        IEnumerable<AccountPayload> accounts,
+        string agentVersion,
+        DateTimeOffset now,
+        IReadOnlyList<ItemNamesPayload>? itemNames = null,
+        IReadOnlyList<NaowhFeedPayload>? naowhFeeds = null) =>
         new(SyncPayload.CurrentSchemaVersion, agentVersion, now, machine with { DisplayName = PayloadLimits.DisplayName(machine.DisplayName) }, accounts.ToList())
         {
             ItemNames = itemNames is { Count: > 0 } ? itemNames : null,
+            NaowhFeeds = naowhFeeds is { Count: > 0 } ? naowhFeeds : null,
         };
 }

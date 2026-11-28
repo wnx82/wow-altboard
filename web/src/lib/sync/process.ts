@@ -13,6 +13,7 @@ import { chunks, fromUnix, uniqueBy } from "./helpers";
 import { applyBaganator } from "./inventory";
 import { repairIdentity, withKnownIdentity } from "./identity";
 import { applyLedger } from "./ledger";
+import { applyNaowhFeeds, applyNaowhMarket } from "./naowh";
 import { resolveMissingRealms } from "./realms";
 import { applyAddonErrors, applyResale } from "./resale";
 import { applyEzAuctioneer } from "./scans";
@@ -203,6 +204,7 @@ export async function processSync(db: Database, document: SyncPayload, context: 
       await applyRecipes(tx, account, now, economy);
       await applyBaganator(tx, account, accountId, now);
       await applyEzAuctioneer(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
+      await applyNaowhMarket(tx, account, { accountId, machineId: machine.id, runId: run.id, now }, economy);
       const resale = await applyResale(tx, account, { accountId, machineId: machine.id, now });
       economy.resalePortfolios += resale.portfolios;
       economy.resaleEvents += resale.events;
@@ -210,6 +212,7 @@ export async function processSync(db: Database, document: SyncPayload, context: 
       await applyAddonErrors(tx, account, { accountId, machineId: machine.id, now });
     }
     if (payload.itemNames) economy.itemNamesStored = await storeClientNames(tx, payload.itemNames, now);
+    if (payload.naowhFeeds) await applyNaowhFeeds(tx, payload.naowhFeeds, now, economy);
 
     // Une fois toutes les données appliquées : un objectif que ce document fait atteindre est daté
     // de cette synchronisation.

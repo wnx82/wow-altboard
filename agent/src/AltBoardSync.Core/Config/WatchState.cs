@@ -10,6 +10,9 @@ public sealed record WatchState
     /// <summary>Empreinte du cache de noms d'objets envoyé, par client : un cache inchangé n'est pas renvoyé.</summary>
     public Dictionary<string, string> ItemNameHashes { get; init; } = new();
 
+    /// <summary>Empreinte du flux de prix de NaowhForever envoyé, par client : un flux inchangé n'est pas renvoyé.</summary>
+    public Dictionary<string, string> NaowhFeedHashes { get; init; } = new();
+
     /// <summary>Dernière version de l'agent annoncée par le serveur ; la fenêtre la propose tant qu'elle suit celle en service.</summary>
     public string? LatestAgentVersion { get; set; }
 
@@ -39,7 +42,12 @@ public sealed class WatchStateStore(string directory)
             {
                 // Le générateur de sérialisation passe les propriétés init par l'initialiseur d'objet :
                 // une clé absente (état écrit par un agent plus ancien) ou nulle y vaut null, pas new().
-                return state with { Fingerprints = state.Fingerprints ?? [], ItemNameHashes = state.ItemNameHashes ?? [] };
+                return state with
+                {
+                    Fingerprints = state.Fingerprints ?? [],
+                    ItemNameHashes = state.ItemNameHashes ?? [],
+                    NaowhFeedHashes = state.NaowhFeedHashes ?? [],
+                };
             }
         }
         catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)

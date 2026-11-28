@@ -269,12 +269,25 @@ internal sealed class WatchLoop(
             itemNames.Add(read);
         }
 
+        // Flux de prix de NaowhForever : même règle que les noms d'objets, pour la région des scans Naowh.
+        var accounts = readable.Select(r => r.Payload!).ToList();
+        var naowhFeeds = new List<NaowhFeedReadResult>();
+        foreach (var (flavor, flavorPath) in PayloadBuilder.Flavors(sources))
+        {
+            var read = await builder.ReadNaowhFeedAsync(flavor, flavorPath, state.NaowhFeedHashes.GetValueOrDefault(flavor), PayloadBuilder.NaowhHouses(accounts, flavor), cancellationToken).ConfigureAwait(false);
+            if (read is null) continue;
+            if (read.Error is not null) log.Warn(read.Error);
+            if (read.Notice is not null) log.Info(read.Notice);
+            naowhFeeds.Add(read);
+        }
+
         var document = PayloadBuilder.Build(
             new MachinePayload(_config.MachineUuid, env.Hostname, _config.MachineName),
-            readable.Select(r => r.Payload!),
+            accounts,
             version,
             env.Now(),
-            itemNames.Where(read => read.Payload is not null).Select(read => read.Payload!).ToList());
+            itemNames.Where(read => read.Payload is not null).Select(read => read.Payload!).ToList(),
+            naowhFeeds.Where(read => read.Payload is not null).Select(read => read.Payload!).ToList());
         var outcome = await client.SendAsync(endpoint, token, document, cancellationToken).ConfigureAwait(false);
         // Un document refusé dit aussi la version servie : c'est souvent la mise à jour qui manque.
         NoteLatestVersion(state, outcome.Response);
@@ -282,6 +295,8 @@ internal sealed class WatchLoop(
 
         foreach (var result in readable) state.Fingerprints[StateKey(result)] = result.Fingerprint!;
         foreach (var read in itemNames.Where(read => read.FileHash is not null)) state.ItemNameHashes[read.Flavor] = read.FileHash!;
+        foreach (var read in naowhFeeds.Where(read => read.FileHash is not null)) state.NaowhFeedHashes[read.Flavor] = read.FileHash!;
+        foreach (var feed in document.NaowhFeeds ?? []) log.Info($"flux de prix de NaowhForever ({feed.Flavor}, région {feed.Region}) : {feed.Houses.Count} hôtels des ventes envoyés");
         foreach (var names in document.ItemNames ?? []) log.Info($"noms des objets du cache du jeu ({names.Flavor}, {names.Locale}, build {names.Build}) : {names.Names.Count} envoyés");
         SaveState(state);
 

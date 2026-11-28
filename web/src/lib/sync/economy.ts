@@ -26,6 +26,15 @@ export type EconomyCounters = {
   resalePortfolios: number;
   resaleEvents: number;
   resaleDeals: number;
+  /** Maisons de NaowhForever importées, ou inchangées depuis le dernier envoi du compte (agent 0.12.0). */
+  naowhHousesImported: number;
+  naowhHousesUnchanged: number;
+  /** Prix actuels et jours d'historique de NaowhForever ajoutés ou modifiés. */
+  naowhPrices: number;
+  naowhDays: number;
+  /** Maisons du flux de prix de NaowhForever remplacées par une version plus récente, ou déjà à jour. */
+  naowhFeedHousesImported: number;
+  naowhFeedHousesUnchanged: number;
 };
 
 export const emptyEconomyCounters = (): EconomyCounters => ({
@@ -40,6 +49,12 @@ export const emptyEconomyCounters = (): EconomyCounters => ({
   resalePortfolios: 0,
   resaleEvents: 0,
   resaleDeals: 0,
+  naowhHousesImported: 0,
+  naowhHousesUnchanged: 0,
+  naowhPrices: 0,
+  naowhDays: 0,
+  naowhFeedHousesImported: 0,
+  naowhFeedHousesUnchanged: 0,
 });
 
 type Scope = { accountId: number; machineId: number; runId: number; now: Date };

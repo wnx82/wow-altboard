@@ -4,6 +4,56 @@ Deux versions, chacune en SemVer : le **site** (`web/package.json`) et l'**agent
 (`agent/Directory.Build.props`, étiquette `agent-vX.Y.Z` pour une release). Le pied de page du
 tableau de bord affiche les deux. Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
+## Site 0.38.0 — 2026-11-28
+
+Pour les prix NaowhForever de l'agent 0.12.0. Migration `0027` : six tables ajoutées, rien de
+modifié.
+
+### Ajouté
+
+- `POST /api/sync` accepte le bloc `naowhMarket` d'un compte : les prix de l'hôtel des ventes que
+  relève l'addon NaowhForever, plus bas prix, médiane pondérée par la quantité et nombre d'annonces de
+  chaque objet, avec ses jours d'historique ([NAOWH-MARKET-DATA-MODEL](docs/NAOWH-MARKET-DATA-MODEL.md)).
+  Le serveur garde le dernier prix connu de chaque objet et accumule les jours, que l'addon oublie
+  après 14 jours. Un fichier plus ancien venu d'un autre PC ne fait reculer aucun prix. La réponse
+  ajoute `naowhHousesImported`, `naowhHousesUnchanged`, `naowhPrices` et `naowhDays`.
+- Il accepte aussi `naowhFeeds` : le flux de prix livré avec l'addon, tiré des données de Blizzard,
+  pour toutes les maisons de la région, Horde et Blackwater compris. Seule la version la plus récente
+  de chaque maison est gardée. La réponse ajoute `naowhFeedHousesImported` et
+  `naowhFeedHousesUnchanged`.
+
+### Modifié
+
+- Une heure de ces prix datée de plus d'une heure dans le futur fait refuser le document
+  (`future_timestamp`) : un prix daté trop tard ne serait plus jamais remplacé.
+
+Ces prix ne sont encore ni affichés ni lus par le moteur de l'économie : c'est le lot suivant.
+
+## Agent 0.12.0 — 2026-11-28
+
+À installer une fois le site 0.38.0 déployé : un site plus ancien refuse le document. S'installe
+seul depuis un agent 0.9.0 ou plus récent.
+
+### Ajouté
+
+- Lecture des prix de l'hôtel des ventes de `NaowhForever.lua` (`ahPrices` et `marketHistory`),
+  dans la même lecture que les recettes : plus bas prix, médiane, annonces et heure de passage de
+  chaque objet, jours d'historique. Document au format 9 : chaque compte est renvoyé une fois. Les
+  variantes à suffixe, rangées par nom traduit, ne sont pas transmises.
+- Lecture du flux de prix de l'addon (`Interface\AddOns\NaowhForever_AuctionData\Prices.lua`) :
+  seulement le littéral `ns.AuctionFeed`, sans jamais exécuter le fichier. Seule la région qu'un scan
+  Naowh des comptes désigne est envoyée (20 objets au moins à 1 % près, comme l'addon) ; sans scan,
+  une information le dit. `watch` ne le renvoie que s'il a changé (`naowhFeedHashes` dans
+  `state.json`).
+- `scan` affiche, par maison, le nombre d'objets et de jours d'historique, puis le résumé du flux.
+- Une clé de maison, un prix ou un jour invalide donnent un avertissement, sans bloquer la
+  synchronisation.
+
+### Modifié
+
+- Le document grossit d'environ 1 Mo par maison et de 1,1 Mo pour le flux. Sur le PC de référence :
+  de 7,9 à 12,2 Mo, pour une limite de 24 Mo.
+
 ## Site 0.37.3 — 2026-11-27
 
 Aucune migration, aucun changement d'agent.

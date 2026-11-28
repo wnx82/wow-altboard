@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using AltBoardSync.Core.App;
 using AltBoardSync.Core.Config;
+using AltBoardSync.Core.Economy;
 using AltBoardSync.Core.IO;
 
 namespace AltBoardSync.Tests;
@@ -390,6 +391,40 @@ public class WatchTests
     }
 
     [Fact]
+    public async Task The_naowh_price_feed_is_sent_again_only_when_its_file_changes()
+    {
+        using var h = new Harness();
+        var folder = Path.GetDirectoryName(h.Temp.AddAccount(h.Flavor, "111111111#1", "account-two-characters.lua"))!;
+        File.Copy(Fixture.PathOf("naowh-market-small.lua"), Path.Combine(folder, "NaowhForever.lua"));
+        var addon = Directory.CreateDirectory(Path.Combine(h.Flavor, "Interface", "AddOns", NaowhFeedReader.AddonFolder)).FullName;
+        var feed = Path.Combine(addon, NaowhFeedReader.FileName);
+        File.Copy(Fixture.PathOf("naowh-feed-small.lua"), feed);
+        var server = new RecordingServer();
+        h.Start(server);
+        await Eventually(() => server.Bodies.Count == 1, "l'envoi du démarrage");
+
+        h.Control.RequestSync();
+        await Eventually(() => server.Bodies.Count == 2, "l'envoi demandé");
+
+        // Un flux modifié seul ne déclenche rien : il part avec la synchronisation suivante.
+        File.WriteAllText(feed, File.ReadAllText(feed).Replace("time = 1795839703", "time = 1795926103"));
+        await Quiet();
+        Assert.Equal(2, server.Bodies.Count);
+        h.Control.RequestSync();
+        await Eventually(() => server.Bodies.Count == 3, "l'envoi demandé après la modification du flux");
+
+        var bodies = server.Bodies.Select(body => JsonDocument.Parse(body).RootElement).ToArray();
+        var first = Assert.Single(bodies[0].GetProperty("naowhFeeds").EnumerateArray());
+        Assert.Equal((3, 1795839703L), (first.GetProperty("region").GetInt32(), first.GetProperty("time").GetInt64()));
+        Assert.Equal(2, bodies[0].GetProperty("accounts")[0].GetProperty("naowhMarket").GetProperty("houses").GetArrayLength());
+        Assert.False(bodies[1].TryGetProperty("naowhFeeds", out _));
+        Assert.Equal(1795926103L, bodies[2].GetProperty("naowhFeeds")[0].GetProperty("time").GetInt64());
+
+        Assert.Contains("flux de prix de NaowhForever (_classic_beta_, région 3) : 3 hôtels des ventes envoyés", h.Log);
+        Assert.Contains("\"naowhFeedHashes\"", File.ReadAllText(Path.Combine(h.Home, "state.json")));
+    }
+
+    [Fact]
     public async Task A_state_file_written_before_agent_0_7_0_still_lets_the_watch_send()
     {
         using var h = new Harness();
@@ -418,11 +453,13 @@ public class WatchTests
         var older = store.Load();
         Assert.Equal("1234", older.Fingerprints["_retail_/a"]);
         Assert.Empty(older.ItemNameHashes);
+        Assert.Empty(older.NaowhFeedHashes);
 
-        File.WriteAllText(store.StatePath, """{"fingerprints":null,"itemNameHashes":null}""");
+        File.WriteAllText(store.StatePath, """{"fingerprints":null,"itemNameHashes":null,"naowhFeedHashes":null}""");
         var nulls = store.Load();
         Assert.Empty(nulls.Fingerprints);
         Assert.Empty(nulls.ItemNameHashes);
+        Assert.Empty(nulls.NaowhFeedHashes);
     }
 
     [Fact]

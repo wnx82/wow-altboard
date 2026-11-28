@@ -264,12 +264,62 @@ repérées en jeu ([RESALE](RESALE.md)), tous deux facultatifs :
 - Compatibilité : un serveur antérieur au site 0.37.0 refuse ces champs, comme `runs` et
   `addonErrors` (schéma strict).
 
+### Prix NaowhForever (facultatif)
+
+Bloc facultatif par compte, ajouté par l'agent 0.12.0 quand `NaowhForever.lua` contient des prix de
+l'hôtel des ventes (`ahPrices`) ou leur historique (`marketHistory`) :
+
+```json
+"naowhMarket": {
+  "file": { "hash": "<SHA-256>", "modifiedAt": "2026-11-28T09:00:00+00:00", "size": 4310227 },
+  "houses": [
+    { "key": "Royaume Test PvE-Alliance", "contentHash": "<SHA-256 des heures, prix et jours>",
+      "scannedAt": 1795817357, "medianAt": 1795817357, "recordedAt": 1795839703,
+      "items": [[2589, 15, 17, 610, 1795852696], [4306, 24000, null, 3, null]],
+      "days": [{ "day": "2026-11-27", "items": [[2589, 16, 598], [4306, 23500, null]] }] }
+  ]
+}
+```
+
+- `key` : `<royaume>-<camp>`, camp `Alliance`, `Horde` ou `Blackwater` ; royaume de 1 à 80
+  caractères, numéro du serveur quand le jeu n'en donnait pas. `items` : `[objet, plus bas, médiane,
+  annonces, revu à]`, triés par objet, sans double, au moins un des deux prix ; `days` : `[objet,
+  médiane, annonces]`, jours `AAAA-MM-JJ` triés. Prix à l'unité en pièces de cuivre, au moins 1 ;
+  heures en secondes Unix. 20 maisons au plus (clé unique), 30 000 objets par maison et par jour,
+  31 jours. Une autre forme fait refuser le document (422 `invalid_payload`). Format et sens des
+  champs : [NAOWH-MARKET-DATA-MODEL](NAOWH-MARKET-DATA-MODEL.md).
+- Un contenu déjà reçu (même maison, compte et `contentHash`) n'est pas réimporté. Chaque prix n'est
+  remplacé que par un relevé au moins aussi récent, chaque jour que par un historique écrit plus tard.
+  La réponse ajoute `naowhHousesImported`, `naowhHousesUnchanged`, `naowhPrices` et `naowhDays`
+  (lignes ajoutées ou modifiées).
+
+Champ `naowhFeeds` du document : le flux de prix livré avec l'addon (`NaowhForever_AuctionData`), un
+par client, pour la région que désignent les scans Naowh des comptes du client :
+
+```json
+"naowhFeeds": [
+  { "flavor": "_forever_", "file": { "hash": "<SHA-256>", "modifiedAt": "…", "size": 1953311 },
+    "time": 1795839703, "region": 3,
+    "houses": [{ "id": 114, "faction": "Horde", "items": [[2589, 14, 16, 402], [4306, 22000, null, null]] }] }
+]
+```
+
+- `time` : heure des données de Blizzard. `houses` : 50 au plus, identifiant unique, camp
+  `Alliance`, `Horde` ou `Blackwater` ; `items` : `[objet, plus bas, médiane, annonces]`, 1 à 30 000,
+  triés par objet. 10 clients au plus, sans double.
+- Une maison n'est remplacée, en bloc, que par des données de Blizzard plus récentes. La réponse
+  ajoute `naowhFeedHousesImported` et `naowhFeedHousesUnchanged`.
+- Une heure de ces deux blocs (`scannedAt`, `medianAt`, `recordedAt`, revu à, jour, `time`) plus
+  d'une heure après l'heure du serveur fait refuser le document (422 `future_timestamp`).
+- Compatibilité : un serveur antérieur au site 0.38.0 refuse ces champs (schéma strict).
+
 Le schéma complet, avec ses bornes, est `web/src/lib/sync/schema.ts` ; son miroir côté agent est
 `agent/src/AltBoardSync.Core/Sync/SyncPayload.cs`. Le fichier
 `tests/fixtures/payloads/two-accounts.json`, produit par l'agent réel, sert de contrat aux tests de l'API ;
 `tests/fixtures/payloads/economy-account.json` fait de même pour les prix et les recettes, et
 `tests/fixtures/payloads/baganator-account.json` pour le courrier, les enchères et les banques de guilde,
-`tests/fixtures/payloads/ezauctioneer-account.json` pour les scans EZAuctioneer.
+`tests/fixtures/payloads/ezauctioneer-account.json` pour les scans EZAuctioneer et
+`tests/fixtures/payloads/naowh-account.json` pour les prix NaowhForever.
 
 ### Réponse `200`
 
@@ -333,7 +383,7 @@ pas recréés.
 | 415 | `unsupported_media_type` | corps non JSON |
 | 422 | `unsupported_schema_version` | `schemaVersion` inconnu (`supported` liste les versions acceptées) |
 | 422 | `invalid_payload` | schéma non respecté (`issues` : chemins et codes, jamais les valeurs) |
-| 422 | `future_timestamp` | un horodatage d'un personnage (`lastSeen`, `statsAt`, sacs, banque, temps de jeu, sessions) ou d'un scan EZAuctioneer dépasse de plus d'une heure l'heure du serveur : horloge du PC en avance (`issues` : chemins, vingt au plus) |
+| 422 | `future_timestamp` | un horodatage d'un personnage (`lastSeen`, `statsAt`, sacs, banque, temps de jeu, sessions), d'un scan EZAuctioneer ou d'un prix NaowhForever dépasse de plus d'une heure l'heure du serveur : horloge du PC en avance (`issues` : chemins, vingt au plus) |
 | 429 | `rate_limited` | plus de 60 requêtes en 5 minutes, ou 10 échecs d'authentification en 15 minutes |
 | 500 | `internal_error` | erreur de traitement : la synchronisation entière est annulée ; `sync_errors` et le journal n'en gardent que le type et le code PostgreSQL ou réseau |
 | 503 | `service_unavailable` | base injoignable : réessayer plus tard |

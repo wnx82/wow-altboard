@@ -126,6 +126,21 @@ Séparées des tables d'Auctionator : les clés de marché des deux addons ne se
 | `market_item_scans` | `(scan_market_id, item_key, scanned_at)` | Un relevé : objet (`item_id`, tiré de la clé `i:<objet>[:s…]`), 25e percentile du prix (strictement positif), unités en vente. Jamais modifié une fois reçu ; résumé par jour au-delà de 60 jours |
 | `market_item_scan_days` | `(scan_market_id, item_key, day)` | Un objet, un jour (heure de Bruxelles) au-delà de 60 jours : plus bas, médiane, plus haut des prix (plus bas ≤ médiane ≤ plus haut), plus grand nombre d'unités, nombre de scans |
 
+### Prix NaowhForever
+
+Voir [NAOWH-MARKET-DATA-MODEL](NAOWH-MARKET-DATA-MODEL.md). Ajoutées par `0027_naowh_market`.
+Séparées des tables d'Auctionator et d'EZAuctioneer : les maisons de Naowh n'y sont pas encore
+rapprochées. Prix à l'unité, en pièces de cuivre, strictement positifs.
+
+| Table | Clé | Contenu |
+|---|---|---|
+| `naowh_houses` | `id` ; unique `(flavor, house_key)` | Une maison vue par NaowhForever : client, clé de l'addon (`<royaume>-<camp>`), royaume (nom que donne le jeu, ou numéro du serveur), camp (`Alliance`, `Horde` ou `Blackwater`), première et dernière réception |
+| `naowh_imports` | `id` ; unique `(house_id, account_id, content_hash)` | Un contenu reçu : compte (supprimé avec lui), machine, synchronisation (null si purgée), empreinte et date du fichier, heure du scan, objets, jours. Un même contenu n'est importé qu'une fois |
+| `naowh_prices` | `(house_id, item_id)` | Dernier prix connu d'un objet : plus bas et annonces, datés par `priced_at` ; médiane pondérée par la quantité, datée par `median_at`. Un des deux prix au moins. Chacun n'est remplacé que par un relevé au moins aussi récent |
+| `naowh_price_days` | `(house_id, item_id, day)` | Un objet, un jour UTC (jour de l'addon) : médiane, annonces, heure de l'historique reçu (`recorded_at`). Remplacé seulement par un historique écrit plus tard ; gardé sans limite |
+| `naowh_feed_houses` | `id` ; unique `(flavor, region, blizzard_house_id)` | Une maison du flux de prix livré avec l'addon : client, région (1 Amériques, 3 Europe), identifiant de Blizzard, camp, heure des données de Blizzard (`feed_time`), empreinte du fichier, objets |
+| `naowh_feed_prices` | `(feed_house_id, item_id)` | Prix d'un objet dans la dernière version du flux : plus bas, médiane, annonces. Remplacés en bloc par une version plus récente |
+
 ### Revente
 
 Portefeuille et affaires d'EZAuctioneer (agent 0.11.0), voir [RESALE](RESALE.md). Ajoutées par
@@ -210,6 +225,7 @@ synchronisations :
 | Personnages | ceux du compte, avec leurs tables filles et leurs snapshots |
 | Marché | les `market_imports` du compte ; `market_item_latest.import_id` passe à null. Les prix de `market_item_days` restent : fusionnés jour par jour avec ceux des autres comptes, ils ne s'en séparent plus |
 | Scans | les `scan_imports` du compte (cascade). Les relevés de `market_item_scans` restent : un même relevé peut venir de plusieurs comptes |
+| Prix NaowhForever | les `naowh_imports` du compte (cascade). Les prix et les jours restent : déjà fusionnés avec ceux des autres comptes |
 | Revente | les portefeuilles du compte, avec positions, annonces et journal (cascade), et ses erreurs d'addon. Les affaires (`resale_deals`) restent : elles appartiennent au marché |
 | Liens | les lignes `machine_accounts` du compte, puis le compte lui-même |
 | Royaumes | un royaume resté sans personnage est supprimé |
@@ -255,6 +271,8 @@ En cas d'erreur, tout est annulé, puis l'échec est journalisé à part (`sync_
 | Session de jeu (`sessions`) | Ajoutée, jamais retirée, même quand `lastSeen` est plus ancien. Une session close remplace sa version ouverte ; une version ouverte n'en remplace une autre que si elle est au moins aussi récente, et jamais une session close |
 | Journée de finances (`finances`) | Rangée par PC : le fichier d'un PC remplace ses propres journées, même quand `lastSeen` est plus ancien, et ne touche pas celles d'un autre PC. Un jour sorti du fichier reste en base. La page additionne les PC, sauf une journée identique reçue de deux PC (dossier `WTF` copié), comptée une fois |
 | Noms du cache du jeu (`itemNames`) | Langue `frFR` seulement ; remplace le nom existant (source `client`), garde la qualité connue |
+| Prix NaowhForever (`naowhMarket`) | Contenu déjà reçu du compte : rien. Sinon, plus bas et médiane remplacés chacun par un relevé au moins aussi récent (ou si le prix connu n'était pas daté), jour d'historique par un historique écrit plus tard. Seules les lignes nouvelles ou modifiées sont écrites |
+| Flux de prix NaowhForever (`naowhFeeds`) | Une maison remplacée en bloc par des données de Blizzard plus récentes ; une maison absente d'une version garde la précédente |
 
 Tous les hash sont calculés sur un JSON **canonique** (clés triées) : le client WoW réécrit ses
 tables dans un ordre différent à chaque sauvegarde.
@@ -307,6 +325,9 @@ les scans d'une période et la purge, `scan_imports(account_id)` et `scan_import
 pour la suppression d'un compte et la purge du journal.
 Depuis le site 0.37.0 (migration `0026`) : `resale_events(portfolio_id, occurred_at)` et
 `account_addon_errors(account_id, occurred_at)`.
+Depuis le site 0.38.0 (migration `0027`) : `naowh_price_days(house_id, day)` pour l'historique
+d'une maison, `naowh_imports(account_id)` et `naowh_imports(sync_run_id)` pour la suppression d'un
+compte et la purge du journal.
 
 ## Durée de conservation
 
@@ -371,6 +392,7 @@ Derrière PgBouncer, les migrations passent en connexion directe. Le suivi est t
 | `0024_notes_checklists` | `character_notes`, `character_tags`, `checklist_items`, `checklist_item_characters`, `checklist_checks` et leurs index, colonnes `app_settings.reset_hour` et `reset_weekday` (ajouts seuls) |
 | `0025_price_alert_notices` | colonne `price_alerts.notified_at` (ajout seul). Les alertes existantes la reçoivent à l'heure de la migration : aucun seuil déjà franchi n'est annoncé. `price` ajouté à `app_settings.notify_events` quand une liste y est enregistrée. Aucune ligne supprimée |
 | `0026_resale_runs_errors` | `resale_portfolios`, `resale_positions`, `resale_auctions`, `resale_events`, `resale_deals`, `character_runs`, `account_addon_errors` et leurs index (ajouts seuls) |
+| `0027_naowh_market` | `naowh_houses`, `naowh_imports`, `naowh_prices`, `naowh_price_days`, `naowh_feed_houses`, `naowh_feed_prices` et leurs index (ajouts seuls) |
 
 ## Checkpoint B
 

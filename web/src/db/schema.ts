@@ -888,6 +888,154 @@ export const marketItemScanDays = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// NaowhForever : prix de l'hôtel des ventes relevés par l'addon (agent 0.12.0, voir
+// docs/NAOWH-MARKET-DATA-MODEL.md)
+// ---------------------------------------------------------------------------
+
+// Une maison telle que l'addon la nomme (« <royaume>-<camp> ») : royaume rendu par le jeu, ou numéro
+// du serveur quand il n'en donnait pas ; camp Alliance, Horde ou Blackwater (HV neutre). Non
+// rapprochée ici des marchés d'Auctionator ni d'EZAuctioneer.
+export const naowhHouses = pgTable(
+  "naowh_houses",
+  {
+    id: id(),
+    flavor: text("flavor").notNull(),
+    houseKey: text("house_key").notNull(),
+    realm: text("realm").notNull(),
+    side: text("side").notNull(),
+    firstSeenAt: ts("first_seen_at").notNull().defaultNow(),
+    lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("naowh_houses_flavor_house_key_key").on(t.flavor, t.houseKey),
+    check("naowh_houses_side_check", sql`${t.side} in ('Alliance', 'Horde', 'Blackwater')`),
+  ],
+);
+
+const naowhHouseId = () =>
+  bigint("house_id", { mode: "number" })
+    .notNull()
+    .references(() => naowhHouses.id, { onDelete: "cascade" });
+
+// Une version des prix d'une maison reçue d'un compte. Un contenu identique renvoyé n'est pas
+// réimporté. Supprimer le compte supprime ses imports ; les prix restent, déjà fusionnés.
+export const naowhImports = pgTable(
+  "naowh_imports",
+  {
+    id: id(),
+    houseId: naowhHouseId(),
+    accountId: bigint("account_id", { mode: "number" })
+      .notNull()
+      .references(() => wowAccounts.id, { onDelete: "cascade" }),
+    machineId: bigint("machine_id", { mode: "number" }).references(() => machines.id),
+    syncRunId: bigint("sync_run_id", { mode: "number" }).references(() => syncRuns.id, { onDelete: "set null" }),
+    contentHash: text("content_hash").notNull(),
+    fileHash: text("file_hash").notNull(),
+    fileModifiedAt: ts("file_modified_at").notNull(),
+    scannedAt: ts("scanned_at"),
+    itemsCount: integer("items_count").notNull(),
+    daysCount: integer("days_count").notNull(),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("naowh_imports_house_account_content_key").on(t.houseId, t.accountId, t.contentHash),
+    index("naowh_imports_account_idx").on(t.accountId),
+    index("naowh_imports_sync_run_idx").on(t.syncRunId),
+  ],
+);
+
+// Dernier prix connu de chaque objet d'une maison : plus bas prix d'achat immédiat et médiane
+// pondérée par la quantité, à l'unité, en pièces de cuivre ; annonces avec prix d'achat immédiat.
+// priced_at : heure du plus bas (revu en parcourant l'hôtel des ventes, sinon scan complet) ;
+// median_at : heure du scan rapide qui a donné la médiane. Chaque prix n'est remplacé que par un
+// relevé plus récent : un PC au fichier ancien ne fait pas reculer la maison.
+export const naowhPrices = pgTable(
+  "naowh_prices",
+  {
+    houseId: naowhHouseId(),
+    itemId: integer("item_id").notNull(),
+    lowCopper: bigint("low_copper", { mode: "number" }),
+    listed: integer("listed"),
+    pricedAt: ts("priced_at"),
+    medianCopper: bigint("median_copper", { mode: "number" }),
+    medianAt: ts("median_at"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.houseId, t.itemId] }),
+    check(
+      "naowh_prices_values_check",
+      sql`(${t.lowCopper} is null or ${t.lowCopper} > 0) and (${t.medianCopper} is null or ${t.medianCopper} > 0) and (${t.listed} is null or ${t.listed} >= 0) and (${t.lowCopper} is not null or ${t.medianCopper} is not null)`,
+    ),
+  ],
+);
+
+// Historique de l'addon : médiane et annonces d'un objet un jour donné (jour UTC, comme l'addon).
+// Le jour en cours change à chaque scan ; il n'est remplacé que par un historique écrit plus tard
+// (recorded_at). L'addon n'en garde que 14 jours : le site les accumule.
+export const naowhPriceDays = pgTable(
+  "naowh_price_days",
+  {
+    houseId: naowhHouseId(),
+    itemId: integer("item_id").notNull(),
+    day: date("day", { mode: "string" }).notNull(),
+    medianCopper: bigint("median_copper", { mode: "number" }).notNull(),
+    listed: integer("listed"),
+    recordedAt: ts("recorded_at"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.houseId, t.itemId, t.day] }),
+    index("naowh_price_days_house_day_idx").on(t.houseId, t.day),
+    check("naowh_price_days_values_check", sql`${t.medianCopper} > 0 and (${t.listed} is null or ${t.listed} >= 0)`),
+  ],
+);
+
+// Un hôtel des ventes de Blizzard tel que le flux de prix livré avec NaowhForever le décrit : région
+// (1 Amériques, 3 Europe), identifiant de Blizzard, camp. Le flux ne dit pas quel royaume il dessert.
+// feed_time : heure des données de Blizzard ; seule la version la plus récente est gardée.
+export const naowhFeedHouses = pgTable(
+  "naowh_feed_houses",
+  {
+    id: id(),
+    flavor: text("flavor").notNull(),
+    region: integer("region").notNull(),
+    blizzardHouseId: integer("blizzard_house_id").notNull(),
+    faction: text("faction").notNull(),
+    feedTime: ts("feed_time").notNull(),
+    fileHash: text("file_hash").notNull(),
+    itemsCount: integer("items_count").notNull(),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [
+    unique("naowh_feed_houses_flavor_region_house_key").on(t.flavor, t.region, t.blizzardHouseId),
+    check("naowh_feed_houses_faction_check", sql`${t.faction} in ('Alliance', 'Horde', 'Blackwater')`),
+  ],
+);
+
+// Prix d'un objet dans une maison du flux : plus bas prix d'achat immédiat, médiane pondérée par la
+// quantité, annonces. Remplacés en bloc par une version plus récente du flux.
+export const naowhFeedPrices = pgTable(
+  "naowh_feed_prices",
+  {
+    feedHouseId: bigint("feed_house_id", { mode: "number" })
+      .notNull()
+      .references(() => naowhFeedHouses.id, { onDelete: "cascade" }),
+    itemId: integer("item_id").notNull(),
+    lowCopper: bigint("low_copper", { mode: "number" }).notNull(),
+    medianCopper: bigint("median_copper", { mode: "number" }),
+    listed: integer("listed"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.feedHouseId, t.itemId] }),
+    check(
+      "naowh_feed_prices_values_check",
+      sql`${t.lowCopper} > 0 and (${t.medianCopper} is null or ${t.medianCopper} > 0) and (${t.listed} is null or ${t.listed} >= 0)`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Revente : portefeuille et affaires d'EZAuctioneer (agent 0.11.0, voir docs/RESALE.md)
 // ---------------------------------------------------------------------------
 

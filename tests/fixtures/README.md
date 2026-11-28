@@ -17,6 +17,9 @@ Aucun nom de dossier de compte réel n'y figure.
 | `payloads/baganator-account.json` | document produit par l'agent 0.8.0 à partir de `account-four-characters.lua` et `syndicator-small.lua` ; contrat du bloc `baganator` |
 | `ezauctioneer-small.lua` | écrit à la main sur le modèle d'un `EZAuctioneer.lua` réel (base version 5) : royaume fictif. Relevés dans le désordre, objet à suffixe, relevé à prix nul, clé d'objet inconnue, marché neutre vide, rapport de scan en double, scan refusé, scan d'un autre addon, portefeuille d'un personnage fictif (transmis depuis l'agent 0.11.0), bonne affaire sans type (ignorée) |
 | `payloads/ezauctioneer-account.json` | document produit par l'agent 0.11.0 à partir de `account-four-characters.lua` et `ezauctioneer-small.lua` ; contrat du bloc `ezAuctioneer` (scans et portefeuilles) et de `addonErrors` |
+| `naowh-market-small.lua` | écrit à la main sur le modèle d'un `NaowhForever.lua` réel (NaowhForever 1.5.1), `ahPrices` et `marketHistory` seulement : royaume fictif. Médianes à décimales, prix nul, clé d'objet non numérique, annonces non entières, heure de passage invalide, objet à médiane seule, jours passés en chaînes et jour en cours en tables avec un prix négatif, clé de jour invalide, maison sans camp, maison à l'historique seul nommée par le numéro du serveur |
+| `naowh-feed-small.lua` | écrit à la main sur le modèle du `Prices.lua` réel de NaowhForever_AuctionData : maisons fictives. Une maison concordant avec `naowh-market-small.lua` (25 objets à 1 % près), une vide, une Horde, une Blackwater avec un objet sans annonces et un prix de 10¹² pièces de cuivre, une au camp inconnu, une autre région |
+| `payloads/naowh-account.json` | document produit par l'agent 0.12.0 à partir de `account-four-characters.lua`, `naowh-market-small.lua` et `naowh-feed-small.lua` ; contrat du bloc `naowhMarket` et de `naowhFeeds` |
 
 ## Régénérer
 
@@ -55,3 +58,8 @@ les rattache à aucun GUID.
 
 Pour `payloads/ezauctioneer-account.json`, même démarche avec `account-four-characters.lua` (renommé
 `AltBoard.lua`) et `ezauctioneer-small.lua` (renommé `EZAuctioneer.lua`).
+
+Pour `payloads/naowh-account.json`, même démarche avec `account-four-characters.lua` (renommé
+`AltBoard.lua`) et `naowh-market-small.lua` (renommé `NaowhForever.lua`), plus `naowh-feed-small.lua`
+copié en `_forever_/Interface/AddOns/NaowhForever_AuctionData/Prices.lua` du même dossier
+temporaire. Remplacer aussi le `modifiedAt` des fichiers par une date fixe.

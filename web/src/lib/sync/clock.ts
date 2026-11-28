@@ -41,6 +41,16 @@ export function futureTimestamps(payload: SyncPayload, now: Date, toleranceSecon
       market.scans.forEach((scan, s) => check(`${at}.scans.${s}.at`, scan.at));
       market.items.forEach((item, i) => item.samples.forEach(([time], s) => check(`${at}.items.${i}.samples.${s}.0`, time)));
     });
+    // Un prix ou un jour de NaowhForever daté dans le futur ne serait plus remplacé jusqu'à cette date.
+    account.naowhMarket?.houses.forEach((house, h) => {
+      const at = `accounts.${a}.naowhMarket.houses.${h}`;
+      check(`${at}.scannedAt`, house.scannedAt);
+      check(`${at}.medianAt`, house.medianAt);
+      check(`${at}.recordedAt`, house.recordedAt);
+      house.items.forEach(([, , , , seenAt], i) => check(`${at}.items.${i}.4`, seenAt ?? undefined));
+      house.days.forEach((day, d) => check(`${at}.days.${d}.day`, Date.parse(`${day.day}T00:00:00Z`) / 1000));
+    });
   });
+  payload.naowhFeeds?.forEach((feed, f) => check(`naowhFeeds.${f}.time`, feed.time));
   return found;
 }

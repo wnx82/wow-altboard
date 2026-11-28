@@ -189,6 +189,8 @@ public sealed class AgentApp(AgentEnvironment env)
                 }
                 if (payload.Recipes is { } recipes)
                     env.Out.WriteLine($"  NaowhForever : {Plural(recipes.Characters.Sum(c => c.Recipes.Count), "recette", "recettes")}");
+                foreach (var house in payload.NaowhMarket?.Houses ?? [])
+                    env.Out.WriteLine($"  NaowhForever « {house.Key} » : {Plural(house.Items.Count, "objet", "objets")}, {Plural(house.Days.Count, "jour", "jours")} d'historique");
                 if (payload.Baganator is { } baganator)
                 {
                     env.Out.WriteLine(
@@ -223,9 +225,29 @@ public sealed class AgentApp(AgentEnvironment env)
             }
         }
 
+        var naowhFeeds = new List<NaowhFeedPayload>();
+        foreach (var (flavor, flavorPath) in PayloadBuilder.Flavors(sources))
+        {
+            var read = await builder.ReadNaowhFeedAsync(flavor, flavorPath, knownHash: null, PayloadBuilder.NaowhHouses(accounts, flavor), cancellationToken).ConfigureAwait(false);
+            if (read?.Error is { } error)
+            {
+                env.Out.WriteLine($"avertissement : {error}");
+                _log.Warn(error);
+            }
+            else if (read?.Notice is { } notice)
+            {
+                env.Out.WriteLine($"information : {notice}");
+            }
+            else if (read?.Payload is { } feed)
+            {
+                env.Out.WriteLine($"Flux de prix de NaowhForever ({flavor}, région {feed.Region}) : {Plural(feed.Houses.Count, "hôtel des ventes", "hôtels des ventes")}, {Plural(feed.Houses.Sum(h => h.Items.Count), "prix", "prix")}");
+                naowhFeeds.Add(feed);
+            }
+        }
+
         env.Out.WriteLine();
 
-        var document = PayloadBuilder.Build(new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), accounts, Version, env.Now(), itemNames);
+        var document = PayloadBuilder.Build(new MachinePayload(config.MachineUuid, env.Hostname, config.MachineName), accounts, Version, env.Now(), itemNames, naowhFeeds);
         if (outFile is not null)
         {
             await File.WriteAllBytesAsync(outFile, JsonSerializer.SerializeToUtf8Bytes(document, SyncJsonContext.Default.SyncPayload), cancellationToken).ConfigureAwait(false);
